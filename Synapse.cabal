@@ -1,0 +1,47 @@
+cabal-version:      3.0
+name:               Synapse
+version:            0.1.0.0
+build-type:         Simple
+
+
+author:             JktuJQ
+maintainer:         odmamontov@gmail.com
+
+
+homepage:           https://github.com/JktuJQ/Synapse
+extra-doc-files:    README.md
+license:            MIT
+license-file:       LICENSE
+
+
+synopsis:
+    Synapse is a machine learning library written in pure Haskell.
+description:
+    Synapse is a machine learning library written in pure Haskell.
+category:           Math
+
+
+common warnings
+    ghc-options: -Wall
+
+
+library
+    import:           warnings
+    exposed-modules:  Synapse
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    base ^>=4.17.2.1
+    hs-source-dirs:   src
+    default-language: Haskell2010
+
+test-suite Synapse-test
+    import:           warnings
+    default-language: Haskell2010
+    -- other-modules:
+    -- other-extensions:
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        base ^>=4.17.2.1,
+        Synapse
