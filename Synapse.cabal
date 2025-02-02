@@ -28,9 +28,15 @@ common warnings
 library
     import:           warnings
     exposed-modules:  Synapse
+
+                    , Synapse.Tensors
+                    , Synapse.Tensors.Vec
+                    , Synapse.Tensors.Mat
+                    
     -- other-modules:
     -- other-extensions:
     build-depends:    base ^>=4.17.2.1
+                    , vector
     hs-source-dirs:   src
     default-language: Haskell2010
 
