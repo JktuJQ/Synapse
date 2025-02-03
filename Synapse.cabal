@@ -28,10 +28,28 @@ common warnings
 library
     import:           warnings
     exposed-modules:  Synapse
-
+                    
+                      -- Linear algebra
                     , Synapse.LinearAlgebra
-                    , Synapse.LinearAlgebra.Vec
                     , Synapse.LinearAlgebra.Mat
+                    , Synapse.LinearAlgebra.Vec
+                    
+                      -- ML
+                    , Synapse.ML
+
+                    , Synapse.ML.Layers
+                    , Synapse.ML.Layers.Constraints
+                    , Synapse.ML.Layers.Initializers
+                    , Synapse.ML.Layers.Regularizers
+
+                    , Synapse.ML.Models
+
+                    , Synapse.ML.Training
+                    , Synapse.ML.Training.Batching
+                    , Synapse.ML.Training.Hyperparameters
+                    , Synapse.ML.Training.Losses
+                    , Synapse.ML.Training.Metrics
+                    , Synapse.ML.Training.Optimisers
                     
     -- other-modules:
     -- other-extensions:
