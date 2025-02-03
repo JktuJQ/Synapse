@@ -13,17 +13,13 @@ implements several mathematical operations on itself.
 
 
 module Synapse.Tensors.Vec
-    ( -- * @Vec@ datatype
+    ( -- * @Vec@ datatype and simple getters.
 
       Vec (Vec, unVec)
-    
-      -- * Functions
-
-      -- Getters
 
     , size
 
-      -- Constructors
+      -- * Constructors
 
     , empty
     , singleton
@@ -31,14 +27,14 @@ module Synapse.Tensors.Vec
     , generate
     , replicate
 
-      -- Concatenation
+      -- * Concatenation
 
     , cons
     , snoc
     , (++)
     , concat
     
-      -- Combining.
+      -- * Combining
 
     , map
     , imap
@@ -46,7 +42,7 @@ module Synapse.Tensors.Vec
     , zipWith
     , zip
     
-    -- Mathematics
+    -- * Mathematics
     
     , zeroes
     , ones
