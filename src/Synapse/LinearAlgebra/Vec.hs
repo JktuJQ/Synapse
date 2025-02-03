@@ -12,7 +12,7 @@ implements several mathematical operations on itself.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.Tensors.Vec
+module Synapse.LinearAlgebra.Vec
     ( -- * @Vec@ datatype and simple getters.
 
       Vec (Vec, unVec)
@@ -60,7 +60,7 @@ module Synapse.Tensors.Vec
     ) where
 
 
-import Synapse.Tensors (Approx(..), Indexable(..))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))

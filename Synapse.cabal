@@ -29,9 +29,9 @@ library
     import:           warnings
     exposed-modules:  Synapse
 
-                    , Synapse.Tensors
-                    , Synapse.Tensors.Vec
-                    , Synapse.Tensors.Mat
+                    , Synapse.LinearAlgebra
+                    , Synapse.LinearAlgebra.Vec
+                    , Synapse.LinearAlgebra.Mat
                     
     -- other-modules:
     -- other-extensions:

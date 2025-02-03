@@ -9,7 +9,7 @@ several useful function to work with them.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.Tensors
+module Synapse.LinearAlgebra
     ( -- * Typeclasses
       Approx((~==), (~/=), correct, roundTo)
     , Indexable(Index, unsafeIndex, index, safeIndex)
