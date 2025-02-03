@@ -162,6 +162,10 @@ toLists x = [[unsafeIndex x (r, c) | c <- [0..nCols x - 1] ] | r <- [0..nRows x 
 
 -- Typeclasses
 
+instance Show a => Show (Mat a) where
+    show mat = "(" ++ show (size mat) ++ "): " ++ show [indexRow mat r | r <- [0..nRows mat - 1]]
+
+
 instance Indexable Mat where
     type Index Mat = (Int, Int)
 
@@ -209,11 +213,17 @@ instance Floating a => Floating (Mat a) where
     atanh = fmap atanh
 
 instance Approx a => Approx (Mat a) where
-    (~==) x y = and $ zipWith (~==) x y
+    (~==) x@(Mat rows1 cols1 _ _ _ _) y@(Mat rows2 cols2 _ _ _ _)
+        | rows1 /= rows2 || cols1 /= cols2 = False
+        | otherwise                        = and [unsafeIndex x (r, c) ~== unsafeIndex y (r, c) | r <- [0..rows1 - 1], c <- [0..cols1 - 1]]
 
     correct x digits = fmap (`correct` digits) x
     roundTo x digits = fmap (`roundTo` digits) x
 
+instance Eq a => Eq (Mat a) where
+    (==) x@(Mat rows1 cols1 _ _ _ _) y@(Mat rows2 cols2 _ _ _ _)
+        | rows1 /= rows2 || cols1 /= cols2 = False
+        | otherwise                        = and [unsafeIndex x (r, c) == unsafeIndex y (r, c) | r <- [0..rows1 - 1], c <- [0..cols1 - 1]]
 
 instance Functor Mat where
     fmap f (Mat rows cols r0 c0 t x) = Mat rows cols r0 c0 t (fmap f x)
