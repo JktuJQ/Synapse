@@ -27,12 +27,23 @@ common warnings
 
 library
     import:           warnings
+    default-language: Haskell2010
+
+    build-depends:    base ^>=4.17.2.1
+                    , hashable
+                    , vector
+                    , unordered-containers
+
+    hs-source-dirs:   src
     exposed-modules:  Synapse
                     
                       -- Linear algebra
                     , Synapse.LinearAlgebra
                     , Synapse.LinearAlgebra.Mat
                     , Synapse.LinearAlgebra.Vec
+
+                      -- Autograd
+                    , Synapse.Autograd
                     
                       -- ML
                     , Synapse.ML
@@ -53,10 +64,6 @@ library
                     
     -- other-modules:
     -- other-extensions:
-    build-depends:    base ^>=4.17.2.1
-                    , vector
-    hs-source-dirs:   src
-    default-language: Haskell2010
 
 test-suite Synapse-test
     import:           warnings
