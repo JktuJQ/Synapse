@@ -49,7 +49,7 @@ module Synapse.LinearAlgebra.Mat
     , diagonal
     , flatten
 
-      -- * Combining
+     -- * Combining
 
     , map
     , for
@@ -92,7 +92,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!))
+import Synapse.LinearAlgebra (FunctorNumOps, Approx(..), Indexable(..), (!))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -100,7 +100,6 @@ import qualified Synapse.LinearAlgebra.Vec as SV
 import Prelude hiding (map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
 import Data.List (find)
-import Data.Maybe (isJust)
 import Data.Tuple (swap)
 
 import qualified Data.Vector as V
@@ -212,6 +211,9 @@ instance Floating a => Floating (Mat a) where
     acosh = fmap acosh
     atanh = fmap atanh
 
+instance FunctorNumOps Mat
+
+
 instance Approx a => Approx (Mat a) where
     (~==) x@(Mat rows1 cols1 _ _ _ _) y@(Mat rows2 cols2 _ _ _ _)
         | rows1 /= rows2 || cols1 /= cols2 = False
@@ -224,6 +226,7 @@ instance Eq a => Eq (Mat a) where
     (==) x@(Mat rows1 cols1 _ _ _ _) y@(Mat rows2 cols2 _ _ _ _)
         | rows1 /= rows2 || cols1 /= cols2 = False
         | otherwise                        = and [unsafeIndex x (r, c) == unsafeIndex y (r, c) | r <- [0..rows1 - 1], c <- [0..cols1 - 1]]
+
 
 instance Functor Mat where
     fmap f (Mat rows cols r0 c0 t x) = Mat rows cols r0 c0 t (fmap f x)
@@ -370,15 +373,15 @@ zipWith f a b = let (rows, cols) = (min (nRows a) (nRows b), min (nCols a) (nCol
 
 -- Operations with matrices
 
--- | Sets new size for a matrix and uses given element for new entries if the matrix is extended.
+-- | Sets new size for a matrix relative to top left corner and uses given element for new entries if the matrix is extended.
 setSize :: Mat a -> a -> (Int, Int) -> Mat a
 setSize mat x = flip generate $ \(r, c) -> if r < nRows mat && c < nCols mat then unsafeIndex mat (r, c) else x
 
--- | Extends matrix size using given element for new entries. The matrix is never reduced in size.
+-- | Extends matrix size relative to top left corner using given element for new entries. The matrix is never reduced in size.
 extend :: Mat a -> a -> (Int, Int) -> Mat a
 extend mat x (rows, cols) = setSize mat x (max (nRows mat) rows, max (nCols mat) cols)
 
--- | Shrinks matrix size. The matrix is never extended in size.
+-- | Shrinks matrix size relative to top left corner. The matrix is never extended in size.
 shrink :: Mat a -> (Int, Int) -> Mat a
 shrink mat (rows, cols) = setSize mat undefined (min (nRows mat) rows, min (nCols mat) cols)
 
@@ -493,12 +496,12 @@ det mat@(Mat rows cols _ _ t _)
                                                                  unsafeIndex x (1, 0) * unsafeIndex x (0, 1)
                                determinant x                   = sum [((-1) ^ i) * (indexRow x 0 ! i) * determinant (minor x (0, i))
                                                                       | i <- [0..nCols x - 1]]
-                     in determinant mat'
+                           in determinant mat'
 
 -- | Row reduced echelon form of matrix.
 rref :: (Eq a, Fractional a) => Mat a -> Mat a
 rref mat@(Mat rows cols _ _ _ _) = go mat 0 [0..rows - 1]
- where
+  where
     go :: (Fractional a, Eq a) => Mat a -> Int -> [Int] -> Mat a
     go m _ [] = m
     go m lead (r:rs) = case find ((0 /=) . unsafeIndex m) [(i, j) | j <- [lead..cols - 1], i <- [r..rows - 1]] of
@@ -518,4 +521,6 @@ inverse mat@(Mat rows cols _ _ _ _)
     | otherwise          = let mat' = mat <|> identity rows
                                reduced = rref mat'
                                (left, right, _, _) = split reduced (rows, cols)
-                           in if isJust $ V.find (== 0) (SV.unVec $ diagonal left) then Nothing else Just right
+                           in case V.find (== 0) (SV.unVec $ diagonal left) of
+                                  Nothing -> Just right
+                                  Just _  -> Nothing

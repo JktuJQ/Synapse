@@ -60,7 +60,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..))
+import Synapse.LinearAlgebra (FunctorNumOps(..), Approx(..), Indexable(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -121,6 +121,9 @@ instance Floating a => Floating (Vec a) where
     asinh = fmap asinh
     acosh = fmap acosh
     atanh = fmap atanh
+
+instance FunctorNumOps Vec
+
 
 instance Approx a => Approx (Vec a) where
     (~==) x y = and $ zipWith (~==) x y
@@ -236,7 +239,7 @@ ones = flip generate (const 1)
 
 -- | Squared magnitude of a @Vec@.
 squaredMagnitude :: Num a => Vec a -> a
-squaredMagnitude = sum . map (^ (2 :: Int))
+squaredMagnitude = sum . (^. (2 :: Int))
 
 -- | Magnitude of a @Vec@.
 magnitude :: Floating a => Vec a -> a
@@ -244,17 +247,17 @@ magnitude = sqrt . squaredMagnitude
 
 -- | Clamps @Vec@ magnitude.
 clampMagnitude :: (Floating a, Ord a) => a -> Vec a -> Vec a
-clampMagnitude m x = map (* (min (magnitude x) m / magnitude x)) x
+clampMagnitude m x = x *. (min (magnitude x) m / magnitude x)
 
 -- | Normalizes @Vec@ by dividing each component by @Vec@ magnitude.
 normalized :: Floating a => Vec a -> Vec a
-normalized x = map (/ magnitude x) x
+normalized x = x /. magnitude x
 
 
 -- | Computes linear combination of @Vec@s. Returns empty @Vec@ if empty list was passed to this function.
 linearCombination :: Num a => [(a, Vec a)] -> Vec a
 linearCombination [] = empty
-linearCombination (x:xs) = foldl' (\acc (a, v) -> acc + fmap (* a) v) (fmap (* fst x) (snd x)) xs
+linearCombination (x:xs) = foldl' (\acc (a, v) -> acc + v *. a) (snd x *. fst x) xs
 
 -- | Calculates dot product of two @Vec@s.
 dot :: Num a => Vec a -> Vec a -> a
@@ -263,8 +266,8 @@ dot a b = sum $ zipWith (*) a b
 
 -- | Calculates an angle between two @Vec@s.
 angleBetween :: Floating a => Vec a -> Vec a -> a
-angleBetween a b = acos ((a `dot` b) / (magnitude a * magnitude b))
+angleBetween a b = acos $ (a `dot` b) / (magnitude a * magnitude b)
 
 -- | Linearly interpolates between two @Vec@s. Given parameter will be clamped between [0.0, 1.0].
 lerp :: (Floating a, Ord a) => a -> Vec a -> Vec a -> Vec a
-lerp k a b = b - fmap (* clamp (0.0, 1.0) k) (b - a)
+lerp k a b = b - (b - a) *. clamp (0.0, 1.0) k 
