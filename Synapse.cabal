@@ -61,11 +61,16 @@ library
 test-suite Synapse-test
     import:           warnings
     default-language: Haskell2010
-    -- other-modules:
-    -- other-extensions:
     type:             exitcode-stdio-1.0
+
+    build-depends:    base ^>=4.17.2.1
+                    , Synapse
+
+                    , HUnit
+
     hs-source-dirs:   test
     main-is:          Main.hs
-    build-depends:
-        base ^>=4.17.2.1,
-        Synapse
+    other-modules:    LinearAlgebraTest
+                    , AutogradTest
+    -- other-extensions:
+

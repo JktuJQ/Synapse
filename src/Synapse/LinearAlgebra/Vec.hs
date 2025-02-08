@@ -72,7 +72,7 @@ import qualified Data.Vector as V
 -- | Mathematical vector (collection of elements).
 newtype Vec a = Vec
     { unVec :: V.Vector a  -- ^ Internal representation
-    } deriving (Eq, Read, Show)
+    } deriving (Eq, Read)
 
 -- | Size of a vector - number of elements.
 size :: Vec a -> Int
@@ -80,6 +80,10 @@ size = V.length . unVec
 
 
 -- Typeclasses
+
+instance Show a => Show (Vec a) where
+    show (Vec x) = show x
+
 
 instance Indexable Vec where
     type Index Vec = Int
