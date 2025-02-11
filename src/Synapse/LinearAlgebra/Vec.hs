@@ -41,6 +41,13 @@ module Synapse.LinearAlgebra.Vec
     , for
     , zipWith
     , zip
+    , (+.)
+    , (-.)
+    , (*.)
+    , (/.)
+    , (^.)
+    , (^^.)
+    , (**.)
     
     -- * Mathematics
     
@@ -60,7 +67,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (FunctorNumOps(..), Approx(..), Indexable(..))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -125,8 +132,6 @@ instance Floating a => Floating (Vec a) where
     asinh = fmap asinh
     acosh = fmap acosh
     atanh = fmap atanh
-
-instance FunctorNumOps Vec
 
 
 instance Approx a => Approx (Vec a) where
@@ -228,6 +233,41 @@ zipWith f (Vec a) (Vec b) = Vec $ V.zipWith f a b
 -- | Zips two @Vec@s.
 zip :: Vec a -> Vec b -> Vec (a, b)
 zip = zipWith (,)
+
+
+infixl 6 +.
+-- | Adds given value to every element of the @Vec@.
+(+.) :: Num a => Vec a -> a -> Vec a
+(+.) x n = map (+ n) x
+
+infixl 6 -.
+-- | Subtracts given value from every element of the @Vec@.
+(-.) :: Num a => Vec a -> a -> Vec a
+(-.) x n = map (subtract n) x
+
+infixl 7 *.
+-- | Multiplies every element of the @Vec@ by given value.
+(*.) :: Num a => Vec a -> a -> Vec a
+(*.) x n = map (* n) x
+
+infixl 7 /.
+-- | Divides every element of the @Vec@ by given value.
+(/.) :: Fractional a => Vec a -> a -> Vec a
+(/.) x n = map (/ n) x
+
+infixr 8 ^.
+-- | Exponentiates every element of the @Vec@ by given value.
+(^.) :: (Num a, Integral b) => Vec a -> b -> Vec a
+(^.) x n = map (^ n) x
+infixr 8 ^^.
+-- | Exponentiates every element of the @Vec@ by given value.
+(^^.) :: (Fractional a, Integral b) => Vec a -> b -> Vec a
+(^^.) x n = map (^^ n) x
+
+infixr 8 **.
+-- | Exponentiates every element of the @Vec@ by given value.
+(**.) :: Floating a => Vec a -> a -> Vec a
+(**.) x n = map (** n) x
 
 
 -- Functions that work on mathematical vector (type constraint refers to a number)

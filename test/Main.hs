@@ -5,9 +5,13 @@ module Main (main) where
 
 
 import qualified LinearAlgebraTest
+import qualified AutogradTest
 
-import Test.HUnit (runTestTTAndExit)
+import Test.HUnit (Test(TestList), runTestTTAndExit)
 
 
 main :: IO ()
-main = runTestTTAndExit LinearAlgebraTest.tests
+main = runTestTTAndExit $ TestList
+    [ LinearAlgebraTest.tests
+    , AutogradTest.tests
+    ]

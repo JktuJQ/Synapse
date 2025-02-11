@@ -11,8 +11,7 @@ several useful function to work with them.
 
 module Synapse.LinearAlgebra
     ( -- * Typeclasses
-      FunctorNumOps ((+.), (-.), (*.), (/.), (^.), (^^.), (**.))
-    , Approx ((~==), (~/=), correct, roundTo)
+      Approx ((~==), (~/=), correct, roundTo)
     , Indexable (Index, unsafeIndex, index, safeIndex)
     , (!)
     , (!?)
@@ -22,40 +21,6 @@ module Synapse.LinearAlgebra
     , closeToZero
     , closeToOne
     ) where
-
-
-infixl 6 +., -.
-infixl 7 *., /.
-infixr 8 ^., ^^., **.
--- | @FunctorNumOps@ class allows functors over numeric values to be easily modified. Operators are applied on the right by default implementations.
-class Functor f => FunctorNumOps f where
-    -- | Adds given value to every element of the functor.
-    (+.) :: Num a => f a -> a -> f a
-    (+.) x n = fmap (+ n) x
-
-    -- | Subtracts given value from every element of the functor.
-    (-.) :: Num a => f a -> a -> f a
-    (-.) x n = fmap (subtract n) x
-
-    -- | Multiplies every element of the functor by given value.
-    (*.) :: Num a => f a -> a -> f a
-    (*.) x n = fmap (* n) x
-
-    -- | Divides every element of the functor by given value.
-    (/.) :: Fractional a => f a -> a -> f a
-    (/.) x n = fmap (/ n) x
-
-    -- | Exponentiates every element of the functor by given value.
-    (^.) :: (Num a, Integral b) => f a -> b -> f a
-    (^.) x n = fmap (^ n) x
-
-    -- | Exponentiates every element of the functor by given value.
-    (^^.) :: (Fractional a, Integral b) => f a -> b -> f a
-    (^^.) x n = fmap (^^ n) x
-
-    -- | Exponentiates every element of the functor by given value.
-    (**.) :: Floating a => f a -> a -> f a
-    (**.) x n = fmap (** n) x
 
 
 infix 4 ~==, ~/=
