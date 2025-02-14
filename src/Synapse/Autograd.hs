@@ -38,7 +38,8 @@ module Synapse.Autograd
     , toList
     , getGradientsOf
     , wrt
-    , gradientN
+    , nthPartialGradient
+    , nthGradient
     ) where
 
 
@@ -49,6 +50,8 @@ import qualified Synapse.LinearAlgebra.Vec as V
 
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
+
+import Data.Foldable (foldl')
 
 import Data.Hashable (Hashable(..))
 
@@ -270,11 +273,12 @@ getGradientsOf differentiatedSymbol = Gradients $ HM.insert differentiatedSymbol
 wrt :: Symbolic a => Gradients a -> Symbol a -> Symbol a
 wrt gradients x = HM.findWithDefault (symbolicZero x) x $ unGradients gradients
 
--- | Takes Nth order gradient of one symbol wrt other symbol.
-gradientN :: Symbolic a => Int -> Symbol a -> Symbol a -> Symbol a
-gradientN n dNy dxN
-    | n < 0     = error "Can't take gradient of negative order"
-    | otherwise = go n dNy
-  where
-    go 0 y = y
-    go i y = go (i - 1) (getGradientsOf y `wrt` dxN)
+-- | Takes partial gradients wrt to all symbols in a list sequentially, returning last result.
+nthPartialGradient :: Symbolic a => Symbol a -> [Symbol a] -> Symbol a
+nthPartialGradient = foldl' $ \y x -> getGradientsOf y `wrt` x
+
+-- | Takes nth order gradient of one symbol wrt other symbol. If n is negative number, an error is returned.
+nthGradient :: Symbolic a => Int -> Symbol a -> Symbol a -> Symbol a
+nthGradient n y 
+    | n < 0 = error "Cannot take negative order gradient"
+    | otherwise = nthPartialGradient y . replicate n
