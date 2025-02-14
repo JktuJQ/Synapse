@@ -30,9 +30,13 @@ library
     default-language: Haskell2010
 
     build-depends:    base ^>=4.17.2.1
-                    , hashable
+
                     , vector
+
+                    , hashable
                     , unordered-containers
+                    
+                    , cereal
 
     hs-source-dirs:   src
     exposed-modules:  Synapse
@@ -49,6 +53,7 @@ library
                     , Synapse.ML
 
                     , Synapse.ML.Layers
+                    , Synapse.ML.Layers.Activations
                     , Synapse.ML.Layers.Constraints
                     , Synapse.ML.Layers.Initializers
                     , Synapse.ML.Layers.Regularizers
