@@ -8,8 +8,8 @@ implements several mathematical operations on itself.
 -}
 
 
--- This language pragma is needed to support @Indexable@ typeclass.
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @EndofunctorNumOps@ typeclasses.
 
 
 module Synapse.LinearAlgebra.Vec
@@ -33,7 +33,7 @@ module Synapse.LinearAlgebra.Vec
     , snoc
     , (++)
     , concat
-    
+
       -- * Combining
 
     , map
@@ -41,19 +41,12 @@ module Synapse.LinearAlgebra.Vec
     , for
     , zipWith
     , zip
-    , (+.)
-    , (-.)
-    , (*.)
-    , (/.)
-    , (^.)
-    , (^^.)
-    , (**.)
-    
+
     -- * Mathematics
-    
+
     , zeroes
     , ones
-    
+
     , squaredMagnitude
     , magnitude
     , clampMagnitude
@@ -61,13 +54,13 @@ module Synapse.LinearAlgebra.Vec
 
     , linearCombination
     , dot
-    
+
     , angleBetween
     , lerp
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..), EndofunctorNumOps(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -92,9 +85,7 @@ instance Show a => Show (Vec a) where
     show (Vec x) = show x
 
 
-instance Indexable Vec where
-    type Index Vec = Int
-
+instance Indexable Vec Int where
     unsafeIndex (Vec x) = V.unsafeIndex x
 
     index (Vec x) = (V.!) x
@@ -110,6 +101,9 @@ instance Num a => Num (Vec a) where
     abs = fmap abs
     signum = fmap signum
     fromInteger = singleton . fromInteger
+
+instance EndofunctorNumOps (Vec a) a where
+    efmap = fmap
 
 instance Fractional a => Fractional (Vec a) where
     (/) = zipWith (/)
@@ -235,41 +229,6 @@ zip :: Vec a -> Vec b -> Vec (a, b)
 zip = zipWith (,)
 
 
-infixl 6 +.
--- | Adds given value to every element of the @Vec@.
-(+.) :: Num a => Vec a -> a -> Vec a
-(+.) x n = map (+ n) x
-
-infixl 6 -.
--- | Subtracts given value from every element of the @Vec@.
-(-.) :: Num a => Vec a -> a -> Vec a
-(-.) x n = map (subtract n) x
-
-infixl 7 *.
--- | Multiplies every element of the @Vec@ by given value.
-(*.) :: Num a => Vec a -> a -> Vec a
-(*.) x n = map (* n) x
-
-infixl 7 /.
--- | Divides every element of the @Vec@ by given value.
-(/.) :: Fractional a => Vec a -> a -> Vec a
-(/.) x n = map (/ n) x
-
-infixr 8 ^.
--- | Exponentiates every element of the @Vec@ by given value.
-(^.) :: (Num a, Integral b) => Vec a -> b -> Vec a
-(^.) x n = map (^ n) x
-infixr 8 ^^.
--- | Exponentiates every element of the @Vec@ by given value.
-(^^.) :: (Fractional a, Integral b) => Vec a -> b -> Vec a
-(^^.) x n = map (^^ n) x
-
-infixr 8 **.
--- | Exponentiates every element of the @Vec@ by given value.
-(**.) :: Floating a => Vec a -> a -> Vec a
-(**.) x n = map (** n) x
-
-
 -- Functions that work on mathematical vector (type constraint refers to a number)
 
 -- | Creates @Vec@ of given length filled with zeroes.
@@ -283,7 +242,7 @@ ones = flip generate (const 1)
 
 -- | Squared magnitude of a @Vec@.
 squaredMagnitude :: Num a => Vec a -> a
-squaredMagnitude = sum . (^. (2 :: Int))
+squaredMagnitude x = sum (fmap (^ (2 :: Int)) x)
 
 -- | Magnitude of a @Vec@.
 magnitude :: Floating a => Vec a -> a
@@ -314,4 +273,4 @@ angleBetween a b = acos $ (a `dot` b) / (magnitude a * magnitude b)
 
 -- | Linearly interpolates between two @Vec@s. Given parameter will be clamped between [0.0, 1.0].
 lerp :: (Floating a, Ord a) => a -> Vec a -> Vec a -> Vec a
-lerp k a b = b - (b - a) *. clamp (0.0, 1.0) k 
+lerp k a b = b - (b - a) *. clamp (0.0, 1.0) k

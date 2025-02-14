@@ -8,8 +8,8 @@ combinations (matrix multiplication, elementwise operations).
 -}
 
 
--- This language pragma is needed to support @Indexable@ typeclass.
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @EndofunctorNumOps@ typeclasses.
 
 
 module Synapse.LinearAlgebra.Mat
@@ -59,14 +59,6 @@ module Synapse.LinearAlgebra.Mat
     , imapCol
     , zipWith
 
-    , (+.)
-    , (-.)
-    , (*.)
-    , (/.)
-    , (^.)
-    , (^^.)
-    , (**.)
-
       -- * Operations with matrices
 
     , setSize
@@ -101,7 +93,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!), EndofunctorNumOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -179,9 +171,7 @@ instance Show a => Show (Mat a) where
     show mat = "(" ++ show (size mat) ++ "): " ++ show (toLists mat)
 
 
-instance Indexable Mat where
-    type Index Mat = (Int, Int)
-
+instance Indexable Mat (Int, Int) where
     unsafeIndex x (r, c) = V.unsafeIndex (storage x) (indexMatToVec x (r, c))
 
     index x (r, c)
@@ -202,6 +192,8 @@ instance Num a => Num (Mat a) where
     signum = fmap signum
     fromInteger = singleton . fromInteger
 
+instance EndofunctorNumOps (Mat a) a where
+    efmap = fmap
 
 instance Fractional a => Fractional (Mat a) where
     (/) = zipWith (/)
@@ -381,42 +373,6 @@ zipWith :: (a -> b -> c) -> Mat a -> Mat b -> Mat c
 zipWith f a b = let (rows, cols) = (min (nRows a) (nRows b), min (nCols a) (nCols b))
                 in Mat rows cols cols 1 0 0 $
                    V.fromList [f (unsafeIndex a (r, c)) (unsafeIndex b (r, c)) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
-
-
-infixl 6 +.
--- | Adds given value to every element of the @Mat@.
-(+.) :: Num a => Mat a -> a -> Mat a
-(+.) x n = map (+ n) x
-
-infixl 6 -.
--- | Subtracts given value from every element of the @Mat@.
-(-.) :: Num a => Mat a -> a -> Mat a
-(-.) x n = map (subtract n) x
-
-infixl 7 *.
--- | Multiplies every element of the @Mat@ by given value.
-(*.) :: Num a => Mat a -> a -> Mat a
-(*.) x n = map (* n) x
-
-infixl 7 /.
--- | Divides every element of the @Mat@ by given value.
-(/.) :: Fractional a => Mat a -> a -> Mat a
-(/.) x n = map (/ n) x
-
-infixr 8 ^.
--- | Exponentiates every element of the @Mat@ by given value.
-(^.) :: (Num a, Integral b) => Mat a -> b -> Mat a
-(^.) x n = map (^ n) x
-
-infixr 8 ^^.
--- | Exponentiates every element of the @Mat@ by given value.
-(^^.) :: (Fractional a, Integral b) => Mat a -> b -> Mat a
-(^^.) x n = map (^^ n) x
-
-infixr 8 **.
--- | Exponentiates every element of the @Mat@ by given value.
-(**.) :: Floating a => Mat a -> a -> Mat a
-(**.) x n = map (** n) x
 
 
 -- Operations with matrices

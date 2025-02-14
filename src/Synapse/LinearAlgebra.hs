@@ -5,16 +5,16 @@ several useful function to work with them.
 -}
 
 
--- This language pragma is needed to support @Indexable@ typeclass.
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @Indexable@ and @EndofunctorNumOps@ typeclasses.
 
 
 module Synapse.LinearAlgebra
     ( -- * Typeclasses
       Approx ((~==), (~/=), correct, roundTo)
-    , Indexable (Index, unsafeIndex, index, safeIndex)
+    , Indexable (unsafeIndex, index, safeIndex)
     , (!)
     , (!?)
+    , EndofunctorNumOps (efmap, (+.), (-.), (*.), (/.), (**.))
 
       -- * Constants
     , epsilon
@@ -55,7 +55,7 @@ closeToOne :: Fractional a => a
 closeToOne = 0.9999
 
 instance Approx Float where
-    (~==) x y = let m = max (abs x) (abs y) 
+    (~==) x y = let m = max (abs x) (abs y)
                in (m < epsilon) || ((abs (x - y) / m) < epsilon)
 
     correct x digits = if x == -0.0 then 0.0 else n / mul
@@ -69,11 +69,11 @@ instance Approx Float where
           where
             (_, fractionalPart) = properFraction $ abs powered :: (Int, Float)
 
-    roundTo x digits = let mul = 10.0 ^ digits 
+    roundTo x digits = let mul = 10.0 ^ digits
                        in fromIntegral (round (x * mul) :: Int) / mul
 
 instance Approx Double where
-    (~==) x y = let m = max (abs x) (abs y) 
+    (~==) x y = let m = max (abs x) (abs y)
                in (m < epsilon) || ((abs (x - y) / m) < epsilon)
 
     correct x digits = if x == -0.0 then 0.0 else n / mul
@@ -87,31 +87,59 @@ instance Approx Double where
           where
             (_, fractionalPart) = properFraction $ abs powered :: (Int, Double)
 
-    roundTo x digits = let mul = 10.0 ^ digits 
+    roundTo x digits = let mul = 10.0 ^ digits
                        in fromIntegral (round (x * mul) :: Int) / mul
 
 
 -- | @Indexable@ typeclass provides indexing interface for datatypes. 
-class Indexable f where
-    -- | Type of index.
-    type Index f
-
+class Indexable f i | f -> i where
     -- | Unsafe indexing.
-    unsafeIndex :: f a -> Index f -> a
+    unsafeIndex :: f a -> i -> a
 
     -- | Indexing with bounds checking.
-    index :: f a -> Index f -> a
+    index :: f a -> i -> a
 
     -- | Safe indexing.
-    safeIndex :: f a -> Index f -> Maybe a
+    safeIndex :: f a -> i -> Maybe a
 
 
 infixl 9 !
 -- | Indexing with bounds checking (operator alias for @index@).
-(!) :: Indexable f => f a -> Index f -> a
+(!) :: Indexable f i => f a -> i -> a
 (!) = index
 
 -- | Safe indexing (operator alias for @safeIndex@).
 infixl 9 !?
-(!?) :: Indexable f => f a -> Index f -> Maybe a
+(!?) :: Indexable f i => f a -> i -> Maybe a
 (!?) = safeIndex
+
+
+infixl 6 +., -.
+infixl 7 *., /.
+infixr 8 **.
+-- | @EndofunctorNumOps@ class allows functors over numeric values to be easily modified. Operators are applied on the right by default implementations.
+class EndofunctorNumOps f a | f -> a where
+    -- | Endofunctor version of @fmap@.
+    efmap :: (a -> a) -> f -> f
+
+    -- | Adds given value to every element of the functor.
+    (+.) :: Num a => f -> a -> f
+    (+.) x n = efmap (+ n) x
+
+    -- | Subtracts given value from every element of the functor.
+    (-.) :: Num a => f -> a -> f
+    (-.) x n = efmap (subtract n) x
+
+    -- | Multiplies every element of the functor by given value.
+    (*.) :: Num a => f -> a -> f
+    (*.) x n = efmap (* n) x
+
+    -- | Divides every element of the functor by given value.
+    (/.) :: Fractional a => f -> a -> f
+    (/.) x n = efmap (/ n) x
+
+    -- | Exponentiates every element of the functor by given value.
+    (**.) :: Floating a => f -> a -> f
+    (**.) x n = efmap (** n) x
+
+    {-# MINIMAL efmap #-}

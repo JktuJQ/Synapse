@@ -12,6 +12,10 @@ and read more about it in @Symbol@ datatype docs.
 -}
 
 
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @EndofunctorNumOps@ typeclass.
+
+
 module Synapse.Autograd
     ( -- * @Symbol@ and @Symbolic@
 
@@ -21,6 +25,9 @@ module Synapse.Autograd
     , symbol
     , constSymbol
     , renameSymbol
+
+    , symbolicUnaryOp
+    , symbolicBinaryOp
 
     , transpose
     , matMul
@@ -34,6 +41,8 @@ module Synapse.Autograd
     , gradientN
     ) where
 
+
+import Synapse.LinearAlgebra (EndofunctorNumOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -110,6 +119,8 @@ which allows @Synapse@ to build a graph of computation and obtain needed gradien
 @symbolGradients@ list contains pairs: first element in that pair is symbol wrt which you can take gradient and
 the second element is closure that represents chain rule - it takes incoming local gradient of said symbol and multiplies it by local derivative.
 You can check out implementations of those operations in the source to give yourself a reference.
+
+Note on @EndofunctorNumOps@: @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
 -}
 data Symbol a = Symbol
     { symbolName      :: String                              -- ^ Name of a symbol (identifier for differentiation).
@@ -152,9 +163,11 @@ instance Symbolic a => Symbolic (Symbol a) where
     symbolicOne x = constSymbol $ symbolicOne $ unSymbol x
 
 
+-- | Converts unary operation into symbolic one.
 symbolicUnaryOp :: (a -> a) -> Symbol a -> [(Symbol a, Symbol a -> Symbol a)] -> Symbol a
 symbolicUnaryOp op x = Symbol "" (op (unSymbol x))
 
+-- | Converts binary operation into symbolic one.
 symbolicBinaryOp :: (a -> a -> a) -> Symbol a -> Symbol a -> [(Symbol a, Symbol a -> Symbol a)] -> Symbol a
 symbolicBinaryOp op a b = Symbol "" (op (unSymbol a) (unSymbol b))
 
@@ -166,6 +179,26 @@ instance Symbolic a => Num (Symbol a) where
     abs x = symbolicUnaryOp abs x [(x, signum)]
     signum x = symbolicUnaryOp signum x [(x, id)]
     fromInteger = constSymbol . fromInteger
+
+instance Symbolic a => EndofunctorNumOps (Symbol (Vec a)) a where
+    -- @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
+    efmap f (Symbol name value localGradients) = Symbol name (fmap f value) localGradients
+
+    (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (/.) x n = x / constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (**.) x n = x ** constSymbol (V.replicate (V.size $ unSymbol x) n)
+
+instance Symbolic a => EndofunctorNumOps (Symbol (Mat a)) a where
+    -- @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
+    efmap f (Symbol name value localGradients) = Symbol name (fmap f value) localGradients
+
+    (+.) x n = x + constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (-.) x n = x - constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (*.) x n = x * constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (/.) x n = x / constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (**.) x n = x ** constSymbol (M.replicate (M.size $ unSymbol x) n)
 
 instance (Symbolic a, Fractional a) => Fractional (Symbol a) where
     (/) a b = symbolicBinaryOp (/) a b [(a, (/ b)), (b, (* (negate a / (b * b))))]

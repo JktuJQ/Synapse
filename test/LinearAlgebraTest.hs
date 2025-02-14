@@ -6,7 +6,7 @@ module LinearAlgebraTest
     ) where
 
 
-import Synapse.LinearAlgebra ((!))
+import Synapse.LinearAlgebra ((!), EndofunctorNumOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -21,7 +21,7 @@ testVecOps :: Test
 testVecOps = TestLabel "testVecOps" $ TestList
     [ TestCase $ assertBool "true result == manual operations == linear combination" $
                  all (V.fromList [-1, 2, 5] ==)
-                     [vec1 V.*. 2 - vec2, V.linearCombination [(2, vec1), (-1, vec2)]]
+                     [vec1 *. 2 - vec2, V.linearCombination [(2, vec1), (-1, vec2)]]
     , TestCase $ assertEqual "addition" (V.replicate 3 4) (vec1 + vec2)
     , TestCase $ assertEqual "dot multiplication" 10 (vec1 `V.dot` vec2)
     ]
@@ -41,7 +41,7 @@ testVecMagnitude = TestLabel "testVecMagnitude" $ TestList
 testVecAngle :: Test
 testVecAngle = TestLabel "testVecAngle" $ TestList
     [ TestCase $ assertEqual "90-degree angle" (pi / 2.0) (V.angleBetween vec1 vec2)
-    , TestCase $ assertEqual "magnitude independent angle" (pi / 2.0) (V.angleBetween (vec1 V.*. 3.0) (vec2 V.*. 4.0))
+    , TestCase $ assertEqual "magnitude independent angle" (pi / 2.0) (V.angleBetween (vec1 *. 3.0) (vec2 *. 4.0))
     , TestCase $ assertEqual "180-degree angle" pi (V.angleBetween vec3 (negate vec3))
     , TestCase $ assertEqual "45-degree angle" (pi / 4.0) (V.angleBetween vec4 vec5)
 
@@ -77,8 +77,8 @@ testMatExtracting = TestLabel "testMatExtracting" $ TestList
 
 testMatOps :: Test
 testMatOps = TestLabel "testMatOps" $ TestList
-    [ TestCase $ assertEqual "num addition" (M.fromLists (3, 3) [[2, 3, 4], [5, 6, 7], [8, 9, 10]]) (mat1 M.+. 1)
-    , TestCase $ assertEqual "num multiplication" (M.fromLists (3, 3) [[2, 4, 6], [8, 10, 12], [14, 16, 18]]) (mat1 M.*. 2)
+    [ TestCase $ assertEqual "num addition" (M.fromLists (3, 3) [[2, 3, 4], [5, 6, 7], [8, 9, 10]]) (mat1 +. 1)
+    , TestCase $ assertEqual "num multiplication" (M.fromLists (3, 3) [[2, 4, 6], [8, 10, 12], [14, 16, 18]]) (mat1 *. 2)
 
     , TestCase $ assertEqual "addition" (M.replicate (3, 3) 10) (mat1 + mat2)
     , TestCase $ assertEqual "transposed addition" (M.fromLists (3, 3) [[10, 8, 6], [12, 10, 8], [14, 12, 10]]) (mat1 + M.transpose mat2)
