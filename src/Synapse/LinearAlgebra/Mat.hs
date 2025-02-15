@@ -10,6 +10,7 @@ combinations (matrix multiplication, elementwise operations).
 
 {-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
 {-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @EndofunctorNumOps@ typeclasses.
+{-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
 
 
 module Synapse.LinearAlgebra.Mat
@@ -171,7 +172,9 @@ instance Show a => Show (Mat a) where
     show mat = "(" ++ show (size mat) ++ "): " ++ show (toLists mat)
 
 
-instance Indexable Mat (Int, Int) where
+instance Indexable Mat where
+    type Index Mat = (Int, Int)
+
     unsafeIndex x (r, c) = V.unsafeIndex (storage x) (indexMatToVec x (r, c))
 
     index x (r, c)

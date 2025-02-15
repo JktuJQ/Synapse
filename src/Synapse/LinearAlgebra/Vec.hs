@@ -9,7 +9,8 @@ implements several mathematical operations on itself.
 
 
 {-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @EndofunctorNumOps@ typeclasses.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
 
 
 module Synapse.LinearAlgebra.Vec
@@ -85,7 +86,9 @@ instance Show a => Show (Vec a) where
     show (Vec x) = show x
 
 
-instance Indexable Vec Int where
+instance Indexable Vec where
+    type Index Vec = Int
+
     unsafeIndex (Vec x) = V.unsafeIndex x
 
     index (Vec x) = (V.!) x

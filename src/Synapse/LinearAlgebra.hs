@@ -5,13 +5,14 @@ several useful function to work with them.
 -}
 
 
-{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @Indexable@ and @EndofunctorNumOps@ typeclasses.
+{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE TypeFamilies           #-}  -- @TypeFamilies@ are needed to define @Indexable@ typeclass.
 
 
 module Synapse.LinearAlgebra
     ( -- * Typeclasses
       Approx ((~==), (~/=), correct, roundTo)
-    , Indexable (unsafeIndex, index, safeIndex)
+    , Indexable (Index, unsafeIndex, index, safeIndex)
     , (!)
     , (!?)
     , EndofunctorNumOps (efmap, (+.), (-.), (*.), (/.), (**.))
@@ -92,25 +93,28 @@ instance Approx Double where
 
 
 -- | @Indexable@ typeclass provides indexing interface for datatypes. 
-class Indexable f i | f -> i where
+class Indexable f where
+    -- | Type of index for @Indexable@ collection.
+    type Index f
+
     -- | Unsafe indexing.
-    unsafeIndex :: f a -> i -> a
+    unsafeIndex :: f a -> Index f -> a
 
     -- | Indexing with bounds checking.
-    index :: f a -> i -> a
+    index :: f a -> Index f -> a
 
     -- | Safe indexing.
-    safeIndex :: f a -> i -> Maybe a
+    safeIndex :: f a -> Index f -> Maybe a
 
 
 infixl 9 !
 -- | Indexing with bounds checking (operator alias for @index@).
-(!) :: Indexable f i => f a -> i -> a
+(!) :: Indexable f => f a -> Index f -> a
 (!) = index
 
 -- | Safe indexing (operator alias for @safeIndex@).
 infixl 9 !?
-(!?) :: Indexable f i => f a -> i -> Maybe a
+(!?) :: Indexable f => f a -> Index f -> Maybe a
 (!?) = safeIndex
 
 
