@@ -36,7 +36,7 @@ library
                     , hashable
                     , unordered-containers
                     
-                    , cereal
+                    , aeson
 
     hs-source-dirs:   src
     exposed-modules:  Synapse

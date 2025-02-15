@@ -36,7 +36,7 @@ import Synapse.Autograd (Symbol(Symbol, unSymbol), Symbolic, constSymbol, symbol
 
 import GHC.Generics (Generic)
 
-import Data.Serialize (Serialize)
+import Data.Aeson (FromJSON, ToJSON)
 
 
 {- | @ActivationFn@ typeclass describes unary functions that can be thought of as activation functions for neural network layers.
@@ -48,8 +48,11 @@ That function is very important, as it will be used in the backward loss propaga
 There is also @callScalar@ function that should allow cheap execution of function when gradients are not needed.
 There is a default implementation that uses @callSymbolicMat@, but it is a bit inefficient - try to provide your own implementation.
 That function is easily extended from scalars to functors over those scalars (see @callFunctor@).
+
+@Synapse@ additionally requires so that activation functions could be serialized - that is to enhance user experience,
+allowing to save and load any parts of your models. If you want to convert said parts to @String@, use @show . toJSON@.
 -}
-class Serialize fn => ActivationFn fn a | fn -> a where
+class (FromJSON fn, ToJSON fn) => ActivationFn fn a | fn -> a where
     -- | Applies activation function to symbolic matrix to produce new symbolic matrix, while retaining gradients graph.
     callSymbolicMat :: Symbolic a => fn -> Symbol (Mat a) -> Symbol (Mat a)
 
@@ -68,7 +71,8 @@ data Linear a = Linear
     {
     } deriving Generic
 
-instance Serialize (Linear a)
+instance FromJSON (Linear a)
+instance ToJSON (Linear a)
 
 instance ActivationFn (Linear a) a where
     callSymbolicMat _ s = symbolicUnaryOp id s [(s, id)]
@@ -80,9 +84,10 @@ data Sin a = Sin
     {
     } deriving Generic
 
-instance Serialize (Sin a)
+instance FromJSON (Sin a)
+instance ToJSON (Sin a)
 
-instance (Floating a, Serialize a) => ActivationFn (Sin a) a where
+instance Floating a => ActivationFn (Sin a) a where
     callSymbolicMat _ = sin
     callScalar _ = sin
 
@@ -92,9 +97,10 @@ data Tanh a = Tanh
     {
     } deriving Generic
 
-instance Serialize (Tanh a)
+instance FromJSON (Tanh a)
+instance ToJSON (Tanh a)
 
-instance (Floating a, Serialize a) => ActivationFn (Tanh a) a where
+instance Floating a => ActivationFn (Tanh a) a where
     callSymbolicMat _ = tanh
     callScalar _ = tanh
 
@@ -110,9 +116,10 @@ data ReLU a = ReLU
 defaultReLU :: Num a => ReLU a
 defaultReLU = ReLU 0 0 Nothing
 
-instance Serialize a => Serialize (ReLU a)
+instance FromJSON a => FromJSON (ReLU a)
+instance ToJSON a => ToJSON (ReLU a)
 
-instance (Num a, Ord a, Serialize a) => ActivationFn (ReLU a) a where
+instance (Num a, Ord a, FromJSON a, ToJSON a) => ActivationFn (ReLU a) a where
     callSymbolicMat (ReLU threshold leftSlope Nothing) s@(Symbol _ mat _) =
         s * constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
                                                         in if x < threshold then leftSlope else 1))
