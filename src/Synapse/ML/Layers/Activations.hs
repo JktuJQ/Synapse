@@ -2,10 +2,10 @@
 -}
 
 
-{-# LANGUAGE DefaultSignatures      #-}  -- @DefaultSignatures@ are needed to provide default implementation in @ActivationFn@ typeclass.
-{-# LANGUAGE DeriveGeneric          #-}  -- @DeriveGeneric@ are needed to easily derive @Serialize@ for activation functions.
-{-# LANGUAGE FlexibleInstances      #-}  -- @FlexibleInstances@ are needed to implement @ActivationFn@ typeclass.
-{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to implement @ActivationFn@ typeclass.
+{-# LANGUAGE DefaultSignatures         #-}  -- @DefaultSignatures@ are needed to provide default implementation in @ActivationFn@ typeclass.
+{-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @ActivationLayer@ datatype.
+{-# LANGUAGE FlexibleInstances         #-}  -- @FlexibleInstances@ are needed to define and implement @ActivationFn@ typeclass.
+{-# LANGUAGE FunctionalDependencies    #-}  -- @FunctionalDependencies@ are needed to define and implement @ActivationFn@ typeclass.
 
 
 module Synapse.ML.Layers.Activations
@@ -13,19 +13,25 @@ module Synapse.ML.Layers.Activations
 
       ActivationFn (callSymbolicMat, callScalar)
     , callFunctor
+
+      -- * @ActivationLayer@ existential datatype
     
+    , ActivationLayer (ActivationLayer)
+
       -- * Activation functions
 
-    , Linear
+    , Linear (Linear)
 
-    , Sin
+    , Sin (Sin)
 
-    , Tanh
+    , Tanh (Tanh)
 
     , ReLU (ReLU, reluThreshold, reluLeftSlope, reluMaxValue)
     , defaultReLU
     ) where
 
+
+import Synapse.ML.Layers.Layer (AbstractLayer(..))
 
 import Synapse.LinearAlgebra (unsafeIndex)
 
@@ -33,10 +39,6 @@ import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
 import Synapse.Autograd (Symbol(Symbol, unSymbol), Symbolic, constSymbol, symbolicUnaryOp)
-
-import GHC.Generics (Generic)
-
-import Data.Aeson (FromJSON, ToJSON)
 
 
 {- | @ActivationFn@ typeclass describes unary functions that can be thought of as activation functions for neural network layers.
@@ -52,7 +54,7 @@ That function is easily extended from scalars to functors over those scalars (se
 @Synapse@ additionally requires so that activation functions could be serialized - that is to enhance user experience,
 allowing to save and load any parts of your models. If you want to convert said parts to @String@, use @show . toJSON@.
 -}
-class (FromJSON fn, ToJSON fn) => ActivationFn fn a | fn -> a where
+class Num a => ActivationFn fn a | fn -> a where
     -- | Applies activation function to symbolic matrix to produce new symbolic matrix, while retaining gradients graph.
     callSymbolicMat :: Symbolic a => fn -> Symbol (Mat a) -> Symbol (Mat a)
 
@@ -62,30 +64,32 @@ class (FromJSON fn, ToJSON fn) => ActivationFn fn a | fn -> a where
     callScalar fn x = unsafeIndex (unSymbol $ callSymbolicMat fn (constSymbol (M.singleton x))) (0, 0)
 
 -- | Applies activation function to a functor to produce new functor.
-callFunctor :: (ActivationFn fn a , Functor f) => fn -> f a -> f a
+callFunctor :: (ActivationFn fn a, Functor f) => fn -> f a -> f a
 callFunctor fn = fmap (callScalar fn)
 
 
+-- | @ActivationLayer@ existential datatype wraps anything that implements @ActivationFn@.
+data ActivationLayer a = forall fn. ActivationFn fn a => ActivationLayer fn
+
+instance Num a => AbstractLayer (ActivationLayer a) a where
+    symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
+    forward (ActivationLayer fn) = callFunctor fn
+    getParameters _ = []
+    updateParameters = const
+
+
+-- Activation functions.
+
 -- | Identity activation function.
 data Linear a = Linear
-    {
-    } deriving Generic
 
-instance FromJSON (Linear a)
-instance ToJSON (Linear a)
-
-instance ActivationFn (Linear a) a where
+instance Num a => ActivationFn (Linear a) a where
     callSymbolicMat _ s = symbolicUnaryOp id s [(s, id)]
     callScalar _ = id
 
 
 -- | Sinusoid activation function.
 data Sin a = Sin
-    {
-    } deriving Generic
-
-instance FromJSON (Sin a)
-instance ToJSON (Sin a)
 
 instance Floating a => ActivationFn (Sin a) a where
     callSymbolicMat _ = sin
@@ -94,11 +98,6 @@ instance Floating a => ActivationFn (Sin a) a where
 
 -- | Hyperbolic tangent activation function.
 data Tanh a = Tanh
-    {
-    } deriving Generic
-
-instance FromJSON (Tanh a)
-instance ToJSON (Tanh a)
 
 instance Floating a => ActivationFn (Tanh a) a where
     callSymbolicMat _ = tanh
@@ -110,16 +109,13 @@ data ReLU a = ReLU
     { reluThreshold :: a        -- ^ Defines threshold of ReLU function (values lower than @reluThreshold@ will be damped).
     , reluLeftSlope :: a        -- ^ Defines left slope of ReLU function (values lower than @reluThreshold@ will be multiplied by this coefficient).
     , reluMaxValue  :: Maybe a  -- ^ Sets maximum value of ReLU function (values greater than @reluMaxValue@ will be clamped to it).
-    } deriving Generic
+    }
 
 -- | Default version of @ReLU@ - threshold and left slope coefficient are set to 0 and no maximum clamping is done.
 defaultReLU :: Num a => ReLU a
 defaultReLU = ReLU 0 0 Nothing
 
-instance FromJSON a => FromJSON (ReLU a)
-instance ToJSON a => ToJSON (ReLU a)
-
-instance (Num a, Ord a, FromJSON a, ToJSON a) => ActivationFn (ReLU a) a where
+instance (Num a, Ord a) => ActivationFn (ReLU a) a where
     callSymbolicMat (ReLU threshold leftSlope Nothing) s@(Symbol _ mat _) =
         s * constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
                                                         in if x < threshold then leftSlope else 1))

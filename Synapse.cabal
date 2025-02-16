@@ -35,8 +35,6 @@ library
 
                     , hashable
                     , unordered-containers
-                    
-                    , aeson
 
     hs-source-dirs:   src
     exposed-modules:  Synapse

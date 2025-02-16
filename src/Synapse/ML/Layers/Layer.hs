@@ -9,10 +9,10 @@ That is the building block of any neural network.
 -}
 
 
-{-# LANGUAGE DefaultSignatures         #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE FunctionalDependencies    #-}
+{-# LANGUAGE DefaultSignatures         #-}  -- @DefaultSignatures@ are needed to provide default implementation in @AbstractLayer@ typeclass.
+{-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @Layer@ datatype.
+{-# LANGUAGE FlexibleInstances         #-}  -- @FlexibleInstances@ are needed to define and implement @AbstractLayer@ typeclass.
+{-# LANGUAGE FunctionalDependencies    #-}  -- @FunctionalDependencies@ are needed to define and implement @AbstractLayer@ typeclass.
 
 
 module Synapse.ML.Layers.Layer
@@ -30,8 +30,6 @@ import Synapse.LinearAlgebra.Mat (Mat)
 
 import Synapse.Autograd (Symbol(unSymbol), Symbolic, constSymbol)
 
-import Data.Aeson (FromJSON, ToJSON)
-
 
 {- | @AbstractLayer@ typeclass defines basic interface of all layers of neural network model.
 
@@ -48,7 +46,7 @@ and layer should change itself accordingly.
 Note: this typeclass correct implementation is very important for work of the neural network and training,
 read the docs thoroughly to ensure that all the invariants are met.
 -}
-class (FromJSON l, ToJSON l, Num a) => AbstractLayer l a | l -> a where
+class Num a => AbstractLayer l a | l -> a where
     {- | Passes symbolic matrix through the layer to produce new symbolic matrix, while retaining gradients graph.
 
     Given @String@ is a prefix for name of symbolic parameters that are used in calculation.
@@ -68,8 +66,10 @@ class (FromJSON l, ToJSON l, Num a) => AbstractLayer l a | l -> a where
 
     -- | Returns a list of all parameters of the layer (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
     getParameters :: l -> [Mat a]
+
     -- | Updates parameters of the layer based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
     updateParameters :: l -> [Mat a] -> l
+
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.
 data Layer a = forall l. AbstractLayer l a => Layer l
