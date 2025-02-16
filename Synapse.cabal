@@ -53,6 +53,7 @@ library
                     , Synapse.ML
 
                     , Synapse.ML.Layers
+                    , Synapse.ML.Layers.Layer
                     , Synapse.ML.Layers.Activations
                     , Synapse.ML.Layers.Constraints
                     , Synapse.ML.Layers.Initializers
