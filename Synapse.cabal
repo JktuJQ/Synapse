@@ -44,20 +44,26 @@ library
                     , Synapse.LinearAlgebra.Mat
                     , Synapse.LinearAlgebra.Vec
 
+
                       -- Autograd
                     , Synapse.Autograd
                     
+
                       -- ML
                     , Synapse.ML
 
                     , Synapse.ML.Layers
                     , Synapse.ML.Layers.Layer
-                    , Synapse.ML.Layers.Activations
+
                     , Synapse.ML.Layers.Constraints
                     , Synapse.ML.Layers.Initializers
                     , Synapse.ML.Layers.Regularizers
 
+                    , Synapse.ML.Layers.Activations
+
+
                     , Synapse.ML.Models
+
 
                     , Synapse.ML.Training
                     , Synapse.ML.Training.Batching
