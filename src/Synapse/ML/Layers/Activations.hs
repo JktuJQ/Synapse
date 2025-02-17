@@ -4,8 +4,6 @@
 
 {-# LANGUAGE DefaultSignatures         #-}  -- @DefaultSignatures@ are needed to provide default implementation in @ActivationFn@ typeclass.
 {-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @ActivationLayer@ datatype.
-{-# LANGUAGE FlexibleInstances         #-}  -- @FlexibleInstances@ are needed to define and implement @ActivationFn@ typeclass.
-{-# LANGUAGE FunctionalDependencies    #-}  -- @FunctionalDependencies@ are needed to define and implement @ActivationFn@ typeclass.
 
 
 module Synapse.ML.Layers.Activations
@@ -54,28 +52,35 @@ That function is easily extended from scalars to functors over those scalars (se
 @Synapse@ additionally requires so that activation functions could be serialized - that is to enhance user experience,
 allowing to save and load any parts of your models. If you want to convert said parts to @String@, use @show . toJSON@.
 -}
-class Num a => ActivationFn fn a | fn -> a where
+class Functor fn => ActivationFn fn where
     -- | Applies activation function to symbolic matrix to produce new symbolic matrix, while retaining gradients graph.
-    callSymbolicMat :: Symbolic a => fn -> Symbol (Mat a) -> Symbol (Mat a)
+    callSymbolicMat :: (Symbolic a, Floating a, Ord a) => fn a -> Symbol (Mat a) -> Symbol (Mat a)
 
     -- | Applies activation function to a scalar to produce new scalar.
-    callScalar :: fn -> a -> a
-    default callScalar :: Symbolic a => fn -> a -> a
+    callScalar :: (Floating a, Ord a) => fn a -> a -> a
+    default callScalar :: (Symbolic a, Floating a, Ord a) => fn a -> a -> a
     callScalar fn x = unsafeIndex (unSymbol $ callSymbolicMat fn (constSymbol (M.singleton x))) (0, 0)
 
 -- | Applies activation function to a functor to produce new functor.
-callFunctor :: (ActivationFn fn a, Functor f) => fn -> f a -> f a
+callFunctor :: (ActivationFn fn, Functor f, Floating a, Ord a) => fn a -> f a -> f a
 callFunctor fn = fmap (callScalar fn)
 
 
 -- | @ActivationLayer@ existential datatype wraps anything that implements @ActivationFn@.
-data ActivationLayer a = forall fn. ActivationFn fn a => ActivationLayer fn
+data ActivationLayer a = forall fn. ActivationFn fn => ActivationLayer (fn a)
 
-instance Num a => AbstractLayer (ActivationLayer a) a where
-    symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
-    forward (ActivationLayer fn) = callFunctor fn
+instance Functor ActivationLayer where
+    fmap f (ActivationLayer fn) = ActivationLayer $ fmap f fn
+
+instance AbstractLayer ActivationLayer where
+    inputSize _ = Nothing
+    outputSize _ = Nothing
+
     getParameters _ = []
     updateParameters = const
+
+    symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
+    forward (ActivationLayer fn) = callFunctor fn
 
 
 -- Activation functions.
@@ -83,7 +88,10 @@ instance Num a => AbstractLayer (ActivationLayer a) a where
 -- | Identity activation function.
 data Linear a = Linear
 
-instance Num a => ActivationFn (Linear a) a where
+instance Functor Linear where
+    fmap _ _ = Linear
+
+instance ActivationFn Linear where
     callSymbolicMat _ s = symbolicUnaryOp id s [(s, id)]
     callScalar _ = id
 
@@ -91,7 +99,10 @@ instance Num a => ActivationFn (Linear a) a where
 -- | Sinusoid activation function.
 data Sin a = Sin
 
-instance Floating a => ActivationFn (Sin a) a where
+instance Functor Sin where
+    fmap _ _ = Sin
+
+instance ActivationFn Sin where
     callSymbolicMat _ = sin
     callScalar _ = sin
 
@@ -99,7 +110,10 @@ instance Floating a => ActivationFn (Sin a) a where
 -- | Hyperbolic tangent activation function.
 data Tanh a = Tanh
 
-instance Floating a => ActivationFn (Tanh a) a where
+instance Functor Tanh where
+    fmap _ _ = Tanh
+
+instance ActivationFn Tanh where
     callSymbolicMat _ = tanh
     callScalar _ = tanh
 
@@ -115,7 +129,10 @@ data ReLU a = ReLU
 defaultReLU :: Num a => ReLU a
 defaultReLU = ReLU 0 0 Nothing
 
-instance (Num a, Ord a) => ActivationFn (ReLU a) a where
+instance Functor ReLU where
+    fmap f (ReLU threshold leftSlope maxValue) = ReLU (f threshold) (f leftSlope) (fmap f maxValue)
+
+instance ActivationFn ReLU where
     callSymbolicMat (ReLU threshold leftSlope Nothing) s@(Symbol _ mat _) =
         s * constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
                                                         in if x < threshold then leftSlope else 1))
