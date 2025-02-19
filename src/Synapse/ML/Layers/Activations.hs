@@ -15,6 +15,7 @@ module Synapse.ML.Layers.Activations
       -- * @ActivationLayer@ existential datatype
     
     , ActivationLayer (ActivationLayer)
+    , activationLayer
 
       -- * Activation functions
 
@@ -29,7 +30,7 @@ module Synapse.ML.Layers.Activations
     ) where
 
 
-import Synapse.ML.Layers.Layer (AbstractLayer(..))
+import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
 import Synapse.LinearAlgebra (unsafeIndex)
 
@@ -81,6 +82,10 @@ instance AbstractLayer ActivationLayer where
 
     symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
     forward (ActivationLayer fn) = callFunctor fn
+
+-- | Creates configuration for activation layer.
+activationLayer :: ActivationFn fn => fn a -> LayerConfiguration (ActivationLayer a)
+activationLayer fn = const $ ActivationLayer fn
 
 
 -- Activation functions.

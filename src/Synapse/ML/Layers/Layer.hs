@@ -21,6 +21,9 @@ module Synapse.ML.Layers.Layer
       -- * @Layer@ existential datatype
 
     , Layer (Layer)
+
+      -- * @LayerConfiguration@ type alias
+    , LayerConfiguration
     ) where
 
 
@@ -41,15 +44,15 @@ That allows optimiser to work with any layer that provides such information.
 (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
 and layer should change itself accordingly.
 
-Note: any model is a @AbstractLayer@ instance too, so don't be confused by the docs on some methods.
+Note: any model is an @AbstractLayer@ instance too, so don't be confused by the docs on some methods.
 
 Important: this typeclass correct implementation is very important for work of the neural network and training,
 read the docs thoroughly to ensure that all the invariants are met.
 -}
 class Functor l => AbstractLayer l where
-    -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence.
+    -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence (activation functions are the example).
     inputSize :: l a -> Maybe Int
-    -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence.
+    -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence (activation functions are the example).
     outputSize :: l a -> Maybe Int
 
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
@@ -91,3 +94,9 @@ instance AbstractLayer Layer where
 
     symbolicForward prefix (Layer l) = symbolicForward prefix l
     forward (Layer l) = forward l
+
+
+-- | @LayerConfiguration@ type alias represents functions that are able to build layers.
+type LayerConfiguration l
+    =  Int  -- ^ Output size of previous layer.
+    -> l    -- ^ Resulting layer.
