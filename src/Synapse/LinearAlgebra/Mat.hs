@@ -58,7 +58,7 @@ module Synapse.LinearAlgebra.Mat
     , imap
     , imapRow
     , imapCol
-    , zipWith
+    , elementwise
 
       -- * Operations with matrices
 
@@ -99,7 +99,7 @@ import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!), EndofunctorNumOps(
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
 
-import Prelude hiding (map, replicate, zip, zipWith)
+import Prelude hiding (map, replicate, zip)
 import Data.Foldable (Foldable(..))
 import Data.List (find)
 import Data.Tuple (swap)
@@ -187,8 +187,8 @@ instance Indexable Mat where
 
 
 instance Num a => Num (Mat a) where
-    (+) = zipWith (+)
-    (-) = zipWith (-)
+    (+) = elementwise (+)
+    (-) = elementwise (-)
     negate = fmap (0 -)
     (*) = adamarMul
     abs = fmap abs
@@ -199,13 +199,13 @@ instance EndofunctorNumOps (Mat a) a where
     efmap = fmap
 
 instance Fractional a => Fractional (Mat a) where
-    (/) = zipWith (/)
+    (/) = elementwise (/)
     recip = fmap (1/)
     fromRational = singleton . fromRational
 
 instance Floating a => Floating (Mat a) where
     pi = singleton pi
-    (**) = zipWith (**)
+    (**) = elementwise (**)
     sqrt = fmap sqrt
     exp = fmap exp
     log = fmap log
@@ -241,7 +241,7 @@ instance Functor Mat where
 
 instance Applicative Mat where
     pure x = Mat 1 1 1 1 0 0 (V.singleton x)
-    (<*>) = zipWith (\f x -> f x)
+    (<*>) = elementwise (\f x -> f x)
 
 instance Foldable Mat where
     foldr f x = V.foldr f x . storage
@@ -372,10 +372,12 @@ imapCol :: Int -> (Int -> a -> a) -> Mat a -> Mat a
 imapCol col f = imap (\(r, c) -> if c == col then f r else id)
 
 -- | Zips two @Mat@s together using given function.
-zipWith :: (a -> b -> c) -> Mat a -> Mat b -> Mat c
-zipWith f a b = let (rows, cols) = (min (nRows a) (nRows b), min (nCols a) (nCols b))
-                in Mat rows cols cols 1 0 0 $
-                   V.fromList [f (unsafeIndex a (r, c)) (unsafeIndex b (r, c)) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
+elementwise :: (a -> b -> c) -> Mat a -> Mat b -> Mat c
+elementwise f a b
+    | size a /= size b = error "Two matrices have different sizes"
+    | otherwise        = let (rows, cols) = size a
+                         in Mat rows cols cols 1 0 0 $
+                            V.fromList [f (unsafeIndex a (r, c)) (unsafeIndex b (r, c)) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
 
 
 -- Operations with matrices
@@ -481,7 +483,7 @@ identity n = generate (n, n) $ \(r, c) -> if r == c then 1 else 0
 
 -- | Adamar multiplication (elementwise multiplication).
 adamarMul :: Num a => Mat a -> Mat a -> Mat a
-adamarMul = zipWith (*)
+adamarMul = elementwise (*)
 
 -- | Matrix multiplication.
 matMul :: Num a => Mat a -> Mat a -> Mat a
