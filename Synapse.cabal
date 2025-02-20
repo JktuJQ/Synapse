@@ -60,6 +60,7 @@ library
                     , Synapse.ML.Layers.Regularizers
 
                     , Synapse.ML.Layers.Activations
+                    , Synapse.ML.Layers.Dense
 
 
                     , Synapse.ML.Models

@@ -4,7 +4,7 @@
 
 module Synapse.ML.Models
     ( -- * Common
-      Input (Input)
+      InputSize (InputSize)
 
       -- * @SequentialModel@ datatype
       
@@ -20,8 +20,8 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 
 
--- | @Input@ newtype wraps @Int@ - amount of features of input that the model should support (@Input 3@ means that model supports any matrix with size (x, 3)).
-newtype Input = Input Int
+-- | @InputSize@ newtype wraps @Int@ - amount of features of input that the model should support (@InputSize 3@ means that model supports any matrix with size (x, 3)).
+newtype InputSize = InputSize Int
 
 -- | @SequentialModel@ datatype represents any model grouping layers linearly.
 newtype SequentialModel a = SequentialModel
@@ -29,14 +29,14 @@ newtype SequentialModel a = SequentialModel
     }
 
 -- | Builds sequential model using input size and layer configurations to ensure that layers are compatible with each other.
-buildSequentialModel :: Input -> [LayerConfiguration (Layer a)] -> SequentialModel a
-buildSequentialModel (Input input) layerConfigs = SequentialModel $ V.fromList $ go input layerConfigs
+buildSequentialModel :: InputSize -> [LayerConfiguration (Layer a)] -> SequentialModel a
+buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ V.fromList $ go i layerConfigs
   where
     go _ [] = []
     go prevSize (l:ls) = let layer = l prevSize
-                             output = outputSize layer
-                             output' = fromMaybe prevSize output
-                         in layer : go output' ls
+                             outputMaybe = outputSize layer
+                             output = fromMaybe prevSize outputMaybe
+                         in layer : go output ls
 
 
 instance Functor SequentialModel where

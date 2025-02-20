@@ -83,6 +83,7 @@ instance AbstractLayer ActivationLayer where
     symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
     forward (ActivationLayer fn) = callFunctor fn
 
+
 -- | Creates configuration for activation layer.
 activationLayer :: ActivationFn fn => fn a -> LayerConfiguration (ActivationLayer a)
 activationLayer fn = const $ ActivationLayer fn
