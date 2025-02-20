@@ -54,10 +54,10 @@ module Synapse.LinearAlgebra.Mat
      -- * Combining
 
     , map
+    , mapRow
+    , mapCol
     , for
     , imap
-    , imapRow
-    , imapCol
     , elementwise
 
       -- * Operations with matrices
@@ -355,6 +355,16 @@ flatten = Vec . storage . force
 map :: (a -> b) -> Mat a -> Mat b
 map = fmap
 
+-- | Applies function to a given row. If new @Vec@ is longer then кщц, it is truncated.
+mapRow :: Int -> (Vec a -> Vec a) -> Mat a -> Mat a
+mapRow row f mat = let newRow = f $ indexRow mat row
+                   in imap (\(r, c) x -> if r == row then unsafeIndex newRow c else x) mat
+
+-- | Applies function to a given column. If new @Vec@ is longer then column, it is truncated.
+mapCol :: Int -> (Vec a -> Vec a) -> Mat a -> Mat a
+mapCol col f mat = let newCol = f $ indexCol mat col
+                   in imap (\(r, c) x -> if c == col then unsafeIndex newCol r else x) mat
+
 -- | Flipped @map@.
 for :: Mat a -> (a -> b) -> Mat b
 for = flip map
@@ -362,14 +372,6 @@ for = flip map
 -- | Applies function to every element and its position of @Mat@.
 imap :: ((Int, Int) -> a -> b) -> Mat a -> Mat b
 imap f mat@(Mat rows cols rk ck r0 c0 x) = Mat rows cols rk ck r0 c0 (V.imap (f . indexVecToMat mat) x)
-
--- | Applies function to every element and its column of a given row.
-imapRow :: Int -> (Int -> a -> a) -> Mat a -> Mat a
-imapRow row f = imap (\(r, c) -> if r == row then f c else id)
-
--- | Applies function to every element and its row of a given column.
-imapCol :: Int -> (Int -> a -> a) -> Mat a -> Mat a
-imapCol col f = imap (\(r, c) -> if c == col then f r else id)
 
 -- | Zips two @Mat@s together using given function.
 elementwise :: (a -> b -> c) -> Mat a -> Mat b -> Mat c
@@ -517,7 +519,7 @@ rref mat@(Mat rows cols _ _ _ _ _) = go mat 0 [0 .. rows - 1]
                            Nothing                -> m
                            Just (pivotRow, lead') -> let newRow = SV.map (/ unsafeIndex m (pivotRow, lead')) (indexRow m pivotRow)
                                                          m'   = swapRows m pivotRow r
-                                                         m''  = imapRow r (\c _ -> newRow ! c) m'
+                                                         m''  = mapRow r (const newRow) m'
                                                          m''' = imap (\(row, c) -> if row == r
                                                                                    then id
                                                                                    else subtract (newRow ! c * unsafeIndex m'' (row, lead'))
