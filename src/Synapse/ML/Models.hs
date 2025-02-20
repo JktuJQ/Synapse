@@ -25,7 +25,7 @@ newtype InputSize = InputSize Int
 
 -- | @SequentialModel@ datatype represents any model grouping layers linearly.
 newtype SequentialModel a = SequentialModel
-    { unSequentialModel :: V.Vector (Layer a)  -- ^ Returns layers of @SequentialModel@
+    { unSequentialModel :: V.Vector (Layer a)  -- ^ Returns layers of @SequentialModel@.
     }
 
 -- | Builds sequential model using input size and layer configurations to ensure that layers are compatible with each other.
