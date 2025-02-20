@@ -36,6 +36,8 @@ library
                     , hashable
                     , unordered-containers
 
+                    , random
+
     hs-source-dirs:   src
     exposed-modules:  Synapse
                     

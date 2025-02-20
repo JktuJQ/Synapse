@@ -6,7 +6,7 @@ module LinearAlgebraTest
     ) where
 
 
-import Synapse.LinearAlgebra ((!), EndofunctorNumOps(..))
+import Synapse.LinearAlgebra ((~==), (!), EndofunctorNumOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -118,18 +118,21 @@ testMatSubmatrices = TestLabel "testMatSubmatrices" $ TestList
     matBL = M.singleton 3 :: Mat Int
     matBR = M.singleton 4 :: Mat Int
 
-testMatDetInverse :: Test
-testMatDetInverse = TestLabel "testMatDetInverse" $ TestList
+testMatComplicatedOps :: Test
+testMatComplicatedOps = TestLabel "testMatComplicatedOps" $ TestList
     [ TestCase $ assertEqual "det == 0" 0 (M.det mat1)
     , TestCase $ assertEqual "det" (-230) (M.det mat2)
     , TestCase $ assertEqual "rref" (M.fromLists (2, 4) [[1.0, 0.0, -3.0, -4.0], [0.0, 1.0, 1.0, 1.0]]) (M.rref mat3)
     , TestCase $ assertEqual "inverse" (Just $ M.fromLists (2, 2) [[-3.0, -4.0], [1.0, 1.0]]) (M.inverse mat4)
+    , TestCase $ assertBool "orthogonal" $ M.fromLists (2, 2) [[-(sqrt 2.0 / 2.0), -(sqrt 2.0 / 2.0)], [sqrt 2.0 / 2.0, -(sqrt 2.0 / 2.0)]] ~==
+                                           M.orthogonalized mat5
     ]
   where
     mat1 = M.fromLists (3, 3) [[1, 2, 3], [4, 5, 6], [7, 8, 9]] :: Mat Int
     mat2 = M.fromLists (3, 3) [[2, 5, 5], [4, -10, 0], [-3, -2, 1]] :: Mat Int
     mat3 = M.fromLists (2, 4) [[1.0, 4.0, 1.0, 0.0], [-1.0, -3.0, 0.0, 1.0]] :: Mat Float
     mat4 = M.fromLists (2, 2) [[1.0, 4.0], [-1.0, -3.0]] :: Mat Float
+    mat5 = M.fromLists (2, 2) [[1.0, 1.0], [-2.0, 2.0]] :: Mat Float
 
 
 tests :: Test
@@ -143,5 +146,5 @@ tests = TestLabel "LinearAlgebraTest" $ TestList
     , testMatExtracting
     , testMatOps
     , testMatSubmatrices
-    , testMatDetInverse
+    , testMatComplicatedOps
     ]

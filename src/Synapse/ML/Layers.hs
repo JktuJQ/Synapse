@@ -6,6 +6,8 @@ module Synapse.ML.Layers
     ( -- * Re-exports
 
       module Synapse.ML.Layers.Layer
+    
+    , module Synapse.ML.Layers.Initializers
 
     , module Synapse.ML.Layers.Activations
     , module Synapse.ML.Layers.Dense
@@ -13,6 +15,8 @@ module Synapse.ML.Layers
 
 
 import Synapse.ML.Layers.Layer
+
+import Synapse.ML.Layers.Initializers
 
 import Synapse.ML.Layers.Activations
 import Synapse.ML.Layers.Dense

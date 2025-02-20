@@ -91,6 +91,7 @@ module Synapse.LinearAlgebra.Mat
     , det
     , rref
     , inverse
+    , orthogonalized
     ) where
 
 
@@ -537,3 +538,11 @@ inverse mat@(Mat rows cols _ _ _ _ _)
                            in case V.find (== 0) (SV.unVec $ diagonal left) of
                                   Nothing -> Just right
                                   Just _  -> Nothing
+
+-- | Orthogonalizes matrix by rows using Gram-Schmidt algorithm.
+orthogonalized :: Floating a => Mat a -> Mat a
+orthogonalized mat = foldl' (\mat' row -> mapRow row SV.normalized $ iterationGramSchmidt mat' row) mat [0 .. nRows mat]
+  where
+    iterationGramSchmidt mat' row = foldl' (\mat'' r ->
+                                            mapRow row (subtract $ indexRow mat'' r *. indexRow mat'' r `SV.dot` indexRow mat'' row) mat''
+                                           ) mat' [0 .. row]
