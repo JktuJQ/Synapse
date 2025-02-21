@@ -1,12 +1,12 @@
-{- | Allows to initialize values of layers weights or biases.
+{- | Allows to initialize values of layers parameters.
 
-@Initializer@ type alias represents functions that are able to initialize flat matrix with given size.
+@Initializer@ type alias represents functions that are able to initialize matrix with given size.
 
 @Synapse@ provides 4 types of initializers:
 * Non-random constant initializers
 * Random uniform distribution initializers
 * Random normal distribution initializers
-* Matrix-like initializers
+* Matrix-specific initializers
 -}
 
 
@@ -42,22 +42,21 @@ module Synapse.ML.Layers.Initializers
     ) where
 
 
-import Synapse.LinearAlgebra.Mat (fromList, orthogonalized)
-
-import Data.Foldable (toList)
+import Synapse.LinearAlgebra.Mat (Mat)
+import qualified Synapse.LinearAlgebra.Mat as M
 
 import System.Random (uniformListR, uniformRs, UniformRange, RandomGen)
 
 
--- | @Initializer@ type alias represents functions that are able to initialize flat matrix with given size.
-type Initializer a = (Int, Int) -> [a]
+-- | @Initializer@ type alias represents functions that are able to initialize matrix with given size.
+type Initializer a = (Int, Int) -> Mat a
 
 
 -- Non-random constant initializers
 
 -- | Initializes list that is filled with given constant.
 constants :: Num a => a -> Initializer a
-constants c (input, output) = replicate (input * output) c
+constants c (input, output) = M.replicate (input, output) c
 
 -- | Initializes list that is filled with zeroes.
 zeroes :: Num a => Initializer a
@@ -75,7 +74,7 @@ ones = constants 1
 This function does not preserve seed generator - call @split@ on it before calling this function.
 -}
 randomUniform :: (UniformRange a, RandomGen g) => (a, a) -> g -> Initializer a
-randomUniform range gen (input, output) = fst $ uniformListR (input * output) range gen
+randomUniform range gen sizes@(input, output) = M.fromList sizes $ fst $ uniformListR (input * output) range gen
 
 {- | Initializes list with samples from random LeCun uniform distribution in range.
 
@@ -109,13 +108,13 @@ glorotUniform gen sizes@(input, output) = let limit = sqrt $ 6.0 / fromIntegral 
 This function does not preserve seed generator - call @split@ on it before calling this function.
 -}
 randomNormal :: (UniformRange a, Floating a, Ord a, RandomGen g) => Maybe a -> a -> a -> g -> Initializer a
-randomNormal truncated mean stdDev gen (input, output) = let us = pairs $ uniformRs (0.0, 1.0) gen
-                                                             ns = concatMap ((\(n1, n2) -> [n1, n2]) . transformBoxMuller) us
-                                                             ns' = map ((+ mean) . (* stdDev)) ns
-                                                             ns'' = case truncated of
-                                                                        Nothing  -> ns'
-                                                                        Just eps -> filter (\x -> abs (x - mean) < eps) ns'
-                                                         in take (input * output) ns''
+randomNormal truncated mean stdDev gen sizes@(input, output) = let us = pairs $ uniformRs (0.0, 1.0) gen
+                                                                   ns = concatMap ((\(n1, n2) -> [n1, n2]) . transformBoxMuller) us
+                                                                   ns' = map ((+ mean) . (* stdDev)) ns
+                                                                   ns'' = case truncated of
+                                                                               Nothing  -> ns'
+                                                                               Just eps -> filter (\x -> abs (x - mean) < eps) ns'
+                                                               in M.fromList sizes $ take (input * output) ns''
   where
     pairs [] = []
     pairs [x] = [(x, 1)]
@@ -162,7 +161,7 @@ glorotNormal gen sizes@(input, output) = let mean = 0
 identity :: Num a => Initializer a
 identity (input, output)
     | input /= output = error "Given dimensions do not represent square matrix"
-    | otherwise       = [if r == c then 1 else 0 | r <- [0 .. input], c <- [0 .. output]]
+    | otherwise       = M.identity input
 
 {- | Initializes float orthogonal matrix obtained from a random normal distribution
 that is truncated for values more than two standard deviations from mean.
@@ -170,4 +169,4 @@ that is truncated for values more than two standard deviations from mean.
 This function does not preserve seed generator - call @split@ on it before calling this function.
 -}
 orthogonal :: (UniformRange a, Floating a, Ord a, RandomGen g) => g -> Initializer a
-orthogonal gen sizes@(input, output) = toList $ orthogonalized $ fromList (input, output) $ randomNormal Nothing 0.0 1.0 gen sizes
+orthogonal gen sizes = M.orthogonalized $ randomNormal Nothing 0.0 1.0 gen sizes
