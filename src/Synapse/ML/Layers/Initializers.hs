@@ -1,4 +1,4 @@
-{- | Allows to initialize values of layers weights or biases in a certain way.
+{- | Allows to initialize values of layers weights or biases.
 
 @Initializer@ type alias represents functions that are able to initialize flat matrix with given size.
 

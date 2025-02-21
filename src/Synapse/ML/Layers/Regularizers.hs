@@ -1,4 +1,4 @@
-{- | Allows to regularize values of layers weights or biases in a certain way.
+{- | Allows to regularize values of layers weights or biases.
 -}
 
 
