@@ -57,8 +57,8 @@ library
                     , Synapse.ML.Layers
                     , Synapse.ML.Layers.Layer
 
-                    , Synapse.ML.Layers.Constraints
                     , Synapse.ML.Layers.Initializers
+                    , Synapse.ML.Layers.Constraints
                     , Synapse.ML.Layers.Regularizers
 
                     , Synapse.ML.Layers.Activations
