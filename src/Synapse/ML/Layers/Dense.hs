@@ -1,14 +1,14 @@
 {- | Provides dense layer implementation.
 
-@DenseLayer@ datatype represents densely-connected neural network layer and
+@Dense@ datatype represents densely-connected neural network layer and
 it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
 -}
 
 
 module Synapse.ML.Layers.Dense
-    ( -- * @DenseLayer@ datatype
+    ( -- * @Dense@ datatype
 
-      DenseLayer (DenseLayer, denseWeights, denseBias)
+      Dense (Dense, denseWeights, denseBias)
     , denseLayer
     ) where
 
@@ -26,17 +26,17 @@ import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
 
-{- | @DenseLayer@ datatype represents densely-connected neural network layer.
+{- | @Dense@ datatype represents densely-connected neural network layer.
 
-@DenseLayer@ performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
+@Dense@ performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
 -}
-data DenseLayer a = DenseLayer
+data Dense a = Dense
     { denseWeights :: Mat a          -- ^ Matrix that represents weights of dense layer.
     , denseBias    :: Maybe (Vec a)  -- ^ Vector that represents bias of dense layer.
     }
 
-instance Functor DenseLayer where
-    fmap f (DenseLayer weights bias) = DenseLayer (fmap f weights) (fmap (fmap f) bias)
+instance Functor Dense where
+    fmap f (Dense weights bias) = Dense (fmap f weights) (fmap (fmap f) bias)
 
 -- | Creates symbol for weights.
 weightsSymbol :: String -> Mat a -> Symbol (Mat a)
@@ -50,24 +50,24 @@ biasToMat rows bias = M.generate (rows, V.size bias) $ \(_, c) -> unsafeIndex bi
 biasSymbol :: String -> Int -> Vec a -> Symbol (Mat a)
 biasSymbol prefix rows = symbol (prefix ++ "2") . biasToMat rows
 
-instance AbstractLayer DenseLayer where
+instance AbstractLayer Dense where
     inputSize = Just . M.nRows . denseWeights
     outputSize = Just . M.nCols . denseWeights
 
-    getParameters (DenseLayer weights Nothing) = [weights]
-    getParameters (DenseLayer weights (Just bias)) = [weights, biasToMat (M.nRows weights) bias]
+    getParameters (Dense weights Nothing) = [weights]
+    getParameters (Dense weights (Just bias)) = [weights, biasToMat (M.nRows weights) bias]
 
-    updateParameters (DenseLayer _ Nothing) [weights'] = DenseLayer weights' Nothing
-    updateParameters (DenseLayer _ (Just _)) [weights', biasMat'] = DenseLayer weights' (Just $ M.indexRow biasMat' 0)
+    updateParameters (Dense _ Nothing) [weights'] = Dense weights' Nothing
+    updateParameters (Dense _ (Just _)) [weights', biasMat'] = Dense weights' (Just $ M.indexRow biasMat' 0)
     updateParameters _ _ = error "Parameters update failed - wrong amount of parameters was given"
 
-    symbolicForward prefix (DenseLayer weights Nothing) input = input `matMul` weightsSymbol prefix weights
-    symbolicForward prefix (DenseLayer weights (Just bias)) input = input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
+    symbolicForward prefix (Dense weights Nothing) input = input `matMul` weightsSymbol prefix weights
+    symbolicForward prefix (Dense weights (Just bias)) input = input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
 
-    forward (DenseLayer weights Nothing) input = input `M.matMul` weights
-    forward (DenseLayer weights (Just bias)) input = input `M.matMul` weights + biasToMat (M.nRows weights) bias
+    forward (Dense weights Nothing) input = input `M.matMul` weights
+    forward (Dense weights (Just bias)) input = input `M.matMul` weights + biasToMat (M.nRows weights) bias
 
 
 -- | Creates configuration for dense layer.
-denseLayer :: Num a => Int -> LayerConfiguration (DenseLayer a)
-denseLayer neurons input = DenseLayer (M.replicate (input, neurons) 0) (Just $ V.replicate neurons 0)
+denseLayer :: Num a => Int -> LayerConfiguration (Dense a)
+denseLayer neurons input = Dense (M.replicate (input, neurons) 0) (Just $ V.replicate neurons 0)

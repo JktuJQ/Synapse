@@ -1,4 +1,4 @@
-{- | Provides several types of layers and functions to control their construction.
+{- | Provides several types of layers and functions to control their construction and usage.
 -}
 
 
@@ -9,7 +9,6 @@ module Synapse.ML.Layers
     
     , module Synapse.ML.Layers.Initializers
     , module Synapse.ML.Layers.Constraints
-    , module Synapse.ML.Layers.Regularizers
 
     , module Synapse.ML.Layers.Activations
     , module Synapse.ML.Layers.Dense
@@ -20,7 +19,6 @@ import Synapse.ML.Layers.Layer
 
 import Synapse.ML.Layers.Initializers
 import Synapse.ML.Layers.Constraints
-import Synapse.ML.Layers.Regularizers
 
 import Synapse.ML.Layers.Activations
 import Synapse.ML.Layers.Dense
