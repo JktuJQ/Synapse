@@ -2,7 +2,6 @@
 -}
 
 
-{-# LANGUAGE DefaultSignatures         #-}  -- @DefaultSignatures@ are needed to provide default implementation in @ActivationFn@ typeclass.
 {-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @ActivationLayer@ datatype.
 
 
@@ -37,7 +36,7 @@ import Synapse.LinearAlgebra (unsafeIndex)
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
-import Synapse.Autograd (Symbol(Symbol, unSymbol), Symbolic, constSymbol, symbolicUnaryOp)
+import Synapse.Autograd (Symbol(Symbol), Symbolic, constSymbol, symbolicUnaryOp)
 
 
 {- | @ActivationFn@ typeclass describes unary functions that can be thought of as activation functions for neural network layers.
@@ -59,8 +58,6 @@ class Functor fn => ActivationFn fn where
 
     -- | Applies activation function to a scalar to produce new scalar.
     callScalar :: (Floating a, Ord a) => fn a -> a -> a
-    default callScalar :: (Symbolic a, Floating a, Ord a) => fn a -> a -> a
-    callScalar fn x = unsafeIndex (unSymbol $ callSymbolicMat fn (constSymbol (M.singleton x))) (0, 0)
 
 -- | Applies activation function to a functor to produce new functor.
 callFunctor :: (ActivationFn fn, Functor f, Floating a, Ord a) => fn a -> f a -> f a
