@@ -8,8 +8,8 @@ implements several mathematical operations on itself.
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @ElementwiseScalarOps@ typeclass.
 {-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
 
 
@@ -61,7 +61,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), EndofunctorNumOps(..))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..), ElementwiseScalarOps(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -105,8 +105,12 @@ instance Num a => Num (Vec a) where
     signum = fmap signum
     fromInteger = singleton . fromInteger
 
-instance EndofunctorNumOps (Vec a) a where
-    efmap = fmap
+instance ElementwiseScalarOps (Vec a) a where
+    (+.) x n = fmap (+ n) x
+    (-.) x n = fmap (subtract n) x
+    (*.) x n = fmap (* n) x
+    (/.) x n = fmap (/ n) x
+    (**.) x n = fmap (** n) x
 
 instance Fractional a => Fractional (Vec a) where
     (/) = zipWith (/)

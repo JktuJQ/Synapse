@@ -5,7 +5,7 @@ several useful function to work with them.
 -}
 
 
-{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @ElementwiseScalarOps@ typeclass.
 {-# LANGUAGE TypeFamilies           #-}  -- @TypeFamilies@ are needed to define @Indexable@ typeclass.
 
 
@@ -15,7 +15,7 @@ module Synapse.LinearAlgebra
     , Indexable (Index, unsafeIndex, index, safeIndex)
     , (!)
     , (!?)
-    , EndofunctorNumOps (efmap, (+.), (-.), (*.), (/.), (**.))
+    , ElementwiseScalarOps ((+.), (-.), (*.), (/.), (**.))
 
       -- * Constants
     , epsilon
@@ -86,12 +86,6 @@ instance Approx Double where
                 then fromIntegral (round n :: Int)
                 else n
           where
-            (_, fractionalPart) = properFraction $ abs powered :: (Int, Double)
-
-    roundTo x digits = let mul = 10.0 ^ digits
-                       in fromIntegral (round (x * mul) :: Int) / mul
-
-
 -- | @Indexable@ typeclass provides indexing interface for datatypes. 
 class Indexable f where
     -- | Type of index for @Indexable@ collection.
@@ -121,29 +115,21 @@ infixl 9 !?
 infixl 6 +., -.
 infixl 7 *., /.
 infixr 8 **.
--- | @EndofunctorNumOps@ class allows functors over numeric values to be easily modified. Operators are applied on the right by default implementations.
-class EndofunctorNumOps f a | f -> a where
-    -- | Endofunctor version of @fmap@.
-    efmap :: (a -> a) -> f -> f
+{- | @ElementwiseScalarOps@ class allows collections over numerical values easily work with scalars by using elementwise operations.
 
-    -- | Adds given value to every element of the functor.
+This class is a multiparameter class to permit instances on types that are not exactly collections, but rather wrappers of collections.
+The best example is @Symbol@ from @Synapse.Autograd@.
+-}
+class ElementwiseScalarOps f a | f -> a where
+    -- | Adds given value to every element of the collection.
     (+.) :: Num a => f -> a -> f
-    (+.) x n = efmap (+ n) x
-
     -- | Subtracts given value from every element of the functor.
     (-.) :: Num a => f -> a -> f
-    (-.) x n = efmap (subtract n) x
 
     -- | Multiplies every element of the functor by given value.
     (*.) :: Num a => f -> a -> f
-    (*.) x n = efmap (* n) x
-
     -- | Divides every element of the functor by given value.
     (/.) :: Fractional a => f -> a -> f
-    (/.) x n = efmap (/ n) x
 
     -- | Exponentiates every element of the functor by given value.
     (**.) :: Floating a => f -> a -> f
-    (**.) x n = efmap (** n) x
-
-    {-# MINIMAL efmap #-}

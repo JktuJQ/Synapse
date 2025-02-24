@@ -12,8 +12,8 @@ and read more about it in @Symbol@ datatype docs.
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @EndofunctorNumOps@ typeclass.
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @ElementwiseScalarOps@ typeclass.
 
 
 module Synapse.Autograd
@@ -43,7 +43,7 @@ module Synapse.Autograd
     ) where
 
 
-import Synapse.LinearAlgebra (EndofunctorNumOps(..))
+import Synapse.LinearAlgebra (ElementwiseScalarOps(..), ElementwiseScalarOps)
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -183,20 +183,14 @@ instance Symbolic a => Num (Symbol a) where
     signum x = symbolicUnaryOp signum x [(x, id)]
     fromInteger = constSymbol . fromInteger
 
-instance Symbolic a => EndofunctorNumOps (Symbol (Vec a)) a where
-    -- @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
-    efmap f (Symbol name value localGradients) = Symbol name (fmap f value) localGradients
-
+instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) a where
     (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
     (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
     (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
     (/.) x n = x / constSymbol (V.replicate (V.size $ unSymbol x) n)
     (**.) x n = x ** constSymbol (V.replicate (V.size $ unSymbol x) n)
 
-instance Symbolic a => EndofunctorNumOps (Symbol (Mat a)) a where
-    -- @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
-    efmap f (Symbol name value localGradients) = Symbol name (fmap f value) localGradients
-
+instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
     (+.) x n = x + constSymbol (M.replicate (M.size $ unSymbol x) n)
     (-.) x n = x - constSymbol (M.replicate (M.size $ unSymbol x) n)
     (*.) x n = x * constSymbol (M.replicate (M.size $ unSymbol x) n)

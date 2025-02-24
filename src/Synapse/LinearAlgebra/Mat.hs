@@ -8,8 +8,8 @@ combinations (matrix multiplication, elementwise operations).
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @EndofunctorNumOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @EndofunctorNumOps@ typeclasses.
+{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
+{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @ElementwiseScalarOps@ typeclasses.
 {-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
 
 
@@ -95,7 +95,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!), EndofunctorNumOps(..))
+import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!), ElementwiseScalarOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -196,8 +196,12 @@ instance Num a => Num (Mat a) where
     signum = fmap signum
     fromInteger = singleton . fromInteger
 
-instance EndofunctorNumOps (Mat a) a where
-    efmap = fmap
+instance ElementwiseScalarOps (Mat a) a where
+    (+.) x n = fmap (+ n) x
+    (-.) x n = fmap (subtract n) x
+    (*.) x n = fmap (* n) x
+    (/.) x n = fmap (/ n) x
+    (**.) x n = fmap (** n) x
 
 instance Fractional a => Fractional (Mat a) where
     (/) = elementwise (/)
