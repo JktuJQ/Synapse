@@ -5,9 +5,11 @@
 
 
 module Synapse.ML.Training.Losses
-    ( -- * @LossFn@ type alias
+    ( -- * @LossFn@ type alias and @Loss@ newtype
 
       LossFn
+    
+    , Loss (Loss)
 
       -- * Regression losses
     
@@ -26,13 +28,17 @@ import Synapse.LinearAlgebra.Mat (Mat)
 import Synapse.Autograd (Symbol, Symbolic)
 
 
-{- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
+-- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
+type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
+
+
+{- | @Loss@ newtype wraps @LossFn@s - differentiable functions that are able to provide a reference of what relation between matrices needs to be minimised.
 
 Every loss function is expected to return symbol of singleton matrix.
 This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
 If you want to bypass this requirement - customise @fit@ function accordingly.
 -}
-type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
+newtype Loss a = Loss (LossFn a)
 
 
 -- Regression losses

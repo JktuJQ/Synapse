@@ -35,9 +35,6 @@ data Dense a = Dense
     , denseBias    :: Maybe (Vec a)  -- ^ Vector that represents bias of dense layer.
     }
 
-instance Functor Dense where
-    fmap f (Dense weights bias) = Dense (fmap f weights) (fmap (fmap f) bias)
-
 -- | Creates symbol for weights.
 weightsSymbol :: String -> Mat a -> Symbol (Mat a)
 weightsSymbol prefix = symbol (prefix ++ "1")
@@ -63,10 +60,6 @@ instance AbstractLayer Dense where
 
     symbolicForward prefix (Dense weights Nothing) input = input `matMul` weightsSymbol prefix weights
     symbolicForward prefix (Dense weights (Just bias)) input = input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
-
-    forward (Dense weights Nothing) input = input `M.matMul` weights
-    forward (Dense weights (Just bias)) input = input `M.matMul` weights + biasToMat (M.nRows weights) bias
-
 
 -- | Creates configuration for dense layer.
 denseLayer :: Num a => Int -> LayerConfiguration (Dense a)

@@ -2,73 +2,58 @@
 -}
 
 
-{-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @ActivationLayer@ datatype.
-
-
 module Synapse.ML.Layers.Activations
-    ( -- * @ActivationFn@ typeclass
+    ( -- * @ActivationFn@ type alias and @Activation@ newtype
 
-      ActivationFn (callSymbolicMat, callScalar)
-    , callFunctor
+      ActivationFn
+    , activateScalar
+    , activateMat
 
-      -- * @ActivationLayer@ existential datatype
+    , Activation (Activation)
+
+      -- * @ActivationLayer@ newtype
     
     , ActivationLayer (ActivationLayer)
     , activationLayer
 
       -- * Activation functions
 
-    , Linear (Linear)
-
-    , Sin (Sin)
-
-    , Tanh (Tanh)
-
-    , ReLU (ReLU, reluThreshold, reluLeftSlope, reluMaxValue)
-    , defaultReLU
+    , reluWith
+    , relu
     ) where
 
 
 import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.LinearAlgebra (unsafeIndex)
+import Synapse.LinearAlgebra (Indexable(unsafeIndex))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
-import Synapse.Autograd (Symbol(Symbol), Symbolic, constSymbol, symbolicUnaryOp)
+import Synapse.Autograd (Symbol(unSymbol), Symbolic, constSymbol)
 
 
-{- | @ActivationFn@ typeclass describes unary functions that can be thought of as activation functions for neural network layers.
+-- | @ActivationFn@ is a type alias that represents unary functions that differentiable almost everywhere.
+type ActivationFn a = Symbol (Mat a) -> Symbol (Mat a)
 
-Any activation function should be differentiable almost everywhere and so
-it must provide @callSymbolicMat@ function, which is allows for function to be differentiated when needed.
-That function is very important, as it will be used in the backward loss propagation.
+-- | Applies activation function to a scalar to produce new scalar.
+activateScalar :: Symbolic a => ActivationFn a -> a -> a
+activateScalar fn = M.unSingleton . unSymbol . fn . constSymbol . M.singleton
 
-There is also @callScalar@ function that should allow cheap execution of function when gradients are not needed.
-There is a default implementation that uses @callSymbolicMat@, but it is a bit inefficient - try to provide your own implementation.
-That function is easily extended from scalars to functors over those scalars (see @callFunctor@).
+-- | Applies activation function to a scalar to produce new scalar.
+activateMat :: Symbolic a => ActivationFn a -> Mat a -> Mat a
+activateMat fn = unSymbol . fn . constSymbol
 
-@Synapse@ additionally requires so that activation functions could be serialized - that is to enhance user experience,
-allowing to save and load any parts of your models. If you want to convert said parts to @String@, use @show . toJSON@.
+
+{- | @Activation@ newtype wraps @ActivationFn@s - unary functions that can be thought of as activation functions for neural network layers.
+
+Any activation function must be differentiable almost everywhere and so
+it must be function that operates on @Symbol@s, which is allows for function to be differentiated when needed.
 -}
-class Functor fn => ActivationFn fn where
-    -- | Applies activation function to symbolic matrix to produce new symbolic matrix, while retaining gradients graph.
-    callSymbolicMat :: (Symbolic a, Floating a, Ord a) => fn a -> Symbol (Mat a) -> Symbol (Mat a)
+newtype Activation a = Activation (ActivationFn a)
 
-    -- | Applies activation function to a scalar to produce new scalar.
-    callScalar :: (Floating a, Ord a) => fn a -> a -> a
-
--- | Applies activation function to a functor to produce new functor.
-callFunctor :: (ActivationFn fn, Functor f, Floating a, Ord a) => fn a -> f a -> f a
-callFunctor fn = fmap (callScalar fn)
-
-
--- | @ActivationLayer@ existential datatype wraps anything that implements @ActivationFn@.
-data ActivationLayer a = forall fn. ActivationFn fn => ActivationLayer (fn a)
-
-instance Functor ActivationLayer where
-    fmap f (ActivationLayer fn) = ActivationLayer $ fmap f fn
+-- | @ActivationLayer@ newtype wraps any @Activation@ function.
+newtype ActivationLayer a = ActivationLayer (Activation a)
 
 instance AbstractLayer ActivationLayer where
     inputSize _ = Nothing
@@ -77,74 +62,31 @@ instance AbstractLayer ActivationLayer where
     getParameters _ = []
     updateParameters = const
 
-    symbolicForward _ (ActivationLayer fn) = callSymbolicMat fn
-    forward (ActivationLayer fn) = callFunctor fn
-
+    symbolicForward _ (ActivationLayer (Activation fn)) = fn
 
 -- | Creates configuration for activation layer.
-activationLayer :: ActivationFn fn => fn a -> LayerConfiguration (ActivationLayer a)
+activationLayer :: Activation a -> LayerConfiguration (ActivationLayer a)
 activationLayer fn = const $ ActivationLayer fn
 
 
--- Activation functions.
+-- Activation functions
 
--- | Identity activation function.
-data Linear a = Linear
+-- | Configurable ReLU function.
+reluWith 
+  :: (Symbolic a, Ord a)
+  => a        -- ^ Threshold of ReLU function.
+  -> a        -- ^ Left slope coefficient - slope of ReLU function on the left of threshold.
+  -> Maybe a  -- ^ Maximum value clamping - all values greater than this will be clamped.
+  -> ActivationFn a
+reluWith threshold leftSlope Nothing s =
+    s * constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
+                                                             in if x < threshold then leftSlope else 1))
+reluWith threshold leftSlope (Just maxValue) s =
+    s * constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
+                                                             in if x < threshold then leftSlope else 1))
+    - constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
+                                                           in if x >= maxValue then x - maxValue else 0))
 
-instance Functor Linear where
-    fmap _ _ = Linear
-
-instance ActivationFn Linear where
-    callSymbolicMat _ s = symbolicUnaryOp id s [(s, id)]
-    callScalar _ = id
-
-
--- | Sinusoid activation function.
-data Sin a = Sin
-
-instance Functor Sin where
-    fmap _ _ = Sin
-
-instance ActivationFn Sin where
-    callSymbolicMat _ = sin
-    callScalar _ = sin
-
-
--- | Hyperbolic tangent activation function.
-data Tanh a = Tanh
-
-instance Functor Tanh where
-    fmap _ _ = Tanh
-
-instance ActivationFn Tanh where
-    callSymbolicMat _ = tanh
-    callScalar _ = tanh
-
-
--- | Rectified linear unit (ReLU) activation function.
-data ReLU a = ReLU
-    { reluThreshold :: a        -- ^ Defines threshold of ReLU function (values lower than @reluThreshold@ will be damped).
-    , reluLeftSlope :: a        -- ^ Defines left slope of ReLU function (values lower than @reluThreshold@ will be multiplied by this coefficient).
-    , reluMaxValue  :: Maybe a  -- ^ Sets maximum value of ReLU function (values greater than @reluMaxValue@ will be clamped to it).
-    }
-
--- | Default version of @ReLU@ - threshold and left slope coefficient are set to 0 and no maximum clamping is done.
-defaultReLU :: Num a => ReLU a
-defaultReLU = ReLU 0 0 Nothing
-
-instance Functor ReLU where
-    fmap f (ReLU threshold leftSlope maxValue) = ReLU (f threshold) (f leftSlope) (fmap f maxValue)
-
-instance ActivationFn ReLU where
-    callSymbolicMat (ReLU threshold leftSlope Nothing) s@(Symbol _ mat _) =
-        s * constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
-                                                        in if x < threshold then leftSlope else 1))
-    callSymbolicMat (ReLU threshold leftSlope (Just maxValue)) s@(Symbol _ mat _) =
-         s * constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
-                                                         in if x < threshold then leftSlope else 1))
-           - constSymbol (M.generate (M.size mat) (\i -> let x = unsafeIndex mat i
-                                                         in if x >= maxValue then x - maxValue else 0))
-
-    callScalar (ReLU threshold leftSlope Nothing) x = if x < threshold then leftSlope * x else x
-    callScalar (ReLU threshold leftSlope (Just maxValue)) x = let x' = callScalar (ReLU threshold leftSlope Nothing) x
-                                                              in if x' > maxValue then maxValue else x
+-- | Default version of ReLU - threshold and left slope coefficient are set to 0 and no maximum clamping is done.
+relu :: (Symbolic a, Ord a) => ActivationFn a
+relu = reluWith 0 0 Nothing

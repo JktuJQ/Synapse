@@ -38,10 +38,6 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ V.fromList $
                              output = fromMaybe prevSize outputMaybe
                          in layer : go output ls
 
-
-instance Functor SequentialModel where
-    fmap f = SequentialModel . fmap (fmap f) . unSequentialModel
-
 instance AbstractLayer SequentialModel where
     inputSize = inputSize . V.head . unSequentialModel
     outputSize = outputSize . V.head . unSequentialModel
@@ -50,4 +46,3 @@ instance AbstractLayer SequentialModel where
     updateParameters (SequentialModel layers) parameters = SequentialModel $ fmap (`updateParameters` parameters) layers
 
     symbolicForward prefix (SequentialModel layers) input = V.foldl' (flip $ symbolicForward prefix) input layers
-    forward (SequentialModel layers) input = V.foldl' (flip forward) input layers

@@ -15,7 +15,9 @@ That is the building block of any neural network.
 module Synapse.ML.Layers.Layer
     ( -- * @AbstractLayer@ typeclass
 
-      AbstractLayer (inputSize, outputSize, getParameters, updateParameters, symbolicForward, forward)
+      AbstractLayer (inputSize, outputSize, getParameters, updateParameters, symbolicForward)
+
+    , forward
       
       -- * @Layer@ existential datatype
 
@@ -28,13 +30,13 @@ module Synapse.ML.Layers.Layer
 
 import Synapse.LinearAlgebra.Mat (Mat)
 
-import Synapse.Autograd (Symbol, Symbolic)
+import Synapse.Autograd (Symbolic, Symbol(unSymbol), constSymbol)
 
 
 {- | @AbstractLayer@ typeclass defines basic interface of all layers of neural network model.
 
-Every layer should be able to pass (@forward@) @Mat@ through itself to produce new @Mat@ - make prediction based on its parameters.
-There is also @symbolicForward@ counterpart, which allows for gradients to be calculated after predictions,
+Every layer should be able to pass @Mat@ through itself to produce new @Mat@ (make prediction based on its parameters)
+using @symbolicForward@ function, which allows for gradients to be calculated after predictions,
 which in turn makes training possible.
 
 @getParameters@ function is needed to obtain information about number and and form of parameters on a layer.
@@ -48,7 +50,7 @@ Note: any model is an @AbstractLayer@ instance too, so don't be confused by the 
 Important: this typeclass correct implementation is very important for work of the neural network and training,
 read the docs thoroughly to ensure that all the invariants are met.
 -}
-class Functor l => AbstractLayer l where
+class AbstractLayer l where
     -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence (activation functions are the example).
     inputSize :: l a -> Maybe Int
     -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence (activation functions are the example).
@@ -72,15 +74,14 @@ class Functor l => AbstractLayer l where
     -}
     symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> l a -> Symbol (Mat a) -> Symbol (Mat a)
 
-    -- | Passes matrix through to produce new matrix.
-    forward :: (Floating a, Ord a) => l a -> Mat a -> Mat a
+
+-- | Passes matrix through to produce new matrix.
+forward :: (AbstractLayer l, Symbolic a, Floating a, Ord a) => l a -> Mat a -> Mat a
+forward layer input = unSymbol $ symbolicForward "" layer (constSymbol input)
 
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.
 data Layer a = forall l. AbstractLayer l => Layer (l a)
-
-instance Functor Layer where
-    fmap f (Layer l) = Layer $ fmap f l
 
 instance AbstractLayer Layer where
     inputSize (Layer l) = inputSize l
@@ -90,7 +91,6 @@ instance AbstractLayer Layer where
     updateParameters (Layer l) = Layer . updateParameters l
 
     symbolicForward prefix (Layer l) = symbolicForward prefix l
-    forward (Layer l) = forward l
 
 
 -- | @LayerConfiguration@ type alias represents functions that are able to build layers.
