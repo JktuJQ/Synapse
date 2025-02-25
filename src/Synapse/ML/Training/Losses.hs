@@ -19,12 +19,11 @@ module Synapse.ML.Training.Losses
     ) where
 
 
-import Synapse.LinearAlgebra ((+.), (*.), (/.), (**.))
+import Synapse.LinearAlgebra ((+.), (*.), (**.), mean)
 
 import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
 
-import Synapse.Autograd (Symbol(unSymbol), Symbolic)
+import Synapse.Autograd (Symbol, Symbolic)
 
 
 -- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
@@ -32,11 +31,6 @@ type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
 
 
 -- Regression losses
-
--- | Divides every element of a @Mat@ by a number of elements in said @Mat@.
-mean :: (Symbolic a, Fractional a) => Symbol (Mat a) -> Symbol (Mat a)
-mean mat = mat /. fromIntegral (M.nElements $ unSymbol mat)
-
 
 -- | Computes the mean of squares of errors.
 mse :: (Symbolic a, Floating a) => LossFn a
