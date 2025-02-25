@@ -39,10 +39,10 @@ class Indexable f where
     unsafeIndex :: f a -> Index f -> a
 
     -- | Indexing with bounds checking.
-    (!) :: Indexable f => f a -> Index f -> a
+    (!) :: f a -> Index f -> a
 
     -- | Safe indexing.
-    (!?) :: Indexable f => f a -> Index f -> Maybe a
+    (!?) :: f a -> Index f -> Maybe a
 
 
 infixl 6 +., -.
