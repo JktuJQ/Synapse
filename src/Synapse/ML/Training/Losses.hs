@@ -1,6 +1,6 @@
 {- | Provides collection of functions that are used to as a reference of what needs to be minimised during training.
 
-@LossFn@ type alias represents those functions, and @Synapse@ provides a variety of them.
+@LossFn@ type alias represents those functions, and @Synapse@ offers a variety of them.
 -}
 
 
@@ -19,14 +19,19 @@ module Synapse.ML.Training.Losses
     ) where
 
 
-import Synapse.LinearAlgebra ((+.), (*.), (**.), mean)
+import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (*.), (**.)), ToScalarOps(mean))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 
 import Synapse.Autograd (Symbol, Symbolic)
 
 
--- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
+{- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
+
+Every loss function is expected to return symbol of singleton matrix.
+This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
+If you want to bypass this requirement - customise @fit@ function accordingly.
+-}
 type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
 
 
