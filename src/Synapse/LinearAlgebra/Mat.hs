@@ -20,6 +20,9 @@ module Synapse.LinearAlgebra.Mat
 
     , nElements
     , size
+
+    , unSingleton
+
     , isTransposed
     , isSubmatrix
 
@@ -95,7 +98,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), (!), ElementwiseScalarOps(..))
+import Synapse.LinearAlgebra (Indexable(..), (!), ElementwiseScalarOps(..), ToScalarOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -137,6 +140,14 @@ nElements mat = nRows mat * nCols mat
 size :: Mat a -> (Int, Int)
 size mat = (nRows mat, nCols mat)
 
+
+-- | Extracts scalar element if @Mat@ is a singleton.
+unSingleton :: Mat a -> a
+unSingleton mat
+    | nElements mat /= 1 = error "Vector is not a singleton"
+    | otherwise   = unsafeIndex mat (0, 0)
+
+
 -- | Whether the matrix is transposed. If the matrix consists of only one element, it is considered never transposed.
 isTransposed :: Mat a -> Bool
 isTransposed mat = colStride mat /= 1 && rowStride mat == 1
@@ -177,12 +188,10 @@ instance Indexable Mat where
     type Index Mat = (Int, Int)
 
     unsafeIndex x (r, c) = V.unsafeIndex (storage x) (indexMatToVec x (r, c))
-
-    index x (r, c)
+    (!) x (r, c)
         | r < 0 || r >= nRows x || c < 0 || c >= nCols x = error $ "Index " ++ show (r, c) ++ " is out of bounds for matrix with size " ++ show (size x)
         | otherwise                                      = unsafeIndex x (r, c)
-
-    safeIndex x (r, c)
+    (!?) x (r, c)
         | r < 0 || r >= nRows x || c < 0 || c >= nCols x = Nothing
         | otherwise                                      = Just $ unsafeIndex x (r, c)
 
@@ -195,13 +204,6 @@ instance Num a => Num (Mat a) where
     abs = fmap abs
     signum = fmap signum
     fromInteger = singleton . fromInteger
-
-instance ElementwiseScalarOps (Mat a) a where
-    (+.) x n = fmap (+ n) x
-    (-.) x n = fmap (subtract n) x
-    (*.) x n = fmap (* n) x
-    (/.) x n = fmap (/ n) x
-    (**.) x n = fmap (** n) x
 
 instance Fractional a => Fractional (Mat a) where
     (/) = elementwise (/)
@@ -226,18 +228,29 @@ instance Floating a => Floating (Mat a) where
     atanh = fmap atanh
 
 
-instance Approx a => Approx (Mat a) where
-    (~==) x@(Mat rows1 cols1 _ _ _ _ _) y@(Mat rows2 cols2 _ _ _ _ _)
-        | rows1 /= rows2 || cols1 /= cols2 = False
-        | otherwise                        = and [unsafeIndex x (r, c) ~== unsafeIndex y (r, c) | r <- [0 .. rows1 - 1], c <- [0 .. cols1 - 1]]
+instance ElementwiseScalarOps (Mat a) a where
+    (+.) x n = fmap (+ n) x
+    (-.) x n = fmap (subtract n) x
+    (*.) x n = fmap (* n) x
+    (/.) x n = fmap (/ n) x
+    (**.) x n = fmap (** n) x
 
-    correct x digits = fmap (`correct` digits) x
-    roundTo x digits = fmap (`roundTo` digits) x
+    elementsMin x n = fmap (min n) x
+    elementsMax x n = fmap (max n) x
+
+instance ToScalarOps (Mat a) a where
+    elementsSum mat@(Mat rows cols _ _ _ _ _) = singleton $ sum [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
+    elementsProduct mat@(Mat rows cols _ _ _ _ _) = singleton $ product [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
+
+    mean x = elementsSum x /. fromIntegral (nElements x)
+
+    norm x = sqrt $ elementsSum $ x * x
+
 
 instance Eq a => Eq (Mat a) where
-    (==) x@(Mat rows1 cols1 _ _ _ _ _) y@(Mat rows2 cols2 _ _ _ _ _)
+    (==) a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
         | rows1 /= rows2 || cols1 /= cols2 = False
-        | otherwise                        = and [unsafeIndex x (r, c) == unsafeIndex y (r, c) | r <- [0 .. rows1 - 1], c <- [0 .. cols1 - 1]]
+        | otherwise                        = and [unsafeIndex a (r, c) == unsafeIndex b (r, c) | r <- [0 .. rows1 - 1], c <- [0 .. cols1 - 1]]
 
 
 instance Functor Mat where
@@ -417,10 +430,6 @@ swapCols mat@(Mat rows cols _ _ _ _ _) col1 col2
                                                                                                 else if c == col2 then unsafeIndex mat (r, col1)
                                                                                                 else unsafeIndex mat (r, c)
 
--- | Transposes matrix.
-transpose :: Mat a -> Mat a
-transpose (Mat rows cols rk ck r0 c0 x) = Mat cols rows ck rk c0 r0 x
-
 
 -- Submatrices
 
@@ -492,12 +501,11 @@ identity n = generate (n, n) $ \(r, c) -> if r == c then 1 else 0
 adamarMul :: Num a => Mat a -> Mat a -> Mat a
 adamarMul = elementwise (*)
 
--- | Matrix multiplication.
-matMul :: Num a => Mat a -> Mat a -> Mat a
-matMul a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
-    | cols1 /= rows2 = error "Matrices dimensions do not match"
-    | otherwise      = generate (rows1, cols2) $ \(r, c) -> indexRow a r `SV.dot` indexCol b c
-
+instance Num a => MatOps (Mat a) a where
+    transpose (Mat rows cols rk ck r0 c0 x) = Mat cols rows ck rk c0 r0 x
+    matMul a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
+        | cols1 /= rows2 = error "Matrices dimensions do not match"
+        | otherwise      = generate (rows1, cols2) $ \(r, c) -> SV.unSingleton $ indexRow a r `SV.dot` indexCol b c
 
 -- | Determinant of a square matrix. If matrix is empty, zero is returned.
 det :: Num a => Mat a -> a
@@ -548,5 +556,5 @@ orthogonalized :: Floating a => Mat a -> Mat a
 orthogonalized mat = foldl' (\mat' row -> mapRow row SV.normalized $ iterationGramSchmidt mat' row) mat [0 .. nRows mat]
   where
     iterationGramSchmidt mat' row = foldl' (\mat'' r ->
-                                            mapRow row (subtract $ indexRow mat'' r *. indexRow mat'' r `SV.dot` indexRow mat'' row) mat''
+                                            mapRow row (subtract $ indexRow mat'' r *. SV.unSingleton (indexRow mat'' r `SV.dot` indexRow mat'' row)) mat''
                                            ) mat' [0 .. row]

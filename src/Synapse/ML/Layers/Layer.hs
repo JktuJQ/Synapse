@@ -9,7 +9,6 @@ That is the building block of any neural network.
 -}
 
 
-{-# LANGUAGE DefaultSignatures         #-}  -- @DefaultSignatures@ are needed to provide default implementation in @AbstractLayer@ typeclass.
 {-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @Layer@ datatype.
 
 
@@ -29,7 +28,7 @@ module Synapse.ML.Layers.Layer
 
 import Synapse.LinearAlgebra.Mat (Mat)
 
-import Synapse.Autograd (Symbol(unSymbol), Symbolic, constSymbol)
+import Synapse.Autograd (Symbol, Symbolic)
 
 
 {- | @AbstractLayer@ typeclass defines basic interface of all layers of neural network model.
@@ -75,8 +74,6 @@ class Functor l => AbstractLayer l where
 
     -- | Passes matrix through to produce new matrix.
     forward :: (Floating a, Ord a) => l a -> Mat a -> Mat a
-    default forward :: (Symbolic a, Floating a, Ord a) => l a -> Mat a -> Mat a
-    forward l mat = unSymbol $ symbolicForward "" l (constSymbol mat)
 
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.

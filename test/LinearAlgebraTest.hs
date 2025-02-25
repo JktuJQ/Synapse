@@ -6,7 +6,7 @@ module LinearAlgebraTest
     ) where
 
 
-import Synapse.LinearAlgebra ((~==), (!), EndofunctorNumOps(..))
+import Synapse.LinearAlgebra ((!), ElementwiseScalarOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -124,7 +124,7 @@ testMatComplicatedOps = TestLabel "testMatComplicatedOps" $ TestList
     , TestCase $ assertEqual "det" (-230) (M.det mat2)
     , TestCase $ assertEqual "rref" (M.fromLists (2, 4) [[1.0, 0.0, -3.0, -4.0], [0.0, 1.0, 1.0, 1.0]]) (M.rref mat3)
     , TestCase $ assertEqual "inverse" (Just $ M.fromLists (2, 2) [[-3.0, -4.0], [1.0, 1.0]]) (M.inverse mat4)
-    , TestCase $ assertBool "orthogonal" $ M.fromLists (2, 2) [[-(sqrt 2.0 / 2.0), -(sqrt 2.0 / 2.0)], [sqrt 2.0 / 2.0, -(sqrt 2.0 / 2.0)]] ~==
+    , TestCase $ assertBool "orthogonal" $ M.fromLists (2, 2) [[-(sqrt 2.0 / 2.0), -(sqrt 2.0 / 2.0)], [sqrt 2.0 / 2.0, -(sqrt 2.0 / 2.0)]] ==
                                            M.orthogonalized mat5
     ]
   where

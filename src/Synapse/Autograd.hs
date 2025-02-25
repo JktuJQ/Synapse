@@ -43,7 +43,7 @@ module Synapse.Autograd
     ) where
 
 
-import Synapse.LinearAlgebra (ElementwiseScalarOps(..), ElementwiseScalarOps)
+import Synapse.LinearAlgebra (Indexable(unsafeIndex), ElementwiseScalarOps(..), ElementwiseScalarOps(..), ToScalarOps(..), VecOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -122,8 +122,6 @@ which allows @Synapse@ to build a graph of computation and obtain needed gradien
 @symbolGradients@ list contains pairs: first element in that pair is symbol wrt which you can take gradient and
 the second element is closure that represents chain rule - it takes incoming local gradient of said symbol and multiplies it by local derivative.
 You can check out implementations of those operations in the source to give yourself a reference.
-
-Note on @EndofunctorNumOps@: @efmap@ does not affect gradients, although other operations from @EndofunctorNumOps@ do.
 -}
 data Symbol a = Symbol
     { symbolName      :: String                              -- ^ Name of a symbol (identifier for differentiation).
@@ -183,20 +181,6 @@ instance Symbolic a => Num (Symbol a) where
     signum x = symbolicUnaryOp signum x [(x, id)]
     fromInteger = constSymbol . fromInteger
 
-instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) a where
-    (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
-    (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
-    (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
-    (/.) x n = x / constSymbol (V.replicate (V.size $ unSymbol x) n)
-    (**.) x n = x ** constSymbol (V.replicate (V.size $ unSymbol x) n)
-
-instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
-    (+.) x n = x + constSymbol (M.replicate (M.size $ unSymbol x) n)
-    (-.) x n = x - constSymbol (M.replicate (M.size $ unSymbol x) n)
-    (*.) x n = x * constSymbol (M.replicate (M.size $ unSymbol x) n)
-    (/.) x n = x / constSymbol (M.replicate (M.size $ unSymbol x) n)
-    (**.) x n = x ** constSymbol (M.replicate (M.size $ unSymbol x) n)
-
 instance (Symbolic a, Fractional a) => Fractional (Symbol a) where
     (/) a b = symbolicBinaryOp (/) a b [(a, (/ b)), (b, (* (negate a / (b * b))))]
     recip x = symbolicUnaryOp recip x [(x, (* (negate (symbolicOne x) / (x * x))))]
@@ -219,14 +203,55 @@ instance (Symbolic a, Floating a) => Floating (Symbol a) where
     acosh x = symbolicUnaryOp acosh x [(x, (* recip (sqrt (x * x - symbolicOne x))))]
     atanh x = symbolicUnaryOp atanh x [(x, (* recip (symbolicOne x - x * x)))]
 
--- | Symbolic matrix transposing.
-transpose :: Symbolic a => Symbol (Mat a) -> Symbol (Mat a)
-transpose x = symbolicUnaryOp M.transpose x [(x, (* transpose x))]
+instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) a where
+    (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (/.) x n = x / constSymbol (V.replicate (V.size $ unSymbol x) n)
+    (**.) x n = x ** constSymbol (V.replicate (V.size $ unSymbol x) n)
 
--- | Symbolic matrix multiplication.
-matMul :: Symbolic a => Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
-matMul a b = symbolicBinaryOp M.matMul a b [(a, (`matMul` transpose b)), (b, (transpose a `matMul`))]
+    elementsMin x n = symbolicUnaryOp (`elementsMin` n) x
+                      [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i <= n then 1 else 0)))]
+    elementsMax x n = symbolicUnaryOp (`elementsMax` n) x
+                      [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i >= n then 1 else 0)))]
 
+instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
+    (+.) x n = x + constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (-.) x n = x - constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (*.) x n = x * constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (/.) x n = x / constSymbol (M.replicate (M.size $ unSymbol x) n)
+    (**.) x n = x ** constSymbol (M.replicate (M.size $ unSymbol x) n)
+
+    elementsMin x n = symbolicUnaryOp (`elementsMin` n) x
+                      [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i <= n then 1 else 0)))]
+    elementsMax x n = symbolicUnaryOp (`elementsMax` n) x
+                      [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i >= n then 1 else 0)))]
+
+instance Symbolic a => ToScalarOps (Symbol (Vec a)) a where
+    elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
+    elementsProduct x = let innerProduct = V.unSingleton $ elementsProduct $ unSymbol x
+                        in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
+
+    mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (V.size (unSymbol x)))))]
+
+    norm x = symbolicUnaryOp norm x [(x, (* (x /. V.unSingleton (norm $ unSymbol x))))]
+
+instance Symbolic a => ToScalarOps (Symbol (Mat a)) a where
+    elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
+    elementsProduct x = let innerProduct = M.unSingleton $ elementsProduct $ unSymbol x
+                        in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
+
+    mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (M.nElements $ unSymbol x))))]
+
+    norm x = symbolicUnaryOp norm x [(x, (* (x /. M.unSingleton (norm $ unSymbol x))))]
+
+instance Symbolic a => VecOps (Symbol (Vec a)) a where
+    dot a b = elementsSum $ a * b
+
+instance Symbolic a => MatOps (Symbol (Mat a)) a where
+    transpose x = symbolicUnaryOp M.transpose x [(x, (* transpose x))]
+
+    matMul a b = symbolicBinaryOp M.matMul a b [(a, (`matMul` transpose b)), (b, (transpose a `matMul`))]
 
 -- Gradients calculation
 
@@ -273,6 +298,6 @@ nthPartialGradient = foldl' $ \y x -> getGradientsOf y `wrt` x
 
 -- | Takes nth order gradient of one symbol wrt other symbol. If n is negative number, an error is returned.
 nthGradient :: Symbolic a => Int -> Symbol a -> Symbol a -> Symbol a
-nthGradient n y 
+nthGradient n y
     | n < 0 = error "Cannot take negative order gradient"
     | otherwise = nthPartialGradient y . replicate n

@@ -2,90 +2,34 @@
 
 This module implements @Vec@ and @Mat@ datatypes and provides
 several useful function to work with them.
+
+Most of typeclasses of this module are multiparameter typeclasses.
+That is to permit instances on types that are not exactly collections, but rather wrappers of collections,
+and it allows imposing additional constraints on inner type.
+The best example is @Symbol@ from @Synapse.Autograd@.
 -}
 
 
-{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @ElementwiseScalarOps@ typeclass.
+{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @ElementwiseScalarOps@, @ToScalarOps@, @VecOps@, @MatOps@ typeclasses.
 {-# LANGUAGE TypeFamilies           #-}  -- @TypeFamilies@ are needed to define @Indexable@ typeclass.
 
 
 module Synapse.LinearAlgebra
-    ( -- * Typeclasses
-      Approx ((~==), (~/=), correct, roundTo)
-    , Indexable (Index, unsafeIndex, index, safeIndex)
-    , (!)
-    , (!?)
-    , ElementwiseScalarOps ((+.), (-.), (*.), (/.), (**.))
+    ( -- * @Indexable@ typeclass
 
-      -- * Constants
-    , epsilon
-    , closeToZero
-    , closeToOne
+     Indexable (Index, unsafeIndex, (!), (!?))
+
+      -- * Scalar operations
+    , ElementwiseScalarOps ((+.), (-.), (*.), (/.), (**.), elementsMin, elementsMax)
+    , ToScalarOps (elementsSum, elementsProduct, mean, norm)
+
+      -- * Collection operations
+    , VecOps (dot)
+    , MatOps (transpose, matMul)
     ) where
 
 
-infix 4 ~==, ~/=
--- | @Approx@ class provides functions to work with potential floating point errors.
-class Approx a where
-    -- | Checks whether two objects are nearly equal.
-    (~==) :: a -> a -> Bool
-    (~==) a b = not $ (~/=) a b
-
-    -- | Checks whether two objects are not nearly equal.
-    (~/=) :: a -> a -> Bool
-    (~/=) a b = not $ (~==) a b
-
-    -- | Corrects distortions that may be caused by float operations.
-    correct :: a -> Int -> a
-
-    -- | Rounds to given amount of digits after floating point. Passing negative number shifts floating point to the left.
-    roundTo :: a -> Int -> a
-
-    {-# MINIMAL ((~==) | (~/=)), correct, roundTo #-}
-
--- | Constant that defines the difference between two fractionals that is considered small enough for approximate equality.
-epsilon :: Fractional a => a
-epsilon = 1e-5
-
--- | Constant that defines how small fractional part of number has to be to be considered close to zero.
-closeToZero :: Fractional a => a
-closeToZero = 0.0001
-
--- | Constant that defines how big fractional part of number has to be to be considered close to one.
-closeToOne :: Fractional a => a
-closeToOne = 0.9999
-
-instance Approx Float where
-    (~==) x y = let m = max (abs x) (abs y)
-               in (m < epsilon) || ((abs (x - y) / m) < epsilon)
-
-    correct x digits = if x == -0.0 then 0.0 else n / mul
-      where
-        mul = 10.0 ^ digits
-
-        powered = x * mul
-        n = if (closeToZero > fractionalPart) || (fractionalPart > closeToOne)
-                then fromIntegral (round n :: Int)
-                else n
-          where
-            (_, fractionalPart) = properFraction $ abs powered :: (Int, Float)
-
-    roundTo x digits = let mul = 10.0 ^ digits
-                       in fromIntegral (round (x * mul) :: Int) / mul
-
-instance Approx Double where
-    (~==) x y = let m = max (abs x) (abs y)
-               in (m < epsilon) || ((abs (x - y) / m) < epsilon)
-
-    correct x digits = if x == -0.0 then 0.0 else n / mul
-      where
-        mul = 10.0 ^ digits
-
-        powered = x * mul
-        n = if (closeToZero > fractionalPart) || (fractionalPart > closeToOne)
-                then fromIntegral (round n :: Int)
-                else n
-          where
+infixl 9 !, !?
 -- | @Indexable@ typeclass provides indexing interface for datatypes. 
 class Indexable f where
     -- | Type of index for @Indexable@ collection.
@@ -95,29 +39,18 @@ class Indexable f where
     unsafeIndex :: f a -> Index f -> a
 
     -- | Indexing with bounds checking.
-    index :: f a -> Index f -> a
+    (!) :: Indexable f => f a -> Index f -> a
 
     -- | Safe indexing.
-    safeIndex :: f a -> Index f -> Maybe a
-
-
-infixl 9 !
--- | Indexing with bounds checking (operator alias for @index@).
-(!) :: Indexable f => f a -> Index f -> a
-(!) = index
-
--- | Safe indexing (operator alias for @safeIndex@).
-infixl 9 !?
-(!?) :: Indexable f => f a -> Index f -> Maybe a
-(!?) = safeIndex
+    (!?) :: Indexable f => f a -> Index f -> Maybe a
 
 
 infixl 6 +., -.
 infixl 7 *., /.
 infixr 8 **.
-{- | @ElementwiseScalarOps@ class allows collections over numerical values easily work with scalars by using elementwise operations.
+{- | @ElementwiseScalarOps@ typeclass allows collections over numerical values easily work with scalars by using elementwise operations.
 
-This class is a multiparameter class to permit instances on types that are not exactly collections, but rather wrappers of collections.
+This typeclass is a multiparameter typeclass to permit instances on types that are not exactly collections, but rather wrappers of collections.
 The best example is @Symbol@ from @Synapse.Autograd@.
 -}
 class ElementwiseScalarOps f a | f -> a where
@@ -125,11 +58,55 @@ class ElementwiseScalarOps f a | f -> a where
     (+.) :: Num a => f -> a -> f
     -- | Subtracts given value from every element of the functor.
     (-.) :: Num a => f -> a -> f
-
     -- | Multiplies every element of the functor by given value.
     (*.) :: Num a => f -> a -> f
     -- | Divides every element of the functor by given value.
     (/.) :: Fractional a => f -> a -> f
-
     -- | Exponentiates every element of the functor by given value.
     (**.) :: Floating a => f -> a -> f
+
+    -- | Applies @min@ operation with given value to every element.
+    elementsMin :: Ord a => f -> a -> f
+    -- | Applies @max@ operation with given value to every element.
+    elementsMax :: Ord a => f -> a -> f
+
+{- | @ToScalar@ typeclass provides operations that reduce collections to singletons (scalars that are still wrapped in said collection).
+
+All functions of that typeclass must return singletons (scalars that are wrapped in collection).
+
+This typeclass is a multiparameter typeclass to permit instances on types that are not exactly collections, but rather wrappers of collections.
+The best example is @Symbol@ from @Synapse.Autograd@.
+-}
+class ToScalarOps f a | f -> a where
+    -- | Sums all elements of collection.
+    elementsSum :: Num a => f -> f
+    -- | Multiplies all elements of collection (@Fractional@ constraint is needed for efficient gradient calculation).
+    elementsProduct :: Fractional a => f -> f
+    
+    -- | Calculates the mean of all elements of collection.
+    mean :: Fractional a => f -> f
+
+    -- | Calculates the Frobenius norm of all elements of collection.
+    norm :: Floating a => f -> f
+
+
+{- | @VecOps@ typeclass provides vector-specific operations.
+
+This typeclass is a multiparameter typeclass to permit instances on types that are not exactly collections, but rather wrappers of collections.
+The best example is @Symbol@ from @Synapse.Autograd@.
+-}
+class VecOps f a | f -> a where
+    -- | Calculates dot product of two vectors.
+    dot :: Num a => f -> f -> f
+
+{- | @MatOps@ typeclass provides matrix-specific operations.
+
+This typeclass is a multiparameter typeclass to permit instances on types that are not exactly collections, but rather wrappers of collections.
+The best example is @Symbol@ from @Synapse.Autograd@. 
+-}
+class MatOps f a | f -> a where
+    -- | Transposes matrix.
+    transpose :: f -> f
+
+    -- | Mutiplies two matrices.
+    matMul :: Num a => f -> f -> f

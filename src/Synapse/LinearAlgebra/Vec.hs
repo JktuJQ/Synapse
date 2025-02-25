@@ -20,6 +20,8 @@ module Synapse.LinearAlgebra.Vec
 
     , size
 
+    , unSingleton
+
       -- * Constructors
 
     , empty
@@ -61,7 +63,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Approx(..), Indexable(..), ElementwiseScalarOps(..))
+import Synapse.LinearAlgebra (Indexable(..), ElementwiseScalarOps(..), ToScalarOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -72,12 +74,18 @@ import qualified Data.Vector as V
 
 -- | Mathematical vector (collection of elements).
 newtype Vec a = Vec
-    { unVec :: V.Vector a  -- ^ Internal representation
+    { unVec :: V.Vector a  -- ^ Internal representation.
     } deriving (Eq, Read)
 
 -- | Size of a vector - number of elements.
 size :: Vec a -> Int
 size = V.length . unVec
+
+-- | Extracts scalar element if @Vec@ is a singleton.
+unSingleton :: Vec a -> a
+unSingleton v
+    | size v /= 1 = error "Vector is not a singleton"
+    | otherwise   = unsafeIndex v 0
 
 
 -- Typeclasses
@@ -90,10 +98,8 @@ instance Indexable Vec where
     type Index Vec = Int
 
     unsafeIndex (Vec x) = V.unsafeIndex x
-
-    index (Vec x) = (V.!) x
-
-    safeIndex (Vec x) = (V.!?) x
+    (!) (Vec x) = (V.!) x
+    (!?) (Vec x) = (V.!?) x
 
 
 instance Num a => Num (Vec a) where
@@ -104,13 +110,6 @@ instance Num a => Num (Vec a) where
     abs = fmap abs
     signum = fmap signum
     fromInteger = singleton . fromInteger
-
-instance ElementwiseScalarOps (Vec a) a where
-    (+.) x n = fmap (+ n) x
-    (-.) x n = fmap (subtract n) x
-    (*.) x n = fmap (* n) x
-    (/.) x n = fmap (/ n) x
-    (**.) x n = fmap (** n) x
 
 instance Fractional a => Fractional (Vec a) where
     (/) = zipWith (/)
@@ -134,13 +133,23 @@ instance Floating a => Floating (Vec a) where
     acosh = fmap acosh
     atanh = fmap atanh
 
+instance ElementwiseScalarOps (Vec a) a where
+    (+.) x n = fmap (+ n) x
+    (-.) x n = fmap (subtract n) x
+    (*.) x n = fmap (* n) x
+    (/.) x n = fmap (/ n) x
+    (**.) x n = fmap (** n) x
 
-instance Approx a => Approx (Vec a) where
-    (~==) x y = and $ zipWith (~==) x y
+    elementsMin x n = fmap (min n) x
+    elementsMax x n = fmap (max n) x
 
-    correct x digits = fmap (`correct` digits) x
-    roundTo x digits = fmap (`roundTo` digits) x
+instance ToScalarOps (Vec a) a where
+    elementsSum = singleton . V.sum . unVec
+    elementsProduct = singleton . V.product . unVec
 
+    mean x = elementsSum x /. fromIntegral (size x)
+
+    norm x = sqrt $ elementsSum $ x * x
 
 instance Functor Vec where
     fmap f = Vec . V.map f . unVec
@@ -269,14 +278,12 @@ linearCombination :: Num a => [(a, Vec a)] -> Vec a
 linearCombination [] = empty
 linearCombination (x:xs) = foldl' (\acc (a, v) -> acc + v *. a) (snd x *. fst x) xs
 
--- | Calculates dot product of two @Vec@s.
-dot :: Num a => Vec a -> Vec a -> a
-dot a b = sum $ zipWith (*) a b
-
+instance Num a => VecOps (Vec a) a where
+    dot a b = elementsSum $ a * b
 
 -- | Calculates an angle between two @Vec@s.
 angleBetween :: Floating a => Vec a -> Vec a -> a
-angleBetween a b = acos $ (a `dot` b) / (magnitude a * magnitude b)
+angleBetween a b = acos $ unSingleton (a `dot` b) / (magnitude a * magnitude b)
 
 -- | Linearly interpolates between two @Vec@s. Given parameter will be clamped between [0.0, 1.0].
 lerp :: (Floating a, Ord a) => a -> Vec a -> Vec a -> Vec a
