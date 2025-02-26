@@ -279,14 +279,13 @@ getGradientsOf differentiatedSymbol = Gradients $ HM.insert differentiatedSymbol
   where
     wrtItself = symbolicOne differentiatedSymbol
 
-    go :: Symbolic a => HM.HashMap (Symbol a) (Symbol a) -> Symbol a -> Symbol a -> HM.HashMap (Symbol a) (Symbol a)
-    go grads (Symbol _ _ localGrads) pathValue =
+    go grads s pathValue =
         foldr (\(child, mulPath) grad -> let pathValue' = mulPath pathValue
                                              grad' = HM.alter (\e -> Just $ case e of
                                                                                 Nothing -> pathValue'
                                                                                 Just x  -> x + pathValue'
                                                               ) child grad
-                                         in go grad' child pathValue') grads localGrads
+                                         in go grad' child pathValue') grads (symbolGradients s)
 
 -- | Chooses gradient with respect to given symbol.
 wrt :: Symbolic a => Gradients a -> Symbol a -> Symbol a

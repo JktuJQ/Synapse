@@ -526,7 +526,6 @@ det mat@(Mat rows cols _ _ _ _ _)
 rref :: (Eq a, Fractional a) => Mat a -> Mat a
 rref mat@(Mat rows cols _ _ _ _ _) = go mat 0 [0 .. rows - 1]
   where
-    go :: (Eq a, Fractional a) => Mat a -> Int -> [Int] -> Mat a
     go m _ [] = m
     go m lead (r:rs) = case find ((0 /=) . unsafeIndex m) [(i, j) | j <- [lead .. cols - 1], i <- [r .. rows - 1]] of
                            Nothing                -> m
