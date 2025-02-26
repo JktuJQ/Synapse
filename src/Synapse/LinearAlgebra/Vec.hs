@@ -30,12 +30,14 @@ module Synapse.LinearAlgebra.Vec
     , generate
     , replicate
 
-      -- * Concatenation
+      -- * Concatenation and splitting
 
     , cons
     , snoc
     , (++)
     , concat
+
+    , splitAt
 
       -- * Combining
 
@@ -65,7 +67,7 @@ module Synapse.LinearAlgebra.Vec
 
 import Synapse.LinearAlgebra (Indexable(..), ElementwiseScalarOps(..), ToScalarOps(..), VecOps(..))
 
-import Prelude hiding ((++), concat, map, replicate, zip, zipWith)
+import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
 import Data.Ord (clamp)
 
@@ -202,7 +204,7 @@ replicate :: Int -> a -> Vec a
 replicate n = generate n . const
 
 
--- Concatenation
+-- Concatenation and splitting
 
 -- | Prepend @Vec@ with given element.
 cons :: a -> Vec a -> Vec a
@@ -220,6 +222,11 @@ infixr 5 ++
 -- | Concatenate all @Vec@s.
 concat :: [Vec a] -> Vec a
 concat = foldr1 (++)
+
+-- | Splits @Vec@ into two @Vec@s at a given index.
+splitAt :: Int -> Vec a -> (Vec a, Vec a)
+splitAt i (Vec v) = let (v1, v2) = V.splitAt i v
+                  in (Vec v1, Vec v2)
 
 
 -- Combining
