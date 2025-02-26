@@ -10,7 +10,7 @@ module Synapse.ML.Training.Metrics
       MetricFn
     , lossFnToMetricFn
     
-    , Metric (Metric)
+    , Metric (Metric, unMetric)
     ) where
 
 
@@ -35,4 +35,6 @@ Every metric function is expected to return symbol of singleton matrix.
 This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
 If you want to bypass this requirement - customise @fit@ function accordingly.
 -}
-newtype Metric a = Metric (MetricFn a)
+newtype Metric a = Metric 
+    { unMetric :: MetricFn a  -- ^ Unwraps @Metric@ newtype.
+    }

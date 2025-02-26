@@ -9,12 +9,8 @@ module Synapse.ML.Layers.Activations
     , activateScalar
     , activateMat
 
-    , Activation (Activation)
-
-      -- * @ActivationLayer@ newtype
-    
-    , ActivationLayer (ActivationLayer)
-    , activationLayer
+    , Activation (Activation, unActivation)
+    , layerActivation
 
       -- * Activation functions
 
@@ -50,23 +46,22 @@ activateMat fn = unSymbol . fn . constSymbol
 Any activation function must be differentiable almost everywhere and so
 it must be function that operates on @Symbol@s, which is allows for function to be differentiated when needed.
 -}
-newtype Activation a = Activation (ActivationFn a)
+newtype Activation a = Activation 
+    { unActivation :: ActivationFn a  -- ^ Unwraps @Activation@ newtype.
+    }
 
--- | @ActivationLayer@ newtype wraps any @Activation@ function.
-newtype ActivationLayer a = ActivationLayer (Activation a)
-
-instance AbstractLayer ActivationLayer where
+instance AbstractLayer Activation where
     inputSize _ = Nothing
     outputSize _ = Nothing
 
     getParameters _ = []
     updateParameters = const
 
-    symbolicForward _ (ActivationLayer (Activation fn)) = fn
+    symbolicForward _ (Activation fn) = fn
 
 -- | Creates configuration for activation layer.
-activationLayer :: Activation a -> LayerConfiguration (ActivationLayer a)
-activationLayer fn = const $ ActivationLayer fn
+layerActivation :: ActivationFn a -> LayerConfiguration (Activation a)
+layerActivation fn = const $ Activation fn
 
 
 -- Activation functions

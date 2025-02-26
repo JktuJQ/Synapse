@@ -9,7 +9,7 @@ module Synapse.ML.Training.Losses
 
       LossFn
     
-    , Loss (Loss)
+    , Loss (Loss, unLoss)
 
       -- * Regression losses
     
@@ -38,7 +38,9 @@ Every loss function is expected to return symbol of singleton matrix.
 This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
 If you want to bypass this requirement - customise @fit@ function accordingly.
 -}
-newtype Loss a = Loss (LossFn a)
+newtype Loss a = Loss 
+    { unLoss :: LossFn a  -- ^ Unwraps @Loss@ newtype.
+    }
 
 
 -- Regression losses

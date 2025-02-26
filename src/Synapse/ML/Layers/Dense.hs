@@ -9,7 +9,7 @@ module Synapse.ML.Layers.Dense
     ( -- * @Dense@ datatype
 
       Dense (Dense, denseWeights, denseBias)
-    , denseLayer
+    , layerDense
     ) where
 
 
@@ -62,5 +62,5 @@ instance AbstractLayer Dense where
     symbolicForward prefix (Dense weights (Just bias)) input = input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
 
 -- | Creates configuration for dense layer.
-denseLayer :: Num a => Int -> LayerConfiguration (Dense a)
-denseLayer neurons input = Dense (M.replicate (input, neurons) 0) (Just $ V.replicate neurons 0)
+layerDense :: Num a => Int -> LayerConfiguration (Dense a)
+layerDense neurons input = Dense (M.replicate (input, neurons) 0) (Just $ V.replicate neurons 0)

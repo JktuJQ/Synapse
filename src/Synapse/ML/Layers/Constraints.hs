@@ -1,15 +1,18 @@
 {- | Allows to constraint values of layers parameters.
 
-@Constraint@ type alias represents functions that are able to constrain the values of matrix.
+@ConstraintFn@ type alias represents functions that are able to constrain the values of matrix
+and @Constraint@ newtype wraps @ConstraintFn@s.
 
-Constraints should be applied for matrices the @updateParameters@ function.
+@ConstraintFn@s should be applied on matrices from the @updateParameters@ function.
 -}
 
 
 module Synapse.ML.Layers.Constraints
-    ( -- * @Constraint@ type alias
+    ( -- * @ConstraintFn@ type alias and @Constraint@ newtype
       
-      Constraint
+      ConstraintFn
+
+    , Constraint (Constraint, unConstraint)
 
       -- * Value constraints
     
@@ -33,31 +36,36 @@ import Data.Foldable (toList)
 import Data.Ord (clamp)
 
 
--- | @Constraint@ type alias represents functions that are able to constrain the values of matrix.
-type Constraint a = Mat a -> Mat a
+-- | @ConstraintFn@ type alias represents functions that are able to constrain the values of matrix.
+type ConstraintFn a = Mat a -> Mat a
+
+-- | @Constraint@ newtype wraps @ConstraintFn@s - functions that are able to constrain the values of matrix.
+newtype Constraint a = Constraint
+    { unConstraint :: ConstraintFn a  -- ^ Unwraps @Constraint@ newtype.
+    }
 
 
 -- Value constraints
 
 -- | Ensures that matrix values are non-negative.
-nonNegative :: (Num a, Ord a) => Constraint a
+nonNegative :: (Num a, Ord a) => ConstraintFn a
 nonNegative = fmap (max 0)
 
 -- | Ensures that matrix values are more or equal than given value.
-clampMin :: Ord a => a -> Constraint a
+clampMin :: Ord a => a -> ConstraintFn a
 clampMin minimal = fmap (max minimal)
 
 -- | Ensures that matrix values are less or equal than given value.
-clampMax :: Ord a => a -> Constraint a
+clampMax :: Ord a => a -> ConstraintFn a
 clampMax maximal = fmap (min maximal)
 
 -- | Ensures that matrix values are clamped between given values.
-clampMinMax :: Ord a => (a, a) -> Constraint a
+clampMinMax :: Ord a => (a, a) -> ConstraintFn a
 clampMinMax = fmap . clamp
 
 
 -- Matrix-specific constraints
 
 -- | Ensures that matrix values are centralized by mean around given value.
-centralize :: Fractional a => a -> Constraint a
+centralize :: Fractional a => a -> ConstraintFn a
 centralize center mat = mat -. (sum (toList mat) / fromIntegral (M.nElements mat)) +. center 
