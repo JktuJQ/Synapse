@@ -13,6 +13,7 @@ module Synapse.ML.Layers.Constraints
       ConstraintFn
 
     , Constraint (Constraint, unConstraint)
+    , applyConstraints
 
       -- * Value constraints
     
@@ -32,7 +33,7 @@ import Synapse.LinearAlgebra ((-.), (+.))
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
-import Data.Foldable (toList)
+import Data.Foldable (foldl', toList)
 import Data.Ord (clamp)
 
 
@@ -43,6 +44,10 @@ type ConstraintFn a = Mat a -> Mat a
 newtype Constraint a = Constraint
     { unConstraint :: ConstraintFn a  -- ^ Unwraps @Constraint@ newtype.
     }
+
+-- | Applies all constraints on a matrix.
+applyConstraints :: [Constraint a] -> Mat a -> Mat a
+applyConstraints constraints mat = foldl' (\mat' (Constraint fn) -> fn mat') mat constraints
 
 
 -- Value constraints
