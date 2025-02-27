@@ -39,13 +39,13 @@ import System.Random (RandomGen, uniformR)
 data Sample f a = Sample
     { sampleInput  :: f a  -- ^ Sample input.
     , sampleOutput :: f a  -- ^ Sample output.
-    }
+    } deriving (Eq, Show)
 
 
 -- | @Dataset@ newtype wraps @Vec@ of @Sample@s - it represents known information about unknown function.
 newtype Dataset f a = Dataset 
     { unDataset :: Vec (Sample f a)  -- ^ Unwraps @Dataset@ newtype.
-    }
+    } deriving (Eq, Show)
 
 -- | Shuffles any @Dataset@ using Fisher-Yates algorithm.
 shuffleDataset :: RandomGen g => Dataset f a -> g -> (Dataset f a, g)
