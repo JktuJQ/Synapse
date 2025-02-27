@@ -13,8 +13,11 @@ module Synapse.ML.Models
     ) where
 
 
-import Synapse.ML.Layers (AbstractLayer(..), Layer, LayerConfiguration)
+import Synapse.ML.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
 
+import Synapse.LinearAlgebra (SingletonOps(singleton))
+
+import Data.Foldable (foldl')
 import Data.Maybe (fromMaybe)
 
 import qualified Data.Vector as V
@@ -44,5 +47,7 @@ instance AbstractLayer SequentialModel where
 
     getParameters = V.foldl' (\acc x -> acc ++ getParameters x) [] . unSequentialModel
     updateParameters (SequentialModel layers) parameters = SequentialModel $ fmap (`updateParameters` parameters) layers
+
+    applyRegularizer prefix (SequentialModel layers) = foldl' (\loss layer -> loss + applyRegularizer prefix layer) (singleton 0) (V.toList layers)
 
     symbolicForward prefix (SequentialModel layers) input = V.foldl' (flip $ symbolicForward prefix) input layers

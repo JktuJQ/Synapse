@@ -8,7 +8,7 @@ it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b
 module Synapse.ML.Layers.Dense
     ( -- * @Dense@ datatype
 
-      Dense (Dense, denseWeights, denseBias, denseConstraints)
+      Dense (Dense, denseWeights, denseBias, denseConstraints, denseRegularizers)
     , layerDenseWith
     , layerDense
     ) where
@@ -16,11 +16,12 @@ module Synapse.ML.Layers.Dense
 
 import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 import Synapse.ML.Layers.Initializers (Initializer(Initializer), zeroes)
-import Synapse.ML.Layers.Constraints (Constraint, applyConstraints)
+import Synapse.ML.Layers.Constraints (Constraint(Constraint))
+import Synapse.ML.Layers.Regularizers (Regularizer(Regularizer))
 
-import Synapse.Autograd (Symbol, symbol, matMul)
+import Synapse.Autograd (Symbol, Symbolic, symbol)
 
-import Synapse.LinearAlgebra (Indexable (unsafeIndex))
+import Synapse.LinearAlgebra (Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -34,10 +35,11 @@ import qualified Synapse.LinearAlgebra.Mat as M
 @Dense@ performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
 -}
 data Dense a = Dense
-    { denseWeights     :: Mat a                             -- ^ Matrix that represents weights of dense layer.
-    , denseBias        :: Vec a                             -- ^ Vector that represents bias of dense layer.
-    
-    , denseConstraints :: ([Constraint a], [Constraint a])  -- ^ Constraints on weights and bias of dense layer.
+    { denseWeights      :: Mat a                           -- ^ Matrix that represents weights of dense layer.
+    , denseBias         :: Vec a                           -- ^ Vector that represents bias of dense layer.
+
+    , denseConstraints  :: (Constraint a, Constraint a)    -- ^ Constraints on weights and bias of dense layer.
+    , denseRegularizers :: (Regularizer a, Regularizer a)  -- ^ Regularizers on weights and bias of dense layer.
     }
 
 -- | Creates symbol for weights.
@@ -56,25 +58,31 @@ instance AbstractLayer Dense where
     inputSize = Just . M.nRows . denseWeights
     outputSize = Just . M.nCols . denseWeights
 
-    getParameters (Dense weights bias _) = [weights, biasToMat (M.nRows weights) bias]
-
-    updateParameters (Dense _ _ constraints) [weights', biasMat'] =
-        Dense (applyConstraints (fst constraints) weights') (M.indexRow (applyConstraints (snd constraints) biasMat') 0) constraints
+    getParameters (Dense weights bias _ _) = [weights, biasToMat (M.nRows weights) bias]
+    updateParameters (Dense _ _ constraints@(Constraint weightsConstraintFn, Constraint biasConstraintFn) regularizers) [weights', biasMat'] =
+        Dense (weightsConstraintFn weights') (M.indexRow (biasConstraintFn biasMat') 0) constraints regularizers
     updateParameters _ _ = error "Parameters update failed - wrong amount of parameters was given"
 
-    symbolicForward prefix (Dense weights bias _) input =
+    applyRegularizer prefix (Dense weights bias _ (Regularizer weightsRegularizerFn, Regularizer biasRegularizerFn)) =
+        weightsRegularizerFn (weightsSymbol prefix weights) + biasRegularizerFn (biasSymbol prefix (M.nRows weights) bias)
+
+    symbolicForward prefix (Dense weights bias _ _) input =
         input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
 
 -- | Creates configuration of dense layer.
 layerDenseWith
-    :: Num a
-    => (Initializer a, [Constraint a])  -- ^ Weights initializer and constraints.
-    -> (Initializer a, [Constraint a])  -- ^ Bias initializer and constraints.
+    :: Symbolic a
+    => (Initializer a, Constraint a, Regularizer a)  -- ^ Weights initializer, constraint and regularizer.
+    -> (Initializer a, Constraint a, Regularizer a)  -- ^ Bias initializer, constraint and regularizer.
     -> Int                              -- ^ Amount of neurons.
     -> LayerConfiguration (Dense a)
-layerDenseWith (Initializer weightsInitializer, weightsConstraints) (Initializer biasInitializer, biasConstraints) neurons input =
-    Dense (weightsInitializer (input, neurons)) (M.indexRow (biasInitializer (1, neurons)) 0) (weightsConstraints, biasConstraints)
+layerDenseWith (Initializer weightsInitializer, weightsConstraints, weightsRegularizer)
+               (Initializer biasInitializer, biasConstraints, biasRegularizer)
+               neurons input =
+    Dense (weightsInitializer (input, neurons)) (M.indexRow (biasInitializer (1, neurons)) 0) 
+          (weightsConstraints, biasConstraints) (weightsRegularizer, biasRegularizer)
 
 -- | Creates default configuration of dense layer - no constraints and both weights and bias are initialized with zeroes.
-layerDense :: Num a => Int -> LayerConfiguration (Dense a)
-layerDense = layerDenseWith (Initializer zeroes, []) (Initializer zeroes, [])
+layerDense :: Symbolic a => Int -> LayerConfiguration (Dense a)
+layerDense = layerDenseWith (Initializer zeroes, Constraint id, Regularizer (const $ singleton 0))
+                            (Initializer zeroes, Constraint id, Regularizer (const $ singleton 0))

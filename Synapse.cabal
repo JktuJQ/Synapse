@@ -59,6 +59,7 @@ library
 
                     , Synapse.ML.Layers.Initializers
                     , Synapse.ML.Layers.Constraints
+                    , Synapse.ML.Layers.Regularizers
 
                     , Synapse.ML.Layers.Activations
                     , Synapse.ML.Layers.Dense

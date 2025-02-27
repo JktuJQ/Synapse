@@ -15,7 +15,7 @@ That is the building block of any neural network.
 module Synapse.ML.Layers.Layer
     ( -- * @AbstractLayer@ typeclass
 
-      AbstractLayer (inputSize, outputSize, getParameters, updateParameters, symbolicForward)
+      AbstractLayer (inputSize, outputSize, getParameters, updateParameters, applyRegularizer, symbolicForward)
 
     , forward
       
@@ -58,9 +58,14 @@ class AbstractLayer l where
 
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
     getParameters :: l a -> [Mat a]
-
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
     updateParameters :: l a -> [Mat a] -> l a
+
+    {- | Applies regularizer of a layer to obtain symbol of singleton matrix which will be added to the loss in training.
+
+    All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
+    -}
+    applyRegularizer :: Symbolic a => String -> l a -> Symbol (Mat a)
 
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
 
@@ -89,6 +94,8 @@ instance AbstractLayer Layer where
 
     getParameters (Layer l) = getParameters l
     updateParameters (Layer l) = Layer . updateParameters l
+
+    applyRegularizer prefix (Layer l) = applyRegularizer prefix l
 
     symbolicForward prefix (Layer l) = symbolicForward prefix l
 
