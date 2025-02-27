@@ -28,10 +28,9 @@ module Synapse.ML.Layers.Constraints
     ) where
 
 
-import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (-.)), ToScalarOps(mean))
+import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
 
 import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
 
 import Data.Foldable (foldl')
 import Data.Ord (clamp)
@@ -73,4 +72,4 @@ clampMinMax = fmap . clamp
 
 -- | Ensures that matrix values are centralized by mean around given value.
 centralize :: Fractional a => a -> ConstraintFn a
-centralize center mat = mat -. M.unSingleton (mean mat) +. center
+centralize center mat = mat -. unSingleton (mean mat) +. center

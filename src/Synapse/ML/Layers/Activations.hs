@@ -21,7 +21,7 @@ module Synapse.ML.Layers.Activations
 
 import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex))
+import Synapse.LinearAlgebra (Indexable(unsafeIndex), SingletonOps(unSingleton))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
@@ -34,7 +34,7 @@ type ActivationFn a = Symbol (Mat a) -> Symbol (Mat a)
 
 -- | Applies activation function to a scalar to produce new scalar.
 activateScalar :: Symbolic a => ActivationFn a -> a -> a
-activateScalar fn = M.unSingleton . unSymbol . fn . constSymbol . M.singleton
+activateScalar fn = unSingleton . unSymbol . fn . constSymbol . M.singleton
 
 -- | Applies activation function to a scalar to produce new scalar.
 activateMat :: Symbolic a => ActivationFn a -> Mat a -> Mat a

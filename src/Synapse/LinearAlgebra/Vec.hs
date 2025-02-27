@@ -20,8 +20,6 @@ module Synapse.LinearAlgebra.Vec
 
     , size
 
-    , unSingleton
-
       -- * Constructors
 
     , empty
@@ -65,7 +63,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(..), ElementwiseScalarOps(..), ToScalarOps(..), VecOps(..))
+import Synapse.LinearAlgebra (Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -82,12 +80,6 @@ newtype Vec a = Vec
 -- | Size of a vector - number of elements.
 size :: Vec a -> Int
 size = V.length . unVec
-
--- | Extracts scalar element if @Vec@ is a singleton.
-unSingleton :: Vec a -> a
-unSingleton v
-    | size v /= 1 = error "Vector is not a singleton"
-    | otherwise   = unsafeIndex v 0
 
 
 -- Typeclasses
@@ -145,12 +137,15 @@ instance ElementwiseScalarOps (Vec a) a where
     elementsMin x n = fmap (min n) x
     elementsMax x n = fmap (max n) x
 
-instance ToScalarOps (Vec a) a where
+instance SingletonOps (Vec a) a where
+    singleton = pure
+    unSingleton v
+        | size v /= 1 = error "Vector is not a singleton"
+        | otherwise   = unsafeIndex v 0
+
     elementsSum = singleton . V.sum . unVec
     elementsProduct = singleton . V.product . unVec
-
     mean x = elementsSum x /. fromIntegral (size x)
-
     norm x = sqrt $ elementsSum $ x * x
 
 instance Functor Vec where
@@ -186,10 +181,6 @@ instance Traversable Vec where
 -- | Creates empty @Vec@.
 empty :: Vec a
 empty = Vec V.empty
-
--- | Creates @Vec@ that contains only one element.
-singleton :: a -> Vec a
-singleton = pure
 
 -- | Creates @Vec@ from list.
 fromList :: [a] -> Vec a

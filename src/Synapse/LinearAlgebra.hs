@@ -10,7 +10,7 @@ The best example is @Symbol@ from @Synapse.Autograd@.
 -}
 
 
-{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @ElementwiseScalarOps@, @ToScalarOps@, @VecOps@, @MatOps@ typeclasses.
+{-# LANGUAGE FunctionalDependencies #-}  -- @FunctionalDependencies@ are needed to define @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
 {-# LANGUAGE TypeFamilies           #-}  -- @TypeFamilies@ are needed to define @Indexable@ typeclass.
 
 
@@ -21,7 +21,7 @@ module Synapse.LinearAlgebra
 
       -- * Scalar operations
     , ElementwiseScalarOps ((+.), (-.), (*.), (/.), (**.), elementsMin, elementsMax)
-    , ToScalarOps (elementsSum, elementsProduct, mean, norm)
+    , SingletonOps (singleton, unSingleton, elementsSum, elementsProduct, mean, norm)
 
       -- * Collection operations
     , VecOps (dot)
@@ -70,14 +70,19 @@ class ElementwiseScalarOps f a | f -> a where
     -- | Applies @max@ operation with given value to every element.
     elementsMax :: Ord a => f -> a -> f
 
-{- | @ToScalar@ typeclass provides operations that reduce collections to singletons (scalars that are still wrapped in said collection).
+{- | @Singleton@ typeclass provides operations that relate to singleton collections (scalars that are wrapped in said collection).
 
 All functions of that typeclass must return singletons (scalars that are wrapped in collection).
 
 This typeclass is a multiparameter typeclass to permit instances on types that are not exactly collections, but rather wrappers of collections.
 The best example is @Symbol@ from @Synapse.Autograd@.
 -}
-class ToScalarOps f a | f -> a where
+class SingletonOps f a | f -> a where
+    -- | Initializes singleton collection.
+    singleton :: a -> f
+    -- | Unwraps singleton collection.
+    unSingleton :: f -> a
+
     -- | Sums all elements of collection.
     elementsSum :: Num a => f -> f
     -- | Multiplies all elements of collection (@Fractional@ constraint is needed for efficient gradient calculation).

@@ -31,9 +31,7 @@ lossFnToMetricFn loss true predicted = unSymbol $ loss (constSymbol true) (const
 
 {- | @Metric@ newtype wraps @MetricFn@s - functions that are able to provide a reference of performance of neural network model.
 
-Every metric function is expected to return symbol of singleton matrix.
-This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
-If you want to bypass this requirement - customise @fit@ function accordingly.
+Every metric function must return symbol of singleton matrix.
 -}
 newtype Metric a = Metric 
     { unMetric :: MetricFn a  -- ^ Unwraps @Metric@ newtype.

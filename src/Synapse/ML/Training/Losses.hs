@@ -21,7 +21,7 @@ module Synapse.ML.Training.Losses
     ) where
 
 
-import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (*.), (**.)), ToScalarOps(mean))
+import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 
@@ -34,9 +34,7 @@ type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
 
 {- | @Loss@ newtype wraps @LossFn@s - differentiable functions that are able to provide a reference of what relation between matrices needs to be minimised.
 
-Every loss function is expected to return symbol of singleton matrix.
-This requirement is not obligatory - but @Synapse@ internally uses this property in @fit@ function.
-If you want to bypass this requirement - customise @fit@ function accordingly.
+Every loss function must return symbol of singleton matrix.
 -}
 newtype Loss a = Loss 
     { unLoss :: LossFn a  -- ^ Unwraps @Loss@ newtype.

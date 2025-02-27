@@ -21,8 +21,6 @@ module Synapse.LinearAlgebra.Mat
     , nElements
     , size
 
-    , unSingleton
-
     , isTransposed
     , isSubmatrix
 
@@ -98,7 +96,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(..), (!), ElementwiseScalarOps(..), ToScalarOps(..), MatOps(..))
+import Synapse.LinearAlgebra (Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -139,13 +137,6 @@ nElements mat = nRows mat * nCols mat
 -- | Size of matrix.
 size :: Mat a -> (Int, Int)
 size mat = (nRows mat, nCols mat)
-
-
--- | Extracts scalar element if @Mat@ is a singleton.
-unSingleton :: Mat a -> a
-unSingleton mat
-    | nElements mat /= 1 = error "Vector is not a singleton"
-    | otherwise   = unsafeIndex mat (0, 0)
 
 
 -- | Whether the matrix is transposed. If the matrix consists of only one element, it is considered never transposed.
@@ -238,12 +229,15 @@ instance ElementwiseScalarOps (Mat a) a where
     elementsMin x n = fmap (min n) x
     elementsMax x n = fmap (max n) x
 
-instance ToScalarOps (Mat a) a where
+instance SingletonOps (Mat a) a where
+    singleton x =  Mat 1 1 1 1 0 0 (V.singleton x)
+    unSingleton mat
+        | nElements mat /= 1 = error "Vector is not a singleton"
+        | otherwise   = unsafeIndex mat (0, 0)
+
     elementsSum mat@(Mat rows cols _ _ _ _ _) = singleton $ sum [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
     elementsProduct mat@(Mat rows cols _ _ _ _ _) = singleton $ product [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
-
     mean x = elementsSum x /. fromIntegral (nElements x)
-
     norm x = sqrt $ elementsSum $ x * x
 
 
@@ -286,10 +280,6 @@ instance Traversable Mat where
 -- | Creates empty @Mat@.
 empty :: Mat a
 empty = Mat 0 0 0 0 0 0 V.empty
-
--- | Creates @Mat@ that consists of only one element.
-singleton :: a -> Mat a
-singleton x = Mat 1 1 1 1 0 0 (V.singleton x)
 
 -- | Creates @Mat@ from list (will throw an error, if elements of that list do not form a matrix of given size).
 fromList :: (Int, Int) -> [a] -> Mat a
@@ -505,7 +495,7 @@ instance Num a => MatOps (Mat a) a where
     transpose (Mat rows cols rk ck r0 c0 x) = Mat cols rows ck rk c0 r0 x
     matMul a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
         | cols1 /= rows2 = error "Matrices dimensions do not match"
-        | otherwise      = generate (rows1, cols2) $ \(r, c) -> SV.unSingleton $ indexRow a r `SV.dot` indexCol b c
+        | otherwise      = generate (rows1, cols2) $ \(r, c) -> unSingleton $ indexRow a r `SV.dot` indexCol b c
 
 -- | Determinant of a square matrix. If matrix is empty, zero is returned.
 det :: Num a => Mat a -> a
@@ -555,5 +545,5 @@ orthogonalized :: Floating a => Mat a -> Mat a
 orthogonalized mat = foldl' (\mat' row -> mapRow row SV.normalized $ iterationGramSchmidt mat' row) mat [0 .. nRows mat]
   where
     iterationGramSchmidt mat' row = foldl' (\mat'' r ->
-                                            mapRow row (subtract $ indexRow mat'' r *. SV.unSingleton (indexRow mat'' r `SV.dot` indexRow mat'' row)) mat''
+                                            mapRow row (subtract $ indexRow mat'' r *. unSingleton (indexRow mat'' r `SV.dot` indexRow mat'' row)) mat''
                                            ) mat' [0 .. row]

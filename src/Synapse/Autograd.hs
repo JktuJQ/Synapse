@@ -43,7 +43,7 @@ module Synapse.Autograd
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex), ElementwiseScalarOps(..), ElementwiseScalarOps(..), ToScalarOps(..), VecOps(..), MatOps(..))
+import Synapse.LinearAlgebra (Indexable(unsafeIndex), ElementwiseScalarOps(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -227,23 +227,29 @@ instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
     elementsMax x n = symbolicUnaryOp (`elementsMax` n) x
                       [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i >= n then 1 else 0)))]
 
-instance Symbolic a => ToScalarOps (Symbol (Vec a)) a where
+instance Symbolic a => SingletonOps (Symbol (Vec a)) a where
+    singleton = constSymbol . singleton
+    unSingleton = unSingleton . unSymbol
+
     elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
-    elementsProduct x = let innerProduct = V.unSingleton $ elementsProduct $ unSymbol x
+    elementsProduct x = let innerProduct = unSingleton $ elementsProduct $ unSymbol x
                         in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
 
     mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (V.size (unSymbol x)))))]
 
-    norm x = symbolicUnaryOp norm x [(x, (* (x /. V.unSingleton (norm $ unSymbol x))))]
+    norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
 
-instance Symbolic a => ToScalarOps (Symbol (Mat a)) a where
+instance Symbolic a => SingletonOps (Symbol (Mat a)) a where
+    singleton = constSymbol . singleton
+    unSingleton = unSingleton . unSymbol
+
     elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
-    elementsProduct x = let innerProduct = M.unSingleton $ elementsProduct $ unSymbol x
+    elementsProduct x = let innerProduct = unSingleton $ elementsProduct $ unSymbol x
                         in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
 
     mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (M.nElements $ unSymbol x))))]
 
-    norm x = symbolicUnaryOp norm x [(x, (* (x /. M.unSingleton (norm $ unSymbol x))))]
+    norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
 
 instance Symbolic a => VecOps (Symbol (Vec a)) a where
     dot a b = elementsSum $ a * b
