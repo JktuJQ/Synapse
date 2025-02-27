@@ -69,10 +69,13 @@ library
 
 
                     , Synapse.ML.Training
+
                     , Synapse.ML.Training.Batching
-                    , Synapse.ML.Training.Hyperparameters
+                    
                     , Synapse.ML.Training.Losses
                     , Synapse.ML.Training.Metrics
+
+                    , Synapse.ML.Training.LearningRates
                     , Synapse.ML.Training.Optimisers
                     
     -- other-modules:
