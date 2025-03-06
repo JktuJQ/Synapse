@@ -8,9 +8,10 @@ implements several mathematical operations on itself.
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @ElementwiseScalarOps@ typeclass.
-{-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
+{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.LinearAlgebra.Vec
@@ -63,7 +64,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
+import Synapse.LinearAlgebra (Container(..), Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -88,8 +89,12 @@ instance Show a => Show (Vec a) where
     show (Vec x) = show x
 
 
-instance Indexable Vec where
-    type Index Vec = Int
+instance Container (Vec a) where
+    type DType (Vec a) = a
+
+
+instance Indexable (Vec a) where
+    type Index (Vec a) = Int
 
     unsafeIndex (Vec x) = V.unsafeIndex x
     (!) (Vec x) = (V.!) x
@@ -127,7 +132,7 @@ instance Floating a => Floating (Vec a) where
     acosh = fmap acosh
     atanh = fmap atanh
 
-instance ElementwiseScalarOps (Vec a) a where
+instance ElementwiseScalarOps (Vec a) where
     (+.) x n = fmap (+ n) x
     (-.) x n = fmap (subtract n) x
     (*.) x n = fmap (* n) x
@@ -137,7 +142,7 @@ instance ElementwiseScalarOps (Vec a) a where
     elementsMin x n = fmap (min n) x
     elementsMax x n = fmap (max n) x
 
-instance SingletonOps (Vec a) a where
+instance SingletonOps (Vec a) where
     singleton = pure
     unSingleton v
         | size v /= 1 = error "Vector is not a singleton"
@@ -276,7 +281,7 @@ linearCombination :: Num a => [(a, Vec a)] -> Vec a
 linearCombination [] = empty
 linearCombination (x:xs) = foldl' (\acc (a, v) -> acc + v *. a) (snd x *. fst x) xs
 
-instance Num a => VecOps (Vec a) a where
+instance Num a => VecOps (Vec a) where
     dot a b = elementsSum $ a * b
 
 -- | Calculates an angle between two @Vec@s.

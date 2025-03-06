@@ -8,9 +8,10 @@ combinations (matrix multiplication, elementwise operations).
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @Indexable@ and @ElementwiseScalarOps@ typeclasses.
-{-# LANGUAGE TypeFamilies          #-}  -- @TypeFamilies@ are needed to implement @Indexable@ typeclass.
+{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.LinearAlgebra.Mat
@@ -96,7 +97,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
+import Synapse.LinearAlgebra (Container(..), Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -175,8 +176,11 @@ instance Show a => Show (Mat a) where
     show mat = "(" ++ show (size mat) ++ "): " ++ show (toLists mat)
 
 
-instance Indexable Mat where
-    type Index Mat = (Int, Int)
+instance Container (Mat a) where
+    type DType (Mat a) = a
+
+instance Indexable (Mat a) where
+    type Index (Mat a) = (Int, Int)
 
     unsafeIndex x (r, c) = V.unsafeIndex (storage x) (indexMatToVec x (r, c))
     (!) x (r, c)
@@ -219,7 +223,7 @@ instance Floating a => Floating (Mat a) where
     atanh = fmap atanh
 
 
-instance ElementwiseScalarOps (Mat a) a where
+instance ElementwiseScalarOps (Mat a) where
     (+.) x n = fmap (+ n) x
     (-.) x n = fmap (subtract n) x
     (*.) x n = fmap (* n) x
@@ -229,7 +233,7 @@ instance ElementwiseScalarOps (Mat a) a where
     elementsMin x n = fmap (min n) x
     elementsMax x n = fmap (max n) x
 
-instance SingletonOps (Mat a) a where
+instance SingletonOps (Mat a) where
     singleton x =  Mat 1 1 1 1 0 0 (V.singleton x)
     unSingleton mat
         | nElements mat /= 1 = error "Vector is not a singleton"
@@ -491,7 +495,7 @@ identity n = generate (n, n) $ \(r, c) -> if r == c then 1 else 0
 adamarMul :: Num a => Mat a -> Mat a -> Mat a
 adamarMul = elementwise (*)
 
-instance Num a => MatOps (Mat a) a where
+instance Num a => MatOps (Mat a) where
     transpose (Mat rows cols rk ck r0 c0 x) = Mat cols rows ck rk c0 r0 x
     matMul a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
         | cols1 /= rows2 = error "Matrices dimensions do not match"

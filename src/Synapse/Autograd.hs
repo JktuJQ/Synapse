@@ -12,8 +12,12 @@ and read more about it in @Symbol@ datatype docs.
 -}
 
 
-{-# LANGUAGE FlexibleInstances     #-}  -- @FlexibleInstances@ are needed to implement @ElementwiseScalarOps@ typeclass.
-{-# LANGUAGE MultiParamTypeClasses #-}  -- @MultiParamTypeClasses@ are needed to implement @ElementwiseScalarOps@ typeclass.
+{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
+-}
+
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies      #-}
+
 
 
 module Synapse.Autograd
@@ -43,7 +47,7 @@ module Synapse.Autograd
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex), ElementwiseScalarOps(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..), MatOps(..))
+import Synapse.LinearAlgebra (Container(..), Indexable(..), ElementwiseScalarOps(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -164,6 +168,13 @@ instance Symbolic a => Symbolic (Symbol a) where
     symbolicOne x = constSymbol $ symbolicOne $ unSymbol x
 
 
+instance Container (Symbol (Vec a)) where
+    type DType (Symbol (Vec a)) = DType (Vec a)
+
+instance Container (Symbol (Mat a)) where
+    type DType (Symbol (Mat a)) = DType (Mat a)
+
+
 -- | Converts unary operation into symbolic one.
 symbolicUnaryOp :: (a -> a) -> Symbol a -> [(Symbol a, Symbol a -> Symbol a)] -> Symbol a
 symbolicUnaryOp op x = Symbol "" (op (unSymbol x))
@@ -203,7 +214,7 @@ instance (Symbolic a, Floating a) => Floating (Symbol a) where
     acosh x = symbolicUnaryOp acosh x [(x, (* recip (sqrt (x * x - symbolicOne x))))]
     atanh x = symbolicUnaryOp atanh x [(x, (* recip (symbolicOne x - x * x)))]
 
-instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) a where
+instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) where
     (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
     (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
     (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
@@ -215,7 +226,7 @@ instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) a where
     elementsMax x n = symbolicUnaryOp (`elementsMax` n) x
                       [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i >= n then 1 else 0)))]
 
-instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
+instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) where
     (+.) x n = x + constSymbol (M.replicate (M.size $ unSymbol x) n)
     (-.) x n = x - constSymbol (M.replicate (M.size $ unSymbol x) n)
     (*.) x n = x * constSymbol (M.replicate (M.size $ unSymbol x) n)
@@ -227,7 +238,7 @@ instance Symbolic a => ElementwiseScalarOps (Symbol (Mat a)) a where
     elementsMax x n = symbolicUnaryOp (`elementsMax` n) x
                       [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> if unsafeIndex (unSymbol x) i >= n then 1 else 0)))]
 
-instance Symbolic a => SingletonOps (Symbol (Vec a)) a where
+instance Symbolic a => SingletonOps (Symbol (Vec a)) where
     singleton = constSymbol . singleton
     unSingleton = unSingleton . unSymbol
 
@@ -239,7 +250,7 @@ instance Symbolic a => SingletonOps (Symbol (Vec a)) a where
 
     norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
 
-instance Symbolic a => SingletonOps (Symbol (Mat a)) a where
+instance Symbolic a => SingletonOps (Symbol (Mat a)) where
     singleton = constSymbol . singleton
     unSingleton = unSingleton . unSymbol
 
@@ -251,10 +262,10 @@ instance Symbolic a => SingletonOps (Symbol (Mat a)) a where
 
     norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
 
-instance Symbolic a => VecOps (Symbol (Vec a)) a where
+instance Symbolic a => VecOps (Symbol (Vec a)) where
     dot a b = elementsSum $ a * b
 
-instance Symbolic a => MatOps (Symbol (Mat a)) a where
+instance Symbolic a => MatOps (Symbol (Mat a)) where
     transpose x = symbolicUnaryOp M.transpose x [(x, (* transpose x))]
 
     matMul a b = symbolicBinaryOp M.matMul a b [(a, (`matMul` transpose b)), (b, (transpose a `matMul`))]
