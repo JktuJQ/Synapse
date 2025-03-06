@@ -64,7 +64,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (Container(..), Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
+import Synapse.LinearAlgebra (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -89,8 +89,7 @@ instance Show a => Show (Vec a) where
     show (Vec x) = show x
 
 
-instance Container (Vec a) where
-    type DType (Vec a) = a
+type instance DType (Vec a) = a
 
 
 instance Indexable (Vec a) where

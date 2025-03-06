@@ -97,7 +97,7 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (Container(..), Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
+import Synapse.LinearAlgebra (DType, Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec(Vec))
 import qualified Synapse.LinearAlgebra.Vec as SV
@@ -176,8 +176,8 @@ instance Show a => Show (Mat a) where
     show mat = "(" ++ show (size mat) ++ "): " ++ show (toLists mat)
 
 
-instance Container (Mat a) where
-    type DType (Mat a) = a
+type instance DType (Mat a) = a
+
 
 instance Indexable (Mat a) where
     type Index (Mat a) = (Int, Int)

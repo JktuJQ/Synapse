@@ -20,9 +20,9 @@ are needed to define @Container@, @Indexable@, @ElementwiseScalarOps@, @Singleto
 
 
 module Synapse.LinearAlgebra
-    ( -- * @Container@ typeclass
+    ( -- * @Container@ type family
       
-      Container (DType)
+      DType
         
       -- * @Indexable@ typeclass
 
@@ -41,14 +41,13 @@ module Synapse.LinearAlgebra
 import Data.Kind (Type)
 
 
--- | @Container@ typeclass allows to get type of element for any container of such types - even nested ones!
-class Container f where
-    type DType f :: Type
+-- | @Container@ type family allows to get type of element for any container of that type - even for nested ones!
+type family DType f :: Type
 
 
 infixl 9 !, !?
 -- | @Indexable@ typeclass provides indexing interface for datatypes. 
-class Container f => Indexable f where
+class Indexable f where
     -- | Type of index for @Indexable@ container.
     type Index f :: Type
 
@@ -70,7 +69,7 @@ infixr 8 **.
 This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
 The best example is @Symbol@ from @Synapse.Autograd@.
 -}
-class Container f => ElementwiseScalarOps f where
+class ElementwiseScalarOps f where
     -- | Adds given value to every element of the container.
     (+.) :: Num (DType f) => f -> DType f -> f
     -- | Subtracts given value from every element of the functor.
@@ -94,7 +93,7 @@ All functions of that typeclass must return singletons (scalars that are wrapped
 This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
 The best example is @Symbol@ from @Synapse.Autograd@.
 -}
-class Container f => SingletonOps f where
+class SingletonOps f where
     -- | Initializes singleton container.
     singleton :: DType f -> f
     -- | Unwraps singleton container.
@@ -117,7 +116,7 @@ class Container f => SingletonOps f where
 This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
 The best example is @Symbol@ from @Synapse.Autograd@.
 -}
-class Container f => VecOps f where
+class VecOps f where
     -- | Calculates dot product of two vectors.
     dot :: Num (DType f) => f -> f -> f
 
@@ -126,7 +125,7 @@ class Container f => VecOps f where
 This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
 The best example is @Symbol@ from @Synapse.Autograd@. 
 -}
-class Container f => MatOps f where
+class MatOps f where
     -- | Transposes matrix.
     transpose :: f -> f
 

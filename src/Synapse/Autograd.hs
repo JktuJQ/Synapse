@@ -47,7 +47,7 @@ module Synapse.Autograd
     ) where
 
 
-import Synapse.LinearAlgebra (Container(..), Indexable(..), ElementwiseScalarOps(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..), MatOps(..))
+import Synapse.LinearAlgebra (DType, Indexable(..), ElementwiseScalarOps(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..), MatOps(..))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -168,11 +168,9 @@ instance Symbolic a => Symbolic (Symbol a) where
     symbolicOne x = constSymbol $ symbolicOne $ unSymbol x
 
 
-instance Container (Symbol (Vec a)) where
-    type DType (Symbol (Vec a)) = DType (Vec a)
+type instance DType (Symbol (Vec a)) = DType (Vec a)
 
-instance Container (Symbol (Mat a)) where
-    type DType (Symbol (Mat a)) = DType (Mat a)
+type instance DType (Symbol (Mat a)) = DType (Mat a)
 
 
 -- | Converts unary operation into symbolic one.
