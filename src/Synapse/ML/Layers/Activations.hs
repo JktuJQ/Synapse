@@ -32,11 +32,11 @@ import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(unSing
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
-import Synapse.Autograd (Symbol(unSymbol), Symbolic, constSymbol)
+import Synapse.Autograd (Symbol(unSymbol), SymbolMat, Symbolic, constSymbol)
 
 
 -- | @ActivationFn@ is a type alias that represents unary functions that differentiable almost everywhere.
-type ActivationFn a = Symbol (Mat a) -> Symbol (Mat a)
+type ActivationFn a = SymbolMat a -> SymbolMat a
 
 -- | Applies activation function to a scalar to produce new scalar.
 activateScalar :: Symbolic a => ActivationFn a -> a -> a

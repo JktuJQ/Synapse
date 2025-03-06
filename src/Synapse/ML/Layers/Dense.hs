@@ -25,7 +25,7 @@ import Synapse.ML.Layers.Initializers (Initializer(Initializer), zeroes)
 import Synapse.ML.Layers.Constraints (Constraint(Constraint))
 import Synapse.ML.Layers.Regularizers (Regularizer(Regularizer))
 
-import Synapse.Autograd (Symbol, Symbolic, symbol)
+import Synapse.Autograd (SymbolMat, Symbolic, symbol)
 
 import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
 
@@ -49,7 +49,7 @@ data Dense a = Dense
     }
 
 -- | Creates symbol for weights.
-weightsSymbol :: String -> Mat a -> Symbol (Mat a)
+weightsSymbol :: String -> Mat a -> SymbolMat a
 weightsSymbol prefix = symbol (prefix ++ "1")
 
 -- | Creates matrix that corresponds to bias (bias rows stacked on each other).
@@ -57,7 +57,7 @@ biasToMat :: Int -> Vec a -> Mat a
 biasToMat rows bias = M.generate (rows, V.size bias) $ \(_, c) -> unsafeIndex bias c
 
 -- | Creates symbol for bias.
-biasSymbol :: String -> Int -> Vec a -> Symbol (Mat a)
+biasSymbol :: String -> Int -> Vec a -> SymbolMat a
 biasSymbol prefix rows = symbol (prefix ++ "2") . biasToMat rows
 
 type instance DType (Dense a) = a

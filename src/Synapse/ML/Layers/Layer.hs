@@ -39,10 +39,10 @@ module Synapse.ML.Layers.Layer
     ) where
 
 
-import Synapse.LinearAlgebra
+import Synapse.LinearAlgebra (DType)
 import Synapse.LinearAlgebra.Mat (Mat)
 
-import Synapse.Autograd (Symbolic, Symbol(unSymbol), constSymbol)
+import Synapse.Autograd (Symbolic, Symbol(unSymbol), SymbolMat, constSymbol)
 
 
 {- | @AbstractLayer@ typeclass defines basic interface of all layers of neural network model.
@@ -77,7 +77,7 @@ class AbstractLayer l where
 
     All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
     -}
-    applyRegularizer :: Symbolic (DType l) => String -> l -> Symbol (Mat (DType l))
+    applyRegularizer :: Symbolic (DType l) => String -> l -> SymbolMat (DType l)
 
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
 
@@ -89,7 +89,7 @@ class AbstractLayer l where
     It is also important so that the order of the parameters stays consistent even for @getParameters@ function
     (that will allow choosing correct gradients automatically in the training).
     -}
-    symbolicForward :: (Symbolic (DType l), Floating (DType l), Ord (DType l)) => String -> l -> Symbol (Mat (DType l)) -> Symbol (Mat (DType l))
+    symbolicForward :: (Symbolic (DType l), Floating (DType l), Ord (DType l)) => String -> l -> SymbolMat (DType l) -> SymbolMat (DType l)
 
 
 -- | Passes matrix through to produce new matrix.

@@ -23,13 +23,11 @@ module Synapse.ML.Training.Losses
 
 import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
 
-import Synapse.LinearAlgebra.Mat (Mat)
-
-import Synapse.Autograd (Symbol, Symbolic)
+import Synapse.Autograd (SymbolMat, Symbolic)
 
 
 -- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
-type LossFn a = Symbol (Mat a) -> Symbol (Mat a) -> Symbol (Mat a)
+type LossFn a = SymbolMat a -> SymbolMat a -> SymbolMat a
 
 
 {- | @Loss@ newtype wraps @LossFn@s - differentiable functions that are able to provide a reference of what relation between matrices needs to be minimised.

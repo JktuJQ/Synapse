@@ -8,10 +8,8 @@ module AutogradTest
 
 import Synapse.Autograd
 
-import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
 
-import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
 import Test.HUnit
@@ -51,8 +49,8 @@ testVecOps = TestLabel "testVecOps" $ TestList
     , TestCase $ assertEqual "vector op gradient" (V.map cos $ unSymbol a) (unSymbol $ getGradientsOf (sin a) `wrt` a)
     ]
   where
-    a = symbol "a" (V.fromList [1.0, 2.0, 3.0]) :: Symbol (Vec Float)
-    b = symbol "b" (V.fromList [3.0, 2.0, 1.0]) :: Symbol (Vec Float)
+    a = symbol "a" (V.fromList [1.0, 2.0, 3.0]) :: SymbolVec Float
+    b = symbol "b" (V.fromList [3.0, 2.0, 1.0]) :: SymbolVec Float
 
 testMatOps :: Test
 testMatOps = TestLabel "testMatOps" $ TestList
@@ -64,11 +62,11 @@ testMatOps = TestLabel "testMatOps" $ TestList
     , TestCase $ assertEqual "matrix composed multiplication gradient" (M.transpose $ unSymbol c) (unSymbol $ getGradientsOf (c `matMul` d `matMul` e) `wrt` d)
     ]
   where
-    a = symbol "a" (M.replicate (3, 3) 3.0) :: Symbol (Mat Float)
-    b = symbol "b" (M.replicate (3, 3) (-3.0)) :: Symbol (Mat Float)
-    c = symbol "c" (M.fromLists (1, 2) [[5.0, 3.0]]) :: Symbol (Mat Float)
-    d = symbol "d" (M.fromLists (2, 1) [[1.0], [-2.0]]) :: Symbol (Mat Float)
-    e = symbol "e" (M.fromLists (1, 1) [[1.0]]) :: Symbol (Mat Float)
+    a = symbol "a" (M.replicate (3, 3) 3.0) :: SymbolMat Float
+    b = symbol "b" (M.replicate (3, 3) (-3.0)) :: SymbolMat Float
+    c = symbol "c" (M.fromLists (1, 2) [[5.0, 3.0]]) :: SymbolMat Float
+    d = symbol "d" (M.fromLists (2, 1) [[1.0], [-2.0]]) :: SymbolMat Float
+    e = symbol "e" (M.fromLists (1, 1) [[1.0]]) :: SymbolMat Float
 
 
 tests :: Test

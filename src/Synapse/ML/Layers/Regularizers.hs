@@ -17,13 +17,11 @@ module Synapse.ML.Layers.Regularizers
 
 import Synapse.LinearAlgebra (ElementwiseScalarOps((*.)), SingletonOps(elementsSum))
 
-import Synapse.LinearAlgebra.Mat (Mat)
-
-import Synapse.Autograd (Symbol, Symbolic)
+import Synapse.Autograd (SymbolMat, Symbolic)
 
 
 -- | @RegularizerFn@ type alias represents functions that impose penalties on parameters which is done by adding result of regularization to loss value.
-type RegularizerFn a = Symbol (Mat a) -> Symbol (Mat a)
+type RegularizerFn a = SymbolMat a -> SymbolMat a
 
 {- | @Regularizer@ newtype wraps @RegularizerFn@s - functions that impose penalties on parameters.
 
