@@ -2,6 +2,12 @@
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Models
     ( -- * Common
       InputSize (InputSize)
@@ -15,7 +21,7 @@ module Synapse.ML.Models
 
 import Synapse.ML.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
 
-import Synapse.LinearAlgebra (SingletonOps(singleton))
+import Synapse.LinearAlgebra (DType, SingletonOps(singleton))
 
 import Data.Foldable (foldl')
 import Data.Maybe (fromMaybe)
@@ -41,7 +47,10 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ V.fromList $
                              output = fromMaybe prevSize outputMaybe
                          in layer : go output ls
 
-instance AbstractLayer SequentialModel where
+
+type instance DType (SequentialModel a) = a
+
+instance AbstractLayer (SequentialModel a) where
     inputSize = inputSize . V.head . unSequentialModel
     outputSize = outputSize . V.head . unSequentialModel
 

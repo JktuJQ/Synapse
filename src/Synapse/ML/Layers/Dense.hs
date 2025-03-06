@@ -5,6 +5,12 @@ it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Layers.Dense
     ( -- * @Dense@ datatype
 
@@ -21,7 +27,7 @@ import Synapse.ML.Layers.Regularizers (Regularizer(Regularizer))
 
 import Synapse.Autograd (Symbol, Symbolic, symbol)
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
+import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
 
 import Synapse.LinearAlgebra.Vec (Vec)
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -54,7 +60,9 @@ biasToMat rows bias = M.generate (rows, V.size bias) $ \(_, c) -> unsafeIndex bi
 biasSymbol :: String -> Int -> Vec a -> Symbol (Mat a)
 biasSymbol prefix rows = symbol (prefix ++ "2") . biasToMat rows
 
-instance AbstractLayer Dense where
+type instance DType (Dense a) = a
+
+instance AbstractLayer (Dense a) where
     inputSize = Just . M.nRows . denseWeights
     outputSize = Just . M.nCols . denseWeights
 

@@ -2,6 +2,12 @@
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Layers.Activations
     ( -- * @ActivationFn@ type alias and @Activation@ newtype
 
@@ -21,7 +27,7 @@ module Synapse.ML.Layers.Activations
 
 import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex), SingletonOps(unSingleton))
+import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(unSingleton))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
@@ -50,7 +56,9 @@ newtype Activation a = Activation
     { unActivation :: ActivationFn a  -- ^ Unwraps @Activation@ newtype.
     }
 
-instance AbstractLayer Activation where
+type instance DType (Activation a) = a
+
+instance AbstractLayer (Activation a) where
     inputSize _ = Nothing
     outputSize _ = Nothing
 

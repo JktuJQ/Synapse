@@ -8,8 +8,19 @@ Notes on how to correctly implement that typeclass are in the docs for it.
 That is the building block of any neural network.
 -}
 
+{- @ConstrainedClassMethods@, @FlexibleContexts@, @TypeFamilies@, @TypeOperators@
+are needed to instantiate @Container@ typeclass.
+-}
 
-{-# LANGUAGE ExistentialQuantification #-}  -- @ExistentialQuantification@ is needed to define @Layer@ datatype.
+{-# LANGUAGE ConstrainedClassMethods #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+
+{- @ExistentialQuantification@ is needed to define @Layer@ datatype.
+-}
+
+{-# LANGUAGE ExistentialQuantification #-} 
 
 
 module Synapse.ML.Layers.Layer
@@ -28,6 +39,7 @@ module Synapse.ML.Layers.Layer
     ) where
 
 
+import Synapse.LinearAlgebra
 import Synapse.LinearAlgebra.Mat (Mat)
 
 import Synapse.Autograd (Symbolic, Symbol(unSymbol), constSymbol)
@@ -52,20 +64,20 @@ read the docs thoroughly to ensure that all the invariants are met.
 -}
 class AbstractLayer l where
     -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence (activation functions are the example).
-    inputSize :: l a -> Maybe Int
+    inputSize :: l -> Maybe Int
     -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence (activation functions are the example).
-    outputSize :: l a -> Maybe Int
+    outputSize :: l -> Maybe Int
 
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
-    getParameters :: l a -> [Mat a]
+    getParameters :: l -> [Mat (DType l)]
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
-    updateParameters :: l a -> [Mat a] -> l a
+    updateParameters :: l -> [Mat (DType l)] -> l
 
     {- | Applies regularizer of a layer to obtain symbol of singleton matrix which will be added to the loss in training.
 
     All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
     -}
-    applyRegularizer :: Symbolic a => String -> l a -> Symbol (Mat a)
+    applyRegularizer :: Symbolic (DType l) => String -> l -> Symbol (Mat (DType l))
 
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
 
@@ -77,18 +89,20 @@ class AbstractLayer l where
     It is also important so that the order of the parameters stays consistent even for @getParameters@ function
     (that will allow choosing correct gradients automatically in the training).
     -}
-    symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> l a -> Symbol (Mat a) -> Symbol (Mat a)
+    symbolicForward :: (Symbolic (DType l), Floating (DType l), Ord (DType l)) => String -> l -> Symbol (Mat (DType l)) -> Symbol (Mat (DType l))
 
 
 -- | Passes matrix through to produce new matrix.
-forward :: (AbstractLayer l, Symbolic a, Floating a, Ord a) => l a -> Mat a -> Mat a
+forward :: (AbstractLayer l, Symbolic (DType l), Floating (DType l), Ord (DType l)) => l -> Mat (DType l) -> Mat (DType l)
 forward layer input = unSymbol $ symbolicForward "" layer (constSymbol input)
 
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.
-data Layer a = forall l. AbstractLayer l => Layer (l a)
+data Layer a = forall l. (AbstractLayer l, DType l ~ a) => Layer l
 
-instance AbstractLayer Layer where
+type instance DType (Layer a) = a
+
+instance AbstractLayer (Layer a) where
     inputSize (Layer l) = inputSize l
     outputSize (Layer l) = outputSize l
 
