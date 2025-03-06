@@ -76,7 +76,7 @@ library
                     , Synapse.ML.Training.Metrics
 
                     , Synapse.ML.Training.LearningRates
-                    , Synapse.ML.Training.Optimisers
+                    , Synapse.ML.Training.Optimizers
                     
     -- other-modules:
     -- other-extensions:
