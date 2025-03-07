@@ -14,7 +14,7 @@ combinations (matrix multiplication, elementwise operations).
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.LinearAlgebra.Mat
+module Synapse.Tensors.Mat
     ( --  * @Mat@ datatype and simple getters.
 
       Mat (nRows, nCols)
@@ -97,10 +97,10 @@ module Synapse.LinearAlgebra.Mat
     ) where
 
 
-import Synapse.LinearAlgebra (DType, Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
+import Synapse.Tensors (DType, Indexable(..), (!), ElementwiseScalarOps(..), SingletonOps(..), MatOps(..))
 
-import Synapse.LinearAlgebra.Vec (Vec(Vec))
-import qualified Synapse.LinearAlgebra.Vec as SV
+import Synapse.Tensors.Vec (Vec(Vec))
+import qualified Synapse.Tensors.Vec as SV
 
 import Prelude hiding (map, replicate, zip)
 import Data.Foldable (Foldable(..))

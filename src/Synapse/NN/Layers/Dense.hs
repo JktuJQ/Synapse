@@ -11,7 +11,7 @@ it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Layers.Dense
+module Synapse.NN.Layers.Dense
     ( -- * @Dense@ datatype
 
       Dense (Dense, denseWeights, denseBias, denseConstraints, denseRegularizers)
@@ -20,20 +20,20 @@ module Synapse.ML.Layers.Dense
     ) where
 
 
-import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
-import Synapse.ML.Layers.Initializers (Initializer(Initializer), zeroes)
-import Synapse.ML.Layers.Constraints (Constraint(Constraint))
-import Synapse.ML.Layers.Regularizers (Regularizer(Regularizer))
+import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
+import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes)
+import Synapse.NN.Layers.Constraints (Constraint(Constraint))
+import Synapse.NN.Layers.Regularizers (Regularizer(Regularizer))
 
 import Synapse.Autograd (SymbolMat, Symbolic, symbol)
 
-import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
+import Synapse.Tensors (DType, Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
 
-import Synapse.LinearAlgebra.Vec (Vec)
-import qualified Synapse.LinearAlgebra.Vec as V
+import Synapse.Tensors.Vec (Vec)
+import qualified Synapse.Tensors.Vec as V
 
-import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
+import Synapse.Tensors.Mat (Mat)
+import qualified Synapse.Tensors.Mat as M
 
 
 {- | @Dense@ datatype represents densely-connected neural network layer.

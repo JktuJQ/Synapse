@@ -19,7 +19,7 @@ are needed to define @Container@, @Indexable@, @ElementwiseScalarOps@, @Singleto
 {-# LANGUAGE TypeFamilies            #-}  
 
 
-module Synapse.LinearAlgebra
+module Synapse.Tensors
     ( -- * @Container@ type family
       
       DType

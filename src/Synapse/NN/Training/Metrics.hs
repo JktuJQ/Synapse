@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Training.Metrics
+module Synapse.NN.Training.Metrics
     ( -- @MetricFn@ type alias and @Metric@ newtype
 
       MetricFn
@@ -20,10 +20,10 @@ module Synapse.ML.Training.Metrics
     ) where
 
 
-import Synapse.ML.Training.Losses (LossFn)
+import Synapse.NN.Training.Losses (LossFn)
 
-import Synapse.LinearAlgebra (DType)
-import Synapse.LinearAlgebra.Mat (Mat)
+import Synapse.Tensors (DType)
+import Synapse.Tensors.Mat (Mat)
 
 import Synapse.Autograd (Symbol(unSymbol), constSymbol)
 

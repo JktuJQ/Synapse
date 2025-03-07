@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Layers.Regularizers
+module Synapse.NN.Layers.Regularizers
     ( -- * @RegularizerFn@ type alias and @Regularizer@ newtype
 
       RegularizerFn
@@ -21,7 +21,7 @@ module Synapse.ML.Layers.Regularizers
     ) where
 
 
-import Synapse.LinearAlgebra (DType, ElementwiseScalarOps((*.)), SingletonOps(elementsSum))
+import Synapse.Tensors (DType, ElementwiseScalarOps((*.)), SingletonOps(elementsSum))
 
 import Synapse.Autograd (SymbolMat, Symbolic)
 

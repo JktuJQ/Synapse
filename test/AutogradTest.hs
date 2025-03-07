@@ -8,9 +8,9 @@ module AutogradTest
 
 import Synapse.Autograd
 
-import qualified Synapse.LinearAlgebra.Vec as V
+import qualified Synapse.Tensors.Vec as V
 
-import qualified Synapse.LinearAlgebra.Mat as M
+import qualified Synapse.Tensors.Mat as M
 
 import Test.HUnit
 

@@ -23,7 +23,7 @@ are needed to instantiate @DType@.
 {-# LANGUAGE ExistentialQuantification #-} 
 
 
-module Synapse.ML.Layers.Layer
+module Synapse.NN.Layers.Layer
     ( -- * @AbstractLayer@ typeclass
 
       AbstractLayer (inputSize, outputSize, getParameters, updateParameters, applyRegularizer, symbolicForward)
@@ -39,8 +39,8 @@ module Synapse.ML.Layers.Layer
     ) where
 
 
-import Synapse.LinearAlgebra (DType)
-import Synapse.LinearAlgebra.Mat (Mat)
+import Synapse.Tensors (DType)
+import Synapse.Tensors.Mat (Mat)
 
 import Synapse.Autograd (Symbolic, Symbol(unSymbol), SymbolMat, constSymbol)
 

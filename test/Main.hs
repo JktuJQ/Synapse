@@ -4,7 +4,7 @@
 module Main (main) where
 
 
-import qualified LinearAlgebraTest
+import qualified TensorsTest
 import qualified AutogradTest
 
 import Test.HUnit (Test(TestList), runTestTTAndExit)
@@ -12,6 +12,6 @@ import Test.HUnit (Test(TestList), runTestTTAndExit)
 
 main :: IO ()
 main = runTestTTAndExit $ TestList
-    [ LinearAlgebraTest.tests
+    [ TensorsTest.tests
     , AutogradTest.tests
     ]

@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Layers.Activations
+module Synapse.NN.Layers.Activations
     ( -- * @ActivationFn@ type alias and @Activation@ newtype
 
       ActivationFn
@@ -25,12 +25,12 @@ module Synapse.ML.Layers.Activations
     ) where
 
 
-import Synapse.ML.Layers.Layer (AbstractLayer(..), LayerConfiguration)
+import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex), SingletonOps(unSingleton))
+import Synapse.Tensors (DType, Indexable(unsafeIndex), SingletonOps(unSingleton))
 
-import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
+import Synapse.Tensors.Mat (Mat)
+import qualified Synapse.Tensors.Mat as M
 
 import Synapse.Autograd (Symbol(unSymbol), SymbolMat, Symbolic, constSymbol)
 

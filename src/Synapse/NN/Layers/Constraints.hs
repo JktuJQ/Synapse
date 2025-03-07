@@ -13,7 +13,7 @@ and @Constraint@ newtype wraps @ConstraintFn@s.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Layers.Constraints
+module Synapse.NN.Layers.Constraints
     ( -- * @ConstraintFn@ type alias and @Constraint@ newtype
       
       ConstraintFn
@@ -33,9 +33,9 @@ module Synapse.ML.Layers.Constraints
     ) where
 
 
-import Synapse.LinearAlgebra (DType, ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
+import Synapse.Tensors (DType, ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
 
-import Synapse.LinearAlgebra.Mat (Mat)
+import Synapse.Tensors.Mat (Mat)
 
 import Data.Ord (clamp)
 

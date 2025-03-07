@@ -2,6 +2,6 @@
 -}
 
 
-module Synapse.ML.Training.Optimizers
+module Synapse.NN.Training.Optimizers
     (
     ) where

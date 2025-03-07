@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Training.LearningRates
+module Synapse.NN.Training.LearningRates
     ( -- * @LearningRateFn@ type alias and @LearningRate@ newtype
 
       LearningRateFn
@@ -24,7 +24,7 @@ module Synapse.ML.Training.LearningRates
     ) where
 
 
-import Synapse.LinearAlgebra (DType)
+import Synapse.Tensors (DType)
 
 
 -- | @LearningRateFn@ type alias represents functions that return coefficient which modulates how big are updates of parameters in training.

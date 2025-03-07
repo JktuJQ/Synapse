@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Models
+module Synapse.NN.Models
     ( -- * Common
       InputSize (InputSize)
 
@@ -19,9 +19,9 @@ module Synapse.ML.Models
     ) where
 
 
-import Synapse.ML.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
+import Synapse.NN.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
 
-import Synapse.LinearAlgebra (DType, SingletonOps(singleton))
+import Synapse.Tensors (DType, SingletonOps(singleton))
 
 import Data.Foldable (foldl')
 import Data.Maybe (fromMaybe)

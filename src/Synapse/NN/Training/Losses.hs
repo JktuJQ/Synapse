@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Training.Losses
+module Synapse.NN.Training.Losses
     ( -- * @LossFn@ type alias and @Loss@ newtype
 
       LossFn
@@ -27,7 +27,7 @@ module Synapse.ML.Training.Losses
     ) where
 
 
-import Synapse.LinearAlgebra (DType, ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
+import Synapse.Tensors (DType, ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
 
 import Synapse.Autograd (SymbolMat, Symbolic)
 

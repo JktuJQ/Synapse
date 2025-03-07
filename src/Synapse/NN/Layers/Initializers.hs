@@ -17,7 +17,7 @@ and @Initializer@ newtype wraps @InitializerFn@s.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Layers.Initializers
+module Synapse.NN.Layers.Initializers
     ( -- * @InitializerFn@ type alias and @Initializer@ newtype
 
       InitializerFn
@@ -51,9 +51,9 @@ module Synapse.ML.Layers.Initializers
     ) where
 
 
-import Synapse.LinearAlgebra (DType)
-import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
+import Synapse.Tensors (DType)
+import Synapse.Tensors.Mat (Mat)
+import qualified Synapse.Tensors.Mat as M
 
 import System.Random (uniformListR, uniformRs, UniformRange, RandomGen)
 

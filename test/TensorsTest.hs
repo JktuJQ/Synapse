@@ -1,18 +1,18 @@
--- | Tests @Synapse.LinearAlgebra@ module and its submodules.
+-- | Tests @Synapse.Tensors@ module and its submodules.
 
 
-module LinearAlgebraTest
+module TensorsTest
     ( tests
     ) where
 
 
-import Synapse.LinearAlgebra ((!), ElementwiseScalarOps(..))
+import Synapse.Tensors ((!), ElementwiseScalarOps(..))
 
-import Synapse.LinearAlgebra.Vec (Vec)
-import qualified Synapse.LinearAlgebra.Vec as V
+import Synapse.Tensors.Vec (Vec)
+import qualified Synapse.Tensors.Vec as V
 
-import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
+import Synapse.Tensors.Mat (Mat)
+import qualified Synapse.Tensors.Mat as M
 
 import Test.HUnit
 
@@ -136,7 +136,7 @@ testMatComplicatedOps = TestLabel "testMatComplicatedOps" $ TestList
 
 
 tests :: Test
-tests = TestLabel "LinearAlgebraTest" $ TestList
+tests = TestLabel "TensorsTest" $ TestList
     [ -- @Vec@
       testVecOps
     , testVecMagnitude

@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.ML.Training.Batching
+module Synapse.NN.Training.Batching
     ( -- * @Sample@ datatype
     
       Sample (Sample, sampleInput, sampleOutput)
@@ -25,13 +25,13 @@ module Synapse.ML.Training.Batching
     ) where
 
 
-import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex))
+import Synapse.Tensors (DType, Indexable(unsafeIndex))
 
-import Synapse.LinearAlgebra.Vec (Vec (Vec))
-import qualified Synapse.LinearAlgebra.Vec as V
+import Synapse.Tensors.Vec (Vec (Vec))
+import qualified Synapse.Tensors.Vec as V
 
-import Synapse.LinearAlgebra.Mat (Mat)
-import qualified Synapse.LinearAlgebra.Mat as M
+import Synapse.Tensors.Mat (Mat)
+import qualified Synapse.Tensors.Mat as M
 
 import Control.Monad.ST (runST)
 

@@ -14,7 +14,7 @@ implements several mathematical operations on itself.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.LinearAlgebra.Vec
+module Synapse.Tensors.Vec
     ( -- * @Vec@ datatype and simple getters.
 
       Vec (Vec, unVec)
@@ -64,7 +64,7 @@ module Synapse.LinearAlgebra.Vec
     ) where
 
 
-import Synapse.LinearAlgebra (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
+import Synapse.Tensors (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))

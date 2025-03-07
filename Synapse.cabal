@@ -41,42 +41,42 @@ library
     hs-source-dirs:   src
     exposed-modules:  Synapse
                     
-                      -- Linear algebra
-                    , Synapse.LinearAlgebra
-                    , Synapse.LinearAlgebra.Mat
-                    , Synapse.LinearAlgebra.Vec
+                      -- Tensors
+                    , Synapse.Tensors
+                    , Synapse.Tensors.Mat
+                    , Synapse.Tensors.Vec
 
 
                       -- Autograd
                     , Synapse.Autograd
                     
 
-                      -- ML
-                    , Synapse.ML
+                      -- NN
+                    , Synapse.NN
 
-                    , Synapse.ML.Layers
-                    , Synapse.ML.Layers.Layer
+                    , Synapse.NN.Layers
+                    , Synapse.NN.Layers.Layer
 
-                    , Synapse.ML.Layers.Initializers
-                    , Synapse.ML.Layers.Constraints
-                    , Synapse.ML.Layers.Regularizers
+                    , Synapse.NN.Layers.Initializers
+                    , Synapse.NN.Layers.Constraints
+                    , Synapse.NN.Layers.Regularizers
 
-                    , Synapse.ML.Layers.Activations
-                    , Synapse.ML.Layers.Dense
-
-
-                    , Synapse.ML.Models
+                    , Synapse.NN.Layers.Activations
+                    , Synapse.NN.Layers.Dense
 
 
-                    , Synapse.ML.Training
+                    , Synapse.NN.Models
 
-                    , Synapse.ML.Training.Batching
+
+                    , Synapse.NN.Training
+
+                    , Synapse.NN.Training.Batching
                     
-                    , Synapse.ML.Training.Losses
-                    , Synapse.ML.Training.Metrics
+                    , Synapse.NN.Training.Losses
+                    , Synapse.NN.Training.Metrics
 
-                    , Synapse.ML.Training.LearningRates
-                    , Synapse.ML.Training.Optimizers
+                    , Synapse.NN.Training.LearningRates
+                    , Synapse.NN.Training.Optimizers
                     
     -- other-modules:
     -- other-extensions:
@@ -93,7 +93,7 @@ test-suite Synapse-test
 
     hs-source-dirs:   test
     main-is:          Main.hs
-    other-modules:    LinearAlgebraTest
+    other-modules:    TensorsTest
                     , AutogradTest
     -- other-extensions:
 
