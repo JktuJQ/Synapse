@@ -2,6 +2,12 @@
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @DType@.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Training.Batching
     ( -- * @Sample@ datatype
     
@@ -19,7 +25,7 @@ module Synapse.ML.Training.Batching
     ) where
 
 
-import Synapse.LinearAlgebra (Indexable(unsafeIndex))
+import Synapse.LinearAlgebra (DType, Indexable(unsafeIndex))
 
 import Synapse.LinearAlgebra.Vec (Vec (Vec))
 import qualified Synapse.LinearAlgebra.Vec as V
@@ -41,11 +47,16 @@ data Sample f a = Sample
     , sampleOutput :: f a  -- ^ Sample output.
     } deriving (Eq, Show)
 
+type instance DType (Sample f a) = a
+
 
 -- | @Dataset@ newtype wraps @Vec@ of @Sample@s - it represents known information about unknown function.
 newtype Dataset f a = Dataset 
     { unDataset :: Vec (Sample f a)  -- ^ Unwraps @Dataset@ newtype.
     } deriving (Eq, Show)
+
+type instance DType (Dataset f a) = a
+
 
 -- | Shuffles any @Dataset@ using Fisher-Yates algorithm.
 shuffleDataset :: RandomGen g => Dataset f a -> g -> (Dataset f a, g)

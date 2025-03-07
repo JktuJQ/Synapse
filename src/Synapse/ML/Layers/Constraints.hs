@@ -7,6 +7,12 @@ and @Constraint@ newtype wraps @ConstraintFn@s.
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @DType@.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Layers.Constraints
     ( -- * @ConstraintFn@ type alias and @Constraint@ newtype
       
@@ -27,7 +33,7 @@ module Synapse.ML.Layers.Constraints
     ) where
 
 
-import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
+import Synapse.LinearAlgebra (DType, ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
 
 import Synapse.LinearAlgebra.Mat (Mat)
 
@@ -37,10 +43,15 @@ import Data.Ord (clamp)
 -- | @ConstraintFn@ type alias represents functions that are able to constrain the values of matrix.
 type ConstraintFn a = Mat a -> Mat a
 
+type instance DType (ConstraintFn a) = a
+
+
 -- | @Constraint@ newtype wraps @ConstraintFn@s - functions that are able to constrain the values of matrix.
 newtype Constraint a = Constraint
     { unConstraint :: ConstraintFn a  -- ^ Unwraps @Constraint@ newtype.
     }
+
+type instance DType (Constraint a) = a
 
 
 -- Value constraints

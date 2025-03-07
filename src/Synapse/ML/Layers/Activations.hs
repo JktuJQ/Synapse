@@ -2,7 +2,7 @@
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
+{- @TypeFamilies@ are needed to instantiate @DType@.
 -}
 
 {-# LANGUAGE TypeFamilies #-}
@@ -37,6 +37,8 @@ import Synapse.Autograd (Symbol(unSymbol), SymbolMat, Symbolic, constSymbol)
 
 -- | @ActivationFn@ is a type alias that represents unary functions that differentiable almost everywhere.
 type ActivationFn a = SymbolMat a -> SymbolMat a
+
+type instance DType (ActivationFn a) = a
 
 -- | Applies activation function to a scalar to produce new scalar.
 activateScalar :: Symbolic a => ActivationFn a -> a -> a

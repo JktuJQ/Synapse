@@ -11,6 +11,12 @@ and @Initializer@ newtype wraps @InitializerFn@s.
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @DType@.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Layers.Initializers
     ( -- * @InitializerFn@ type alias and @Initializer@ newtype
 
@@ -45,6 +51,7 @@ module Synapse.ML.Layers.Initializers
     ) where
 
 
+import Synapse.LinearAlgebra (DType)
 import Synapse.LinearAlgebra.Mat (Mat)
 import qualified Synapse.LinearAlgebra.Mat as M
 
@@ -54,10 +61,15 @@ import System.Random (uniformListR, uniformRs, UniformRange, RandomGen)
 -- | @InitializerFn@ type alias represents functions that are able to initialize matrix with given size.
 type InitializerFn a = (Int, Int) -> Mat a
 
+type instance DType (InitializerFn a) = a
+
+
 -- | @Initializer@ newtype wraps @InitializerFn@s - functions that are able to initialize matrix with given size.
 newtype Initializer a = Initializer 
     { unInitializer :: InitializerFn a  -- ^ Unwraps @Initializer@ newtype.
     }
+
+type instance DType (Initializer a) = a
 
 
 -- Non-random constant initializers

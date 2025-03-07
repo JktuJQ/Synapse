@@ -5,7 +5,7 @@ it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
+{- @TypeFamilies@ are needed to instantiate @DType@.
 -}
 
 {-# LANGUAGE TypeFamilies #-}

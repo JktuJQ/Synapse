@@ -9,7 +9,7 @@ That is the building block of any neural network.
 -}
 
 {- @ConstrainedClassMethods@, @FlexibleContexts@, @TypeFamilies@, @TypeOperators@
-are needed to instantiate @Container@ typeclass.
+are needed to instantiate @DType@.
 -}
 
 {-# LANGUAGE ConstrainedClassMethods #-}

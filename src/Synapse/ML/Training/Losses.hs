@@ -4,6 +4,12 @@
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @DType@.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Training.Losses
     ( -- * @LossFn@ type alias and @Loss@ newtype
 
@@ -21,13 +27,15 @@ module Synapse.ML.Training.Losses
     ) where
 
 
-import Synapse.LinearAlgebra (ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
+import Synapse.LinearAlgebra (DType, ElementwiseScalarOps((+.), (*.), (**.)), SingletonOps(mean))
 
 import Synapse.Autograd (SymbolMat, Symbolic)
 
 
 -- | @LossFn@ type alias represents functions that are able to provide a reference of what relation between matrices needs to be minimised.
 type LossFn a = SymbolMat a -> SymbolMat a -> SymbolMat a
+
+type instance DType (LossFn a) = a
 
 
 {- | @Loss@ newtype wraps @LossFn@s - differentiable functions that are able to provide a reference of what relation between matrices needs to be minimised.
@@ -37,6 +45,8 @@ Every loss function must return symbol of singleton matrix.
 newtype Loss a = Loss 
     { unLoss :: LossFn a  -- ^ Unwraps @Loss@ newtype.
     }
+
+type instance DType (Loss a) = a
 
 
 -- Regression losses

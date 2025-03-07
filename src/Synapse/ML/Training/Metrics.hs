@@ -4,6 +4,12 @@
 -}
 
 
+{- @TypeFamilies@ are needed to instantiate @DType@.
+-}
+
+{-# LANGUAGE TypeFamilies #-}
+
+
 module Synapse.ML.Training.Metrics
     ( -- @MetricFn@ type alias and @Metric@ newtype
 
@@ -16,6 +22,7 @@ module Synapse.ML.Training.Metrics
 
 import Synapse.ML.Training.Losses (LossFn)
 
+import Synapse.LinearAlgebra (DType)
 import Synapse.LinearAlgebra.Mat (Mat)
 
 import Synapse.Autograd (Symbol(unSymbol), constSymbol)
@@ -23,6 +30,8 @@ import Synapse.Autograd (Symbol(unSymbol), constSymbol)
 
 -- | @MetricFn@ type alias represents functions that are able to provide a reference of performance of neural network model.
 type MetricFn a = Mat a -> Mat a -> Mat a
+
+type instance DType (MetricFn a) = a
 
 -- | Converts any loss function to a metric function (because the same constraint is imposed on both @MetricFn@ and @LossFn@).
 lossFnToMetricFn :: LossFn a -> MetricFn a
@@ -36,3 +45,5 @@ Every metric function must return symbol of singleton matrix.
 newtype Metric a = Metric 
     { unMetric :: MetricFn a  -- ^ Unwraps @Metric@ newtype.
     }
+
+type instance DType (Metric a) = a
