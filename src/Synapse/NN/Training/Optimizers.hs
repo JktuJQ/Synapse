@@ -26,7 +26,7 @@ import Synapse.Tensors (DType, ElementwiseScalarOps((*.)))
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
-import Synapse.NN.Layers.Initializers (ones)
+import Synapse.NN.Layers.Initializers (zeroes)
 
 import Data.Kind (Type)
 
@@ -58,12 +58,12 @@ type instance DType (SGD a) = a
 instance Num a => Optimizer (SGD a) where
     type OptimizerParameters (SGD a) = Mat a
 
-    optimizerInitialParameters _ parameter = ones (M.size parameter)
+    optimizerInitialParameters _ parameter = zeroes (M.size parameter)
 
     optimizerUpdateStep (SGD momentum nesterov) (parameter, velocity) (lr, gradient) = (parameter', velocity')
       where
         velocity' = velocity *. momentum - gradient *. lr
 
         parameter' = if nesterov
-                     then parameter + velocity *. momentum - gradient *. lr
-                     else parameter + velocity
+                     then parameter + velocity' *. momentum - gradient *. lr
+                     else parameter + velocity'
