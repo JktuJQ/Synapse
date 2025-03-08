@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.NN.Training.Metrics
+module Synapse.NN.Metrics
     ( -- @MetricFn@ type alias and @Metric@ newtype
 
       MetricFn
@@ -20,7 +20,7 @@ module Synapse.NN.Training.Metrics
     ) where
 
 
-import Synapse.NN.Training.Losses (LossFn)
+import Synapse.NN.Losses (LossFn)
 
 import Synapse.Tensors (DType)
 import Synapse.Tensors.Mat (Mat)

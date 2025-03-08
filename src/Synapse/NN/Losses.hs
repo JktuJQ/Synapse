@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.NN.Training.Losses
+module Synapse.NN.Losses
     ( -- * @LossFn@ type alias and @Loss@ newtype
 
       LossFn

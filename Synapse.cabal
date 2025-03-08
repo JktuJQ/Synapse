@@ -64,19 +64,18 @@ library
                     , Synapse.NN.Layers.Activations
                     , Synapse.NN.Layers.Dense
 
-
                     , Synapse.NN.Models
-
 
                     , Synapse.NN.Training
 
-                    , Synapse.NN.Training.Batching
+                    , Synapse.NN.Batching
                     
-                    , Synapse.NN.Training.Losses
-                    , Synapse.NN.Training.Metrics
+                    , Synapse.NN.Losses
+                    , Synapse.NN.Metrics
 
-                    , Synapse.NN.Training.LearningRates
-                    , Synapse.NN.Training.Optimizers
+                    , Synapse.NN.LearningRates
+
+                    , Synapse.NN.Optimizers
                     
     -- other-modules:
     -- other-extensions:

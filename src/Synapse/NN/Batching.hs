@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.NN.Training.Batching
+module Synapse.NN.Batching
     ( -- * @Sample@ datatype
     
       Sample (Sample, sampleInput, sampleOutput)

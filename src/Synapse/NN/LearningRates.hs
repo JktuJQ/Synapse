@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module Synapse.NN.Training.LearningRates
+module Synapse.NN.LearningRates
     ( -- * @LearningRateFn@ type alias and @LearningRate@ newtype
 
       LearningRateFn

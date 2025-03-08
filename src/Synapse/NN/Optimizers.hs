@@ -10,7 +10,7 @@ use @DType@ and define @Optimizer@ typeclass.
 {-# LANGUAGE TypeFamilies     #-}
 
 
-module Synapse.NN.Training.Optimizers
+module Synapse.NN.Optimizers
     ( -- @Optimizer@ typeclass
       
       Optimizer (OptimizerParameters, optimizerInitialParameters, optimizerUpdateStep)
