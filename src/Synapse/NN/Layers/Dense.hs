@@ -66,6 +66,7 @@ instance AbstractLayer Dense where
     inputSize = Just . M.nRows . denseWeights
     outputSize = Just . M.nCols . denseWeights
 
+    nParameters _ = 2
     getParameters (Dense weights bias _ _) = [weights, biasToMat (M.nRows weights) bias]
     updateParameters (Dense _ _ constraints@(Constraint weightsConstraintFn, Constraint biasConstraintFn) regularizers) [weights', biasMat'] =
         Dense (weightsConstraintFn weights') (M.indexRow (biasConstraintFn biasMat') 0) constraints regularizers
@@ -74,7 +75,7 @@ instance AbstractLayer Dense where
     applyRegularizer prefix (Dense weights bias _ (Regularizer weightsRegularizerFn, Regularizer biasRegularizerFn)) =
         weightsRegularizerFn (weightsSymbol prefix weights) + biasRegularizerFn (biasSymbol prefix (M.nRows weights) bias)
 
-    symbolicForward prefix (Dense weights bias _ _) input =
+    symbolicForward prefix input (Dense weights bias _ _) =
         input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
 
 -- | Creates configuration of dense layer.
