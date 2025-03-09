@@ -20,7 +20,8 @@ are needed to instantiate @DType@.
 {- @ExistentialQuantification@ is needed to define @Layer@ datatype.
 -}
 
-{-# LANGUAGE ExistentialQuantification #-} 
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 
 module Synapse.NN.Layers.Layer
@@ -29,7 +30,7 @@ module Synapse.NN.Layers.Layer
       AbstractLayer (inputSize, outputSize, getParameters, updateParameters, applyRegularizer, symbolicForward)
 
     , forward
-      
+
       -- * @Layer@ existential datatype
 
     , Layer (Layer)
@@ -64,20 +65,20 @@ read the docs thoroughly to ensure that all the invariants are met.
 -}
 class AbstractLayer l where
     -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence (activation functions are the example).
-    inputSize :: l -> Maybe Int
+    inputSize :: l a -> Maybe Int
     -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence (activation functions are the example).
-    outputSize :: l -> Maybe Int
+    outputSize :: l a -> Maybe Int
 
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
-    getParameters :: l -> [Mat (DType l)]
+    getParameters :: l a -> [Mat a]
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
-    updateParameters :: l -> [Mat (DType l)] -> l
+    updateParameters :: l a -> [Mat a] -> l a
 
     {- | Applies regularizer of a layer to obtain symbol of singleton matrix which will be added to the loss in training.
 
     All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
     -}
-    applyRegularizer :: Symbolic (DType l) => String -> l -> SymbolMat (DType l)
+    applyRegularizer :: Symbolic a => String -> l a -> SymbolMat a
 
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
 
@@ -89,20 +90,20 @@ class AbstractLayer l where
     It is also important so that the order of the parameters stays consistent even for @getParameters@ function
     (that will allow choosing correct gradients automatically in the training).
     -}
-    symbolicForward :: (Symbolic (DType l), Floating (DType l), Ord (DType l)) => String -> l -> SymbolMat (DType l) -> SymbolMat (DType l)
+    symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> l a -> SymbolMat a -> SymbolMat a
 
 
 -- | Passes matrix through to produce new matrix.
-forward :: (AbstractLayer l, Symbolic (DType l), Floating (DType l), Ord (DType l)) => l -> Mat (DType l) -> Mat (DType l)
+forward :: (AbstractLayer l, Symbolic a, Floating a, Ord a) => l a -> Mat a -> Mat a
 forward layer input = unSymbol $ symbolicForward "" layer (constSymbol input)
 
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.
-data Layer a = forall l. (AbstractLayer l, DType l ~ a) => Layer l
+data Layer a = forall l. (AbstractLayer l) => Layer (l a)
 
 type instance DType (Layer a) = a
 
-instance AbstractLayer (Layer a) where
+instance AbstractLayer Layer where
     inputSize (Layer l) = inputSize l
     outputSize (Layer l) = outputSize l
 

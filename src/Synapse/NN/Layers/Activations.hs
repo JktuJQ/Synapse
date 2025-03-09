@@ -60,7 +60,7 @@ newtype Activation a = Activation
 
 type instance DType (Activation a) = a
 
-instance AbstractLayer (Activation a) where
+instance AbstractLayer Activation where
     inputSize _ = Nothing
     outputSize _ = Nothing
 

@@ -7,6 +7,9 @@
 
 {-# LANGUAGE TypeFamilies #-}
 
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 module Synapse.NN.Models
     ( -- * Common
@@ -23,10 +26,18 @@ import Synapse.NN.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
 
 import Synapse.Tensors (DType, SingletonOps(singleton))
 
-import Data.Foldable (foldl')
 import Data.Maybe (fromMaybe)
+import Data.Functor ((<&>))
 
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
+
+
+class MV.PrimMonad m => Model model m where
+    data Training model m a
+
+    toTrainingMode :: model a -> m (Training model m a)
+    toEvalMode :: Training model m a -> m (model a)
 
 
 -- | @InputSize@ newtype wraps @Int@ - amount of features of input that the model should support (@InputSize 3@ means that model supports any matrix with size (x, 3)).
@@ -50,13 +61,24 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ V.fromList $
 
 type instance DType (SequentialModel a) = a
 
-instance AbstractLayer (SequentialModel a) where
+instance AbstractLayer SequentialModel where
     inputSize = inputSize . V.head . unSequentialModel
     outputSize = outputSize . V.head . unSequentialModel
 
     getParameters = V.foldl' (\acc x -> acc ++ getParameters x) [] . unSequentialModel
     updateParameters (SequentialModel layers) parameters = SequentialModel $ fmap (`updateParameters` parameters) layers
 
-    applyRegularizer prefix (SequentialModel layers) = foldl' (\loss layer -> loss + applyRegularizer prefix layer) (singleton 0) (V.toList layers)
+    applyRegularizer prefix (SequentialModel layers) = V.foldl' (\loss layer -> loss + applyRegularizer prefix layer) (singleton 0) layers
 
     symbolicForward prefix (SequentialModel layers) input = V.foldl' (flip $ symbolicForward prefix) input layers
+
+
+instance MV.PrimMonad m => Model SequentialModel m where
+    newtype Training SequentialModel m a = TrainingSequentialModel
+        { unTrainingSequentialModel :: MV.MVector (MV.PrimState m) (Layer a)
+        }
+    
+    toTrainingMode (SequentialModel layers) = V.thaw layers <&> TrainingSequentialModel
+    toEvalMode (TrainingSequentialModel layers) = V.freeze layers <&> SequentialModel
+
+type instance DType (Training SequentialModel m a) = a

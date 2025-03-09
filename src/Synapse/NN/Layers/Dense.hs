@@ -62,7 +62,7 @@ biasSymbol prefix rows = symbol (prefix ++ "2") . biasToMat rows
 
 type instance DType (Dense a) = a
 
-instance AbstractLayer (Dense a) where
+instance AbstractLayer Dense where
     inputSize = Just . M.nRows . denseWeights
     outputSize = Just . M.nCols . denseWeights
 
