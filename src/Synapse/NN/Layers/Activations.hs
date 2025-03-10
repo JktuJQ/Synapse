@@ -65,7 +65,7 @@ instance AbstractLayer Activation where
     outputSize _ = Nothing
 
     nParameters _ = 0
-    getParameters _ = []
+    getParameters _ _ = []
     updateParameters = const
 
     applyRegularizer _ _ = constSymbol $ M.singleton 0

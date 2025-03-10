@@ -67,7 +67,7 @@ instance AbstractLayer Dense where
     outputSize = Just . M.nCols . denseWeights
 
     nParameters _ = 2
-    getParameters (Dense weights bias _ _) = [weights, biasToMat (M.nRows weights) bias]
+    getParameters prefix (Dense weights bias _ _) = [weightsSymbol prefix weights, biasSymbol prefix (M.nRows weights) bias]
     updateParameters (Dense _ _ constraints@(Constraint weightsConstraintFn, Constraint biasConstraintFn) regularizers) [weights', biasMat'] =
         Dense (weightsConstraintFn weights') (M.indexRow (biasConstraintFn biasMat') 0) constraints regularizers
     updateParameters _ _ = error "Parameters update failed - wrong amount of parameters was given"

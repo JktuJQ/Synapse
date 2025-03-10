@@ -42,9 +42,9 @@ class Optimizer optimizer where
     -- | Performs the update step of optimizer.
     optimizerUpdateStep
         :: Num a
-        => optimizer a                                             -- ^ Optimizer itself.
+        => optimizer a                               -- ^ Optimizer itself.
         -> (Mat a, OptimizerParameters optimizer a)  -- ^ Given parameter and current state of optimizer-specific parameters.
-        -> (a, Mat a)                -- ^ Learning rate and gradient of given parameter.
+        -> (a, Mat a)                                -- ^ Learning rate and gradient of given parameter.
         -> (Mat a, OptimizerParameters optimizer a)  -- ^ Updated parameter and a new state of optimizer-specific parameters.
 
 

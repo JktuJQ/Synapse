@@ -71,7 +71,7 @@ class AbstractLayer l where
     -- | Returns the number of parameters of this layer.
     nParameters :: l a -> Int
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
-    getParameters :: l a -> [Mat a]
+    getParameters :: String -> l a -> [SymbolMat a]
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
     updateParameters :: l a -> [Mat a] -> l a
 
@@ -108,7 +108,7 @@ class AbstractLayerM l m where
     -- | Returns the number of parameters of this layer.
     nParametersM :: l a -> m Int
     -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
-    getParametersM :: l a -> m [Mat a]
+    getParametersM :: String -> l a -> m [SymbolMat a]
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
     updateParametersM :: l a -> [Mat a] -> m (l a)
 
@@ -141,7 +141,7 @@ instance AbstractLayer Layer where
     outputSize (Layer l) = outputSize l
 
     nParameters (Layer l) = nParameters l
-    getParameters (Layer l) = getParameters l
+    getParameters prefix (Layer l) = getParameters prefix l
     updateParameters (Layer l) = Layer . updateParameters l
 
     applyRegularizer prefix (Layer l) = applyRegularizer prefix l

@@ -72,21 +72,27 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ V.fromList $
 
 type instance DType (SequentialModel a) = a
 
+layerPrefix :: String -> Int -> String
+layerPrefix prefix i = prefix ++ "l" ++ show i ++ "w"
+
 instance AbstractLayer SequentialModel where
     inputSize = inputSize . V.head . unSequentialModel
     outputSize = outputSize . V.head . unSequentialModel
 
     nParameters = V.foldl' (\parameters layer -> parameters + nParameters layer) 0 . unSequentialModel
-    getParameters = V.foldl' (\acc x -> acc ++ getParameters x) [] . unSequentialModel
+    getParameters prefix =
+        snd . V.foldl' (\(i, acc) layer -> (i + 1, acc ++ getParameters (layerPrefix prefix i) layer)) (1 :: Int, []) . unSequentialModel
     updateParameters model = SequentialModel . V.fromList . go (V.toList $ unSequentialModel model)
       where
         go [] _ = []
         go (layer:layers) parameters = let (x, parameters') = splitAt (nParameters layer) parameters
                                        in updateParameters layer x : go layers parameters'
 
-    applyRegularizer prefix = V.foldl' (\loss layer -> loss + applyRegularizer prefix layer) (singleton 0) . unSequentialModel
+    applyRegularizer prefix =
+        snd . V.foldl' (\(i, mat) layer -> (i + 1, mat + applyRegularizer (layerPrefix prefix i) layer)) (1 :: Int, singleton 0) . unSequentialModel
 
-    symbolicForward prefix input = V.foldl' (symbolicForward prefix) input . unSequentialModel
+    symbolicForward prefix input =
+        snd . V.foldl' (\(i, mat) layer -> (i + 1, symbolicForward (layerPrefix prefix i) mat layer)) (1 :: Int, input) . unSequentialModel
 
 
 instance MV.PrimMonad m => Model SequentialModel m where
@@ -105,7 +111,8 @@ instance MV.PrimMonad m => AbstractLayerM (Training SequentialModel m) m where
     outputSizeM (TrainingSequentialModel layers) = MV.read layers 0 <&> outputSize
 
     nParametersM = MV.foldl' (\parameters layer -> parameters + nParameters layer) 0 . unTrainingSequentialModel
-    getParametersM = MV.foldl' (\acc x -> acc ++ getParameters x) [] . unTrainingSequentialModel
+    getParametersM prefix =
+        fmap snd . MV.foldl' (\(i, acc) layer -> (i + 1, acc ++ getParameters (layerPrefix prefix i) layer)) (1 :: Int, []) . unTrainingSequentialModel
     updateParametersM model p = go (unTrainingSequentialModel model) p >> return model
       where
         go layers parameters
@@ -116,6 +123,8 @@ instance MV.PrimMonad m => AbstractLayerM (Training SequentialModel m) m where
                 _ <- MV.write layers 0 (updateParameters layer x)
                 go (MV.tail layers) parameters'
 
-    applyRegularizerM prefix = MV.foldl' (\loss layer -> loss + applyRegularizer prefix layer) (singleton 0) . unTrainingSequentialModel
+    applyRegularizerM prefix =
+        fmap snd . MV.foldl' (\(i, mat) layer -> (i + 1, mat + applyRegularizer (layerPrefix prefix i) layer)) (1 :: Int, singleton 0) . unTrainingSequentialModel
 
-    symbolicForwardM prefix input = MV.foldl' (symbolicForward prefix) input . unTrainingSequentialModel
+    symbolicForwardM prefix input =
+        fmap snd . MV.foldl' (\(i, mat) layer -> (i + 1, symbolicForward (layerPrefix prefix i) mat layer)) (1 :: Int, input) . unTrainingSequentialModel
