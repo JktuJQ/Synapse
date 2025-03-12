@@ -68,9 +68,7 @@ instance AbstractLayer Activation where
     getParameters _ _ = []
     updateParameters = const
 
-    applyRegularizer _ _ = constSymbol $ M.singleton 0
-
-    symbolicForward _ input (Activation fn) = fn input
+    symbolicForward _ input (Activation fn) = (fn input, M.singleton 0)
 
 -- | Creates configuration for activation layer.
 layerActivation :: ActivationFn a -> LayerConfiguration (Activation a)

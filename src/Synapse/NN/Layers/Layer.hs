@@ -25,10 +25,8 @@ are needed to instantiate @DType@.
 module Synapse.NN.Layers.Layer
     ( -- * @AbstractLayer@ and @AbstractLayerM@ typeclasses
 
-      AbstractLayer (inputSize, outputSize, nParameters, getParameters, updateParameters, applyRegularizer, symbolicForward)
+      AbstractLayer (inputSize, outputSize, nParameters, getParameters, updateParameters, symbolicForward)
     , forward
-
-    , AbstractLayerM (inputSizeM, outputSizeM, nParametersM, getParametersM, updateParametersM, applyRegularizerM, symbolicForwardM)
 
       -- * @Layer@ existential datatype
 
@@ -75,13 +73,8 @@ class AbstractLayer l where
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
     updateParameters :: l a -> [Mat a] -> l a
 
-    {- | Applies regularizer of a layer to obtain symbol of singleton matrix which will be added to the loss in training.
-
-    All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
-    -}
-    applyRegularizer :: Symbolic a => String -> l a -> SymbolMat a
-
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
+    Second matrix is a result of application of regularizer on a layer.
 
     Given @String@ is a prefix for name of symbolic parameters that are used in calculation.
     Every used parameter should have unique name to be recognised by the autograd - 
@@ -91,44 +84,11 @@ class AbstractLayer l where
     It is also important so that the order of the parameters stays consistent even for @getParameters@ function
     (that will allow choosing correct gradients automatically in the training).
     -}
-    symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> SymbolMat a -> l a -> SymbolMat a
+    symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> SymbolMat a -> l a -> (SymbolMat a, SymbolMat a)
 
 -- | Passes matrix through to produce new matrix.
 forward :: (AbstractLayer l, Symbolic a, Floating a, Ord a) => Mat a -> l a -> Mat a
-forward input = unSymbol . symbolicForward ""  (constSymbol input)
-
-
--- | @AbstractLayerM@ is a monadic version of @AbstractLayer@ which allows training neural networks in mutable monadic contexts.
-class AbstractLayerM l m where
-    -- | Returns the size of the input for @forward@ and @symbolicForward@ functions that is supported. @Nothing@ means size independence (activation functions are the example).
-    inputSizeM :: l a -> m (Maybe Int)
-    -- | Returns the size of the output of @forward@ and @symbolicForward@. @Nothing@ means size independence (activation functions are the example).
-    outputSizeM :: l a -> m (Maybe Int)
-
-    -- | Returns the number of parameters of this layer.
-    nParametersM :: l a -> m Int
-    -- | Returns a list of all parameters (those must be of the exact same order as they are named (check @symbolicForward@ docs)).
-    getParametersM :: String -> l a -> m [SymbolMat a]
-    -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from @getParameters@)
-    updateParametersM :: l a -> [Mat a] -> m (l a)
-
-    {- | Applies regularizer of a layer to obtain symbol of singleton matrix which will be added to the loss in training.
-
-    All used symbol parameters should have the same name, as in @symbolicForward@ (check docs for more info).
-    -}
-    applyRegularizerM :: Symbolic a => String -> l a -> m (SymbolMat a)
-
-    {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
-
-    Given @String@ is a prefix for name of symbolic parameters that are used in calculation.
-    Every used parameter should have unique name to be recognised by the autograd - 
-    it must start with given prefix and end with the numerical index of said parameter.
-    For example 3rd layer with 2 parameters (weights and bias) should
-    name its weights symbol "l3w1" and name its bias symbol "l3w2" ("l3w" prefix will be supplied).
-    It is also important so that the order of the parameters stays consistent even for @getParameters@ function
-    (that will allow choosing correct gradients automatically in the training).
-    -}
-    symbolicForwardM :: (Symbolic a, Floating a, Ord a) => String -> SymbolMat a -> l a -> m (SymbolMat a)
+forward input = unSymbol . fst . symbolicForward ""  (constSymbol input)
 
 
 -- | @Layer@ existential datatype wraps anything that implements @AbstractLayer@.
@@ -143,8 +103,6 @@ instance AbstractLayer Layer where
     nParameters (Layer l) = nParameters l
     getParameters prefix (Layer l) = getParameters prefix l
     updateParameters (Layer l) = Layer . updateParameters l
-
-    applyRegularizer prefix (Layer l) = applyRegularizer prefix l
 
     symbolicForward prefix input (Layer l) = symbolicForward prefix input l
 

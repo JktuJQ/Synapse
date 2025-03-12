@@ -43,8 +43,8 @@ class Optimizer optimizer where
     optimizerUpdateStep
         :: Num a
         => optimizer a                               -- ^ Optimizer itself.
-        -> (Mat a, OptimizerParameters optimizer a)  -- ^ Given parameter and current state of optimizer-specific parameters.
         -> (a, Mat a)                                -- ^ Learning rate and gradient of given parameter.
+        -> (Mat a, OptimizerParameters optimizer a)  -- ^ Given parameter and current state of optimizer-specific parameters.
         -> (Mat a, OptimizerParameters optimizer a)  -- ^ Updated parameter and a new state of optimizer-specific parameters.
 
 
@@ -61,7 +61,7 @@ instance Optimizer SGD where
 
     optimizerInitialParameters _ parameter = zeroes (M.size parameter)
 
-    optimizerUpdateStep (SGD momentum nesterov) (parameter, velocity) (lr, gradient) = (parameter', velocity')
+    optimizerUpdateStep (SGD momentum nesterov) (lr, gradient) (parameter, velocity) = (parameter', velocity')
       where
         velocity' = velocity *. momentum - gradient *. lr
 

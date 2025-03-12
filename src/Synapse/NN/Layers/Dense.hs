@@ -72,11 +72,10 @@ instance AbstractLayer Dense where
         Dense (weightsConstraintFn weights') (M.indexRow (biasConstraintFn biasMat') 0) constraints regularizers
     updateParameters _ _ = error "Parameters update failed - wrong amount of parameters was given"
 
-    applyRegularizer prefix (Dense weights bias _ (Regularizer weightsRegularizerFn, Regularizer biasRegularizerFn)) =
-        weightsRegularizerFn (weightsSymbol prefix weights) + biasRegularizerFn (biasSymbol prefix (M.nRows weights) bias)
-
-    symbolicForward prefix input (Dense weights bias _ _) =
-        input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
+    symbolicForward prefix input (Dense weights bias _ (Regularizer weightsRegularizerFn, Regularizer biasRegularizerFn)) =
+        ( input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
+        , weightsRegularizerFn (weightsSymbol prefix weights) + biasRegularizerFn (biasSymbol prefix (M.nRows weights) bias)
+        )
 
 -- | Creates configuration of dense layer.
 layerDenseWith
