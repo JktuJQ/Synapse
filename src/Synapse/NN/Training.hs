@@ -23,7 +23,8 @@ import Synapse.NN.Losses (Loss(Loss))
 import Synapse.NN.Metrics (Metric(Metric))
 
 import Control.Monad (forM_)
-import Data.IORef (newIORef, writeIORef, modifyIORef, readIORef)
+import Control.Monad.ST (runST)
+import Data.STRef (newSTRef, writeSTRef, modifySTRef, readSTRef)
 
 import System.Random (RandomGen)
 
@@ -46,51 +47,52 @@ newtype RecordedMetrics a = RecordedMetrics
     { unRecordedMetrics :: Vec a  -- ^ Results of metric recording.
     }
 
+
 -- | @train@ function is the heart of @Synapse@ library. It allows training neural networks on datasets.
 train
     :: (Symbolic a, Floating a, Ord a, RandomGen g, AbstractLayer model, Optimizer optimizer)
-    => model a                                       -- ^ Trained model.
-    -> optimizer a                                              -- ^ Optimizer that will be used in training.
-    -> Hyperparameters a                                        -- ^ Hyperparameters of training.
-    -> (VecDataset a, g)                                        -- ^ Dataset with samples of vector functions, generator of random values that will be used to shuffle dataset.
-    -> IO (model a, Vec (RecordedMetrics a), g)  -- ^ Updated model, vector of recorded metrics (loss is also recorded and is the first in vector), updated generator of random values.
-train model optimizer (Hyperparameters epochs batchSize (LearningRate lr) (Loss loss) (Vec metrics)) (dataset, gen0) = do
-    modelState <- newIORef model
-    optimizerParameters <- readIORef modelState >>= newIORef . fmap (optimizerInitialParameters optimizer . unSymbol) . getParameters "m"
+    => model a                                -- ^ Trained model.
+    -> optimizer a                            -- ^ Optimizer that will be used in training.
+    -> Hyperparameters a                      -- ^ Hyperparameters of training.
+    -> (VecDataset a, g)                      -- ^ Dataset with samples of vector functions, generator of random values that will be used to shuffle dataset.
+    -> (model a, Vec (RecordedMetrics a), g)  -- ^ Updated model, vector of recorded metrics (loss is also recorded and is the first in vector), updated generator of random values.
+train model optimizer (Hyperparameters epochs batchSize (LearningRate lr) (Loss loss) (Vec metrics)) (dataset, gen0) = runST $ do
+    modelState <- newSTRef model
+    optimizerParameters <- readSTRef modelState >>= newSTRef . fmap (optimizerInitialParameters optimizer . unSymbol) . getParameters "m"
 
     let batchesN = (V.length (unVec $ unDataset dataset) + batchSize - 1) `div` batchSize
 
     allMetrics <- V.generateM (1 + V.length metrics) (const $ MV.new (epochs * batchesN))
 
-    gen <- newIORef gen0
+    gen <- newSTRef gen0
 
     forM_ [1 .. epochs] $ \epoch -> do
-        currentGen <- readIORef gen
+
+        currentGen <- readSTRef gen
         let (shuffledDataset, gen') = shuffleDataset dataset currentGen
-        _ <- writeIORef gen gen'
+        _ <- writeSTRef gen gen'
 
         forM_ (zip [1 ..] $ V.toList $ unVec $ unDataset $ batchVectors batchSize shuffledDataset) $ \(batchI, Sample batchInput batchOutput) -> do
-            currentModelState <- readIORef modelState
-            currentOptimizerParameters <- readIORef optimizerParameters
+            currentModelState <- readSTRef modelState
+            currentOptimizerParameters <- readSTRef optimizerParameters
 
             let (prediction, regularizersLoss) = symbolicForward "m" (constSymbol batchInput) currentModelState
 
             let currentIteration = epoch * batchI
             let lossValue = loss (constSymbol batchOutput) prediction
-            let lrValue = lr currentIteration 
+            let lrValue = lr currentIteration
+
+            let (parameters', optimizerParameters') = unzip $ trainParameters optimizer (lrValue, getGradientsOf $ lossValue + regularizersLoss) (zip (getParameters "m" currentModelState) currentOptimizerParameters)
+
+            _ <- modifySTRef modelState (`updateParameters` parameters')
+            _ <- writeSTRef optimizerParameters optimizerParameters'
+
             MV.write (V.unsafeIndex allMetrics 0) currentIteration (unSingleton lossValue)
             forM_ (zip [1 ..] $ V.toList metrics) $
                 \(metricI, Metric metric) -> MV.write (V.unsafeIndex allMetrics metricI) currentIteration (unSingleton $ metric batchOutput (unSymbol prediction))
 
-            let (parameters', optimizerParameters') = unzip $ trainParameters optimizer (lrValue, getGradientsOf $ lossValue + regularizersLoss) (zip (getParameters "m" currentModelState) currentOptimizerParameters)
-
-            _ <- modifyIORef modelState (`updateParameters` parameters')
-            _ <- writeIORef optimizerParameters optimizerParameters'
-
-            return ()
-
     recordedMetrics <- V.mapM (fmap (RecordedMetrics . Vec) . V.unsafeFreeze) allMetrics
-    gen'' <- readIORef gen
+    gen'' <- readSTRef gen
 
     return (model, Vec recordedMetrics, gen'')
   where

@@ -122,13 +122,13 @@ and the second is that mass traversal operations on those sparse matrices might 
 significant enough and you are just better using convenient functions instead of workarounds.
 -}
 data Mat a = Mat
-    { nRows        :: {-# UNPACK #-} !Int         -- ^ Number of rows. 
-    , nCols        :: {-# UNPACK #-} !Int         -- ^ Number of columns.
-    , rowStride    :: {-# UNPACK #-} !Int         -- ^ How much increasing row index affects true indexing.
-    , colStride    :: {-# UNPACK #-} !Int         -- ^ How much increasing column index affects true indexing.
-    , rowOffset    :: {-# UNPACK #-} !Int         -- ^ Row offset (from which row index does the matrix actually start).
-    , colOffset    :: {-# UNPACK #-} !Int         -- ^ Column offset (from which column index does the matrix actually start).
-    , storage      ::                 V.Vector a  -- ^ Internal storage (elements are stored in a vector using row-major ordering).
+    { nRows     :: {-# UNPACK #-} !Int         -- ^ Number of rows. 
+    , nCols     :: {-# UNPACK #-} !Int         -- ^ Number of columns.
+    , rowStride :: {-# UNPACK #-} !Int         -- ^ How much increasing row index affects true indexing.
+    , colStride :: {-# UNPACK #-} !Int         -- ^ How much increasing column index affects true indexing.
+    , rowOffset :: {-# UNPACK #-} !Int         -- ^ Row offset (from which row index does the matrix actually start).
+    , colOffset :: {-# UNPACK #-} !Int         -- ^ Column offset (from which column index does the matrix actually start).
+    , storage   ::                 V.Vector a  -- ^ Internal storage (elements are stored in a vector using row-major ordering).
     }
 
 -- | Number of elements in a matrix.

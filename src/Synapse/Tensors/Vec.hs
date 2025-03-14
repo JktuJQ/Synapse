@@ -221,7 +221,7 @@ concat = foldr1 (++)
 -- | Splits @Vec@ into two @Vec@s at a given index.
 splitAt :: Int -> Vec a -> (Vec a, Vec a)
 splitAt i (Vec v) = let (v1, v2) = V.splitAt i v
-                  in (Vec v1, Vec v2)
+                    in (Vec v1, Vec v2)
 
 
 -- Combining
