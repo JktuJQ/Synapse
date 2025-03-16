@@ -35,7 +35,7 @@ testNthOrderGradients :: Test
 testNthOrderGradients = TestLabel "testNthOrderGradients" $ TestList
     [ TestCase $ assertEqual "identity 2nd gradient" 0 (unSymbol $ nthGradient 2 a a)
     , TestCase $ assertEqual "composed operations 2nd gradient" (4 * 3) (unSymbol $ nthGradient 2 (a * (b + b) * a) a)
-    , TestCase $ assertEqual "4th gradient" (sin 0.5) (unSymbol $ nthGradient 4 (sin c) c)
+    , TestCase $ assertEqual "4th gradient" (unSymbol $ sin c) (unSymbol $ nthGradient 4 (sin c) c)
     ]
   where
     a = symbol "a" 4 :: Symbol Int

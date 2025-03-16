@@ -33,6 +33,8 @@ import qualified Synapse.Tensors.Vec as V
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
+import Prelude hiding (tail)
+
 import Control.Monad.ST (runST)
 
 import System.Random (RandomGen, uniformR)
@@ -70,7 +72,7 @@ shuffleDataset (Dataset dataset) gen
   where
     go _ 0 seed = return seed
     go v lastIndex seed = let (swapIndex, seed') = uniformR (0, lastIndex) seed
-                          in swap v swapIndex lastIndex >> go v lastIndex seed'
+                          in swap v swapIndex lastIndex >> go v (lastIndex - 1) seed'
 
 -- | @VecDataset@ type alias represents @Dataset@s with samples of vector functions.
 type VecDataset = Dataset Vec

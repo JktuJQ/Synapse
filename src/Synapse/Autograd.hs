@@ -247,33 +247,41 @@ instance Symbolic a => ElementwiseScalarOps (SymbolMat a) where
 
 instance Symbolic a => SingletonOps (SymbolVec a) where
     singleton = constSymbol . singleton
+    isSingleton = isSingleton . unSymbol
     unSingleton = unSingleton . unSymbol
 
-    elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
+    extendSingleton vec reference = constSymbol $ extendSingleton (unSymbol vec) (unSymbol reference)
+
+    elementsSum x = symbolicUnaryOp elementsSum x [(x, (`extendSingleton` x))]
     elementsProduct x = let innerProduct = unSingleton $ elementsProduct $ unSymbol x
-                        in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (V.generate (V.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
+                        in symbolicUnaryOp elementsProduct x [(x, \path -> extendSingleton path x * constSymbol (V.generate (V.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i))]
 
-    mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (V.size (unSymbol x)))))]
+    mean x = symbolicUnaryOp mean x [(x, \path -> extendSingleton path x /. fromIntegral (V.size (unSymbol x)))]
 
-    norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
+    norm x = symbolicUnaryOp norm x [(x, \path -> extendSingleton path x * (x /. unSingleton (norm $ unSymbol x)))]
 
 instance Symbolic a => SingletonOps (SymbolMat a) where
     singleton = constSymbol . singleton
+    isSingleton = isSingleton . unSymbol
     unSingleton = unSingleton . unSymbol
 
-    elementsSum x = symbolicUnaryOp elementsSum x [(x, (* symbolicOne x))]
+    extendSingleton mat reference = constSymbol $ extendSingleton (unSymbol mat) (unSymbol reference)
+
+    elementsSum x = symbolicUnaryOp elementsSum x [(x, (`extendSingleton` x))]
     elementsProduct x = let innerProduct = unSingleton $ elementsProduct $ unSymbol x
-                        in symbolicUnaryOp elementsProduct x [(x, (* constSymbol (M.generate (M.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i)))]
+                        in symbolicUnaryOp elementsProduct x [(x, \path -> extendSingleton path x * constSymbol (M.generate (M.size $ unSymbol x) $ \i -> innerProduct / unsafeIndex (unSymbol x) i))]
 
-    mean x = symbolicUnaryOp mean x [(x, (* (symbolicOne x /. fromIntegral (M.nElements $ unSymbol x))))]
+    mean x = symbolicUnaryOp mean x [(x, \path -> extendSingleton path x /. fromIntegral (M.nElements $ unSymbol x))]
 
-    norm x = symbolicUnaryOp norm x [(x, (* (x /. unSingleton (norm $ unSymbol x))))]
+    norm x = symbolicUnaryOp norm x [(x, \path -> extendSingleton path x * (x /. unSingleton (norm $ unSymbol x)))]
 
 instance Symbolic a => VecOps (SymbolVec a) where
     dot a b = elementsSum $ a * b
 
 instance Symbolic a => MatOps (SymbolMat a) where
     transpose x = symbolicUnaryOp M.transpose x [(x, (* transpose x))]
+
+    addMatRow mat row = symbolicBinaryOp addMatRow mat row [(mat, id), (row, constSymbol . M.rowVec . flip M.indexRow 0 . unSymbol)]
 
     matMul a b = symbolicBinaryOp M.matMul a b [(a, (`matMul` transpose b)), (b, (transpose a `matMul`))]
 

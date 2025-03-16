@@ -87,12 +87,16 @@ test-suite Synapse-test
 
     build-depends:    base ^>=4.17.2.1
                     , Synapse
+                    , random
 
                     , HUnit
+
+                    , easyplot
 
     hs-source-dirs:   test
     main-is:          Main.hs
     other-modules:    TensorsTest
                     , AutogradTest
+                    , NNTest
     -- other-extensions:
 

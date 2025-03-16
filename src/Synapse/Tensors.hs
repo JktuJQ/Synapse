@@ -30,11 +30,11 @@ module Synapse.Tensors
 
       -- * Container-scalar operations
     , ElementwiseScalarOps ((+.), (-.), (*.), (/.), (**.), elementsMin, elementsMax)
-    , SingletonOps (singleton, unSingleton, elementsSum, elementsProduct, mean, norm)
+    , SingletonOps (singleton, isSingleton, unSingleton, extendSingleton, elementsSum, elementsProduct, mean, norm)
 
       -- * Specific container operations
     , VecOps (dot)
-    , MatOps (transpose, matMul)
+    , MatOps (transpose, addMatRow, matMul)
     ) where
 
 
@@ -96,8 +96,13 @@ The best example is @Symbol@ from @Synapse.Autograd@.
 class SingletonOps f where
     -- | Initializes singleton container.
     singleton :: DType f -> f
+    -- | Return true if container represents a singleton.
+    isSingleton :: f -> Bool
     -- | Unwraps singleton container.
     unSingleton :: f -> DType f
+
+    -- Extends singleton to needed size using second argument as a reference.
+    extendSingleton :: f -> f -> f
 
     -- | Sums all elements of container.
     elementsSum :: Num (DType f) => f -> f
@@ -128,6 +133,9 @@ The best example is @Symbol@ from @Synapse.Autograd@.
 class MatOps f where
     -- | Transposes matrix.
     transpose :: f -> f
+
+    -- | Add matrix that represents row to every row of given matrix.
+    addMatRow :: Num (DType f) => f -> f -> f
 
     -- | Mutiplies two matrices.
     matMul :: Num (DType f) => f -> f -> f

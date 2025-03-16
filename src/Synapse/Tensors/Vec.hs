@@ -8,10 +8,13 @@ implements several mathematical operations on itself.
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
+{- @ConstrainedClassMethods@, @FlexibleContexts@, @TypeFamilies@ are needed
+to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@ typeclasses.
 -}
 
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstrainedClassMethods #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE TypeFamilies            #-}
 
 
 module Synapse.Tensors.Vec
@@ -64,7 +67,7 @@ module Synapse.Tensors.Vec
     ) where
 
 
-import Synapse.Tensors (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
+import Synapse.Tensors (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -143,9 +146,12 @@ instance ElementwiseScalarOps (Vec a) where
 
 instance SingletonOps (Vec a) where
     singleton = pure
-    unSingleton v
-        | size v /= 1 = error "Vector is not a singleton"
-        | otherwise   = unsafeIndex v 0
+    isSingleton vec = size vec == 1
+    unSingleton vec
+        | not $ isSingleton vec = error "Vector is not a singleton"
+        | otherwise             = unsafeIndex vec 0
+
+    extendSingleton vec reference = replicate (size reference) (unSingleton vec)
 
     elementsSum = singleton . V.sum . unVec
     elementsProduct = singleton . V.product . unVec
@@ -207,7 +213,7 @@ cons x = Vec . V.cons x . unVec
 
 -- | Append @Vec@ with given element.
 snoc :: Vec a -> a -> Vec a
-snoc (Vec v) x = Vec $ V.snoc v x
+snoc (Vec vec) x = Vec $ V.snoc vec x
 
 -- | Concatenate two @Vec@s.
 infixr 5 ++
@@ -278,10 +284,21 @@ normalized x = x /. magnitude x
 -- | Computes linear combination of @Vec@s. Returns empty @Vec@ if empty list was passed to this function.
 linearCombination :: Num a => [(a, Vec a)] -> Vec a
 linearCombination [] = empty
-linearCombination (x:xs) = foldl' (\acc (a, v) -> acc + v *. a) (snd x *. fst x) xs
+linearCombination (x:xs) = foldl' (\acc (a, vec) -> acc + vec *. a) (snd x *. fst x) xs
+
+
+{- | @VecOps@ typeclass provides vector-specific operations.
+
+This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
+The best example is @Symbol@ from @Synapse.Autograd@.
+-}
+class VecOps f where
+    -- | Calculates dot product of two vectors.
+    dot :: Num (DType f) => f -> f -> f
 
 instance Num a => VecOps (Vec a) where
     dot a b = elementsSum $ a * b
+
 
 -- | Calculates an angle between two @Vec@s.
 angleBetween :: Floating a => Vec a -> Vec a -> a

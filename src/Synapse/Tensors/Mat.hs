@@ -235,9 +235,12 @@ instance ElementwiseScalarOps (Mat a) where
 
 instance SingletonOps (Mat a) where
     singleton x =  Mat 1 1 1 1 0 0 (V.singleton x)
+    isSingleton mat = nElements mat == 1
     unSingleton mat
-        | nElements mat /= 1 = error "Vector is not a singleton"
-        | otherwise   = unsafeIndex mat (0, 0)
+        | not $ isSingleton mat = error "Matrix is not a singleton"
+        | otherwise             = unsafeIndex mat (0, 0)
+
+    extendSingleton mat reference = extend mat (unSingleton mat) (size reference)
 
     elementsSum mat@(Mat rows cols _ _ _ _ _) = singleton $ sum [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
     elementsProduct mat@(Mat rows cols _ _ _ _ _) = singleton $ product [unsafeIndex mat (r, c) | r <- [0 .. rows - 1], c <- [0 .. cols - 1]]
@@ -497,6 +500,10 @@ adamarMul = elementwise (*)
 
 instance Num a => MatOps (Mat a) where
     transpose (Mat rows cols rk ck r0 c0 x) = Mat cols rows ck rk c0 r0 x
+    addMatRow mat row
+        | nRows row /= 1         = error "Given row matrix is not a row"
+        | nCols row /= nCols mat = error "Number of columns does not match"
+        | otherwise              = imap (\(_, c) -> (+ unsafeIndex row (0, c))) mat
     matMul a@(Mat rows1 cols1 _ _ _ _ _) b@(Mat rows2 cols2 _ _ _ _ _)
         | cols1 /= rows2 = error "Matrices dimensions do not match"
         | otherwise      = generate (rows1, cols2) $ \(r, c) -> unSingleton $ indexRow a r `SV.dot` indexCol b c

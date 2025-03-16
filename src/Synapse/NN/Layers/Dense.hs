@@ -21,16 +21,15 @@ module Synapse.NN.Layers.Dense
 
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
-import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes)
+import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes, ones)
 import Synapse.NN.Layers.Constraints (Constraint(Constraint))
 import Synapse.NN.Layers.Regularizers (Regularizer(Regularizer))
 
-import Synapse.Autograd (SymbolMat, Symbolic, symbol)
+import Synapse.Autograd (SymbolMat, Symbolic, unSymbol, symbol)
 
-import Synapse.Tensors (DType, Indexable(unsafeIndex), SingletonOps(singleton), MatOps(matMul))
+import Synapse.Tensors (DType, SingletonOps(singleton), MatOps(addMatRow, matMul))
 
 import Synapse.Tensors.Vec (Vec)
-import qualified Synapse.Tensors.Vec as V
 
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
@@ -52,13 +51,10 @@ data Dense a = Dense
 weightsSymbol :: String -> Mat a -> SymbolMat a
 weightsSymbol prefix = symbol (prefix ++ "1")
 
--- | Creates matrix that corresponds to bias (bias rows stacked on each other).
-biasToMat :: Int -> Vec a -> Mat a
-biasToMat rows bias = M.generate (rows, V.size bias) $ \(_, c) -> unsafeIndex bias c
 
 -- | Creates symbol for bias.
-biasSymbol :: String -> Int -> Vec a -> SymbolMat a
-biasSymbol prefix rows = symbol (prefix ++ "2") . biasToMat rows
+biasSymbol :: String -> Vec a -> SymbolMat a
+biasSymbol prefix = symbol (prefix ++ "2") . M.rowVec
 
 type instance DType (Dense a) = a
 
@@ -67,14 +63,17 @@ instance AbstractLayer Dense where
     outputSize = Just . M.nCols . denseWeights
 
     nParameters _ = 2
-    getParameters prefix (Dense weights bias _ _) = [weightsSymbol prefix weights, biasSymbol prefix (M.nRows weights) bias]
+    getParameters prefix (Dense weights bias _ _) = [weightsSymbol prefix weights, biasSymbol prefix bias]
     updateParameters (Dense _ _ constraints@(Constraint weightsConstraintFn, Constraint biasConstraintFn) regularizers) [weights', biasMat'] =
         Dense (weightsConstraintFn weights') (M.indexRow (biasConstraintFn biasMat') 0) constraints regularizers
     updateParameters _ _ = error "Parameters update failed - wrong amount of parameters was given"
 
     symbolicForward prefix input (Dense weights bias _ (Regularizer weightsRegularizerFn, Regularizer biasRegularizerFn)) =
-        ( input `matMul` weightsSymbol prefix weights + biasSymbol prefix (M.nRows weights) bias
-        , weightsRegularizerFn (weightsSymbol prefix weights) + biasRegularizerFn (biasSymbol prefix (M.nRows weights) bias)
+        let symbolWeights = weightsSymbol prefix weights
+            symbolBias = biasSymbol prefix bias
+        in
+        ( (input `matMul` symbolWeights) `addMatRow` symbolBias
+        , weightsRegularizerFn symbolWeights + biasRegularizerFn symbolBias
         )
 
 -- | Creates configuration of dense layer.
@@ -90,7 +89,7 @@ layerDenseWith (Initializer weightsInitializer, weightsConstraints, weightsRegul
     Dense (weightsInitializer (input, neurons)) (M.indexRow (biasInitializer (1, neurons)) 0) 
           (weightsConstraints, biasConstraints) (weightsRegularizer, biasRegularizer)
 
--- | Creates default configuration of dense layer - no constraints and both weights and bias are initialized with zeroes.
+-- | Creates default configuration of dense layer - no constraints and weight are initialized with ones, bias is initialized with zeroes.
 layerDense :: Symbolic a => Int -> LayerConfiguration (Dense a)
-layerDense = layerDenseWith (Initializer zeroes, Constraint id, Regularizer (const $ singleton 0))
+layerDense = layerDenseWith (Initializer ones, Constraint id, Regularizer (const $ singleton 0))
                             (Initializer zeroes, Constraint id, Regularizer (const $ singleton 0))
