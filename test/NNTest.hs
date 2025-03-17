@@ -1,4 +1,4 @@
--- | Tests @Synapse.Autograd@ module and its submodules.
+-- | Tests @Synapse.NN@ module and its submodules.
 
 
 module NNTest
@@ -9,9 +9,6 @@ module NNTest
 
 import Synapse.Tensors
 import qualified Synapse.Tensors.Vec as V
-import qualified Synapse.Tensors.Mat as M
-
-import Synapse.Autograd
 
 import Synapse.NN.Models
 import Synapse.NN.Layers

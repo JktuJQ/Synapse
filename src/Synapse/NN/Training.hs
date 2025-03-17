@@ -2,6 +2,9 @@
 -}
 
 
+{-# LANGUAGE OverloadedStrings #-}
+
+
 module Synapse.NN.Training
     ( -- * Training
       Hyperparameters (Hyperparameters, hyperparametersEpochs, hyperparametersBatchSize, hyperparametersLearningRate, hyperparametersLoss, hyperparametersMetrics)
@@ -27,11 +30,10 @@ import Data.IORef (newIORef, writeIORef, modifyIORef, readIORef)
 
 import System.Random (RandomGen)
 
+import System.ProgressBar
+
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
-import Data.Foldable (foldlM)
-import Synapse.NN.Models (SequentialModel(unSequentialModel))
-import Synapse.Tensors.Mat (singleton)
 
 
 -- | @Hyperparamters@ datatype represents configuration of a training.
@@ -52,19 +54,26 @@ newtype RecordedMetrics a = RecordedMetrics
 
 -- | @train@ function is the heart of @Synapse@ library. It allows training neural networks on datasets.
 train
-    :: (Symbolic a, Floating a, Ord a, RandomGen g, Optimizer optimizer, Show a)
-    => SequentialModel a                                -- ^ Trained model.
+    :: (Symbolic a, Floating a, Ord a, RandomGen g, AbstractLayer model, Optimizer optimizer, Show a)
+    => model a                                -- ^ Trained model.
     -> optimizer a                            -- ^ Optimizer that will be used in training.
     -> Hyperparameters a                      -- ^ Hyperparameters of training.
     -> (VecDataset a, g)                      -- ^ Dataset with samples of vector functions, generator of random values that will be used to shuffle dataset.
-    -> IO (SequentialModel a, Vec (RecordedMetrics a), g)  -- ^ Updated model, vector of recorded metrics (loss is also recorded and is the first in vector), updated generator of random values.
+    -> IO (model a, Vec (RecordedMetrics a), g)  -- ^ Updated model, vector of recorded metrics (loss is also recorded and is the first in vector), updated generator of random values.
 train model optimizer (Hyperparameters epochs batchSize (LearningRate lr) (Loss loss) (Vec metrics)) (dataset, gen0) = do
+    let totalIterations = epochs * ((V.length (unVec $ unDataset dataset) + batchSize - 1) `div` batchSize)
+    progressBar <- newProgressBar
+        (defStyle { stylePrefix = exact <> msg " iterations"
+                  , stylePostfix = msg "\nElapsed time: " <> elapsedTime renderDuration
+                                <> msg "; Remaining time: " <> remainingTime renderDuration ""
+                                <> msg "; Total time: " <> totalTime renderDuration ""
+                  }
+        ) 10 (Progress 0 totalIterations ())
+
     modelState <- newIORef model
     optimizerParameters <- readIORef modelState >>= newIORef . fmap (optimizerInitialParameters optimizer . unSymbol) . getParameters "m"
 
-    let batchesN = (V.length (unVec $ unDataset dataset) + batchSize - 1) `div` batchSize
-
-    allMetrics <- V.generateM (1 + V.length metrics) (const $ MV.new (epochs * batchesN))
+    allMetrics <- V.generateM (1 + V.length metrics) (const $ MV.new totalIterations)
 
     gen <- newIORef gen0
 
@@ -75,6 +84,8 @@ train model optimizer (Hyperparameters epochs batchSize (LearningRate lr) (Loss 
         _ <- writeIORef gen gen'
 
         forM_ (zip [1 ..] $ V.toList $ unVec $ unDataset $ batchVectors batchSize shuffledDataset) $ \(batchI, Sample batchInput batchOutput) -> do
+            incProgress progressBar 1
+            
             currentModelState <- readIORef modelState
             currentOptimizerParameters <- readIORef optimizerParameters
 

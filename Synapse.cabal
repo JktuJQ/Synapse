@@ -38,6 +38,8 @@ library
 
                     , random
 
+                    , terminal-progress-bar
+
     hs-source-dirs:   src
     exposed-modules:  Synapse
                     

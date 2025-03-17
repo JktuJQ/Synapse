@@ -25,7 +25,7 @@ import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes, ones)
 import Synapse.NN.Layers.Constraints (Constraint(Constraint))
 import Synapse.NN.Layers.Regularizers (Regularizer(Regularizer))
 
-import Synapse.Autograd (SymbolMat, Symbolic, unSymbol, symbol)
+import Synapse.Autograd (SymbolMat, Symbolic, symbol)
 
 import Synapse.Tensors (DType, SingletonOps(singleton), MatOps(addMatRow, matMul))
 
