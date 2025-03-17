@@ -20,7 +20,7 @@ are needed to define @Container@, @Indexable@, @ElementwiseScalarOps@, @Singleto
 
 
 module Synapse.Tensors
-    ( -- * @Container@ type family
+    ( -- * @DType@ type family
       
       DType
         

@@ -2,9 +2,7 @@
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
+-- @TypeFamilies@ are needed to instantiate @DType@.
 {-# LANGUAGE TypeFamilies #-}
 
 
@@ -17,7 +15,10 @@ module Synapse.NN.Batching
 
     , Dataset (Dataset, unDataset)
 
+    , datasetSize
+
     , shuffleDataset
+    , splitDataset
 
     , VecDataset
     , BatchedDataset
@@ -33,8 +34,6 @@ import qualified Synapse.Tensors.Vec as V
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
-import Prelude hiding (tail)
-
 import Control.Monad.ST (runST)
 
 import System.Random (RandomGen, uniformR)
@@ -44,24 +43,28 @@ import Data.Vector.Mutable (swap)
 
 
 -- | @Sample@ datatype represents known pair of inputs and outputs of function that is unknown.
-data Sample f a = Sample
-    { sampleInput  :: f a  -- ^ Sample input.
-    , sampleOutput :: f a  -- ^ Sample output.
+data Sample a = Sample
+    { sampleInput  :: a  -- ^ Sample input.
+    , sampleOutput :: a  -- ^ Sample output.
     } deriving (Eq, Show)
 
-type instance DType (Sample f a) = a
+type instance DType (Sample a) = DType a
 
 
 -- | @Dataset@ newtype wraps vector of @Sample@s - it represents known information about unknown function.
-newtype Dataset f a = Dataset 
-    { unDataset :: Vec (Sample f a)  -- ^ Unwraps @Dataset@ newtype.
+newtype Dataset a = Dataset 
+    { unDataset :: Vec (Sample a)  -- ^ Unwraps @Dataset@ newtype.
     } deriving (Eq, Show)
 
-type instance DType (Dataset f a) = a
+type instance DType (Dataset a) = DType a
+
+-- | Returns size of dataset.
+datasetSize :: Dataset a -> Int
+datasetSize = V.size . unDataset
 
 
 -- | Shuffles any @Dataset@ using Fisher-Yates algorithm.
-shuffleDataset :: RandomGen g => Dataset f a -> g -> (Dataset f a, g)
+shuffleDataset :: RandomGen g => Dataset a -> g -> (Dataset a, g)
 shuffleDataset (Dataset dataset) gen
     | V.size dataset <= 1 = (Dataset dataset, gen)
     | otherwise           = runST $ do
@@ -74,10 +77,16 @@ shuffleDataset (Dataset dataset) gen
     go v lastIndex seed = let (swapIndex, seed') = uniformR (0, lastIndex) seed
                           in swap v swapIndex lastIndex >> go v (lastIndex - 1) seed'
 
+-- | Splits dataset such that size of left dataset divided on size of right dataset will be equal to given ratio.
+splitDataset :: Dataset a -> Float -> (Dataset a, Dataset a)
+splitDataset (Dataset dataset) ratio = let (left, right) = V.splitAt (round $ fromIntegral (V.size dataset) * ratio) dataset
+                                       in (Dataset left, Dataset right)
+
+
 -- | @VecDataset@ type alias represents @Dataset@s with samples of vector functions.
-type VecDataset = Dataset Vec
+type VecDataset a = Dataset (Vec a)
 -- | @BatchedDataset@ type alias represents @Dataset@s with samples of vector functions where multiple samples were batched together.
-type BatchedDataset = Dataset Mat
+type BatchedDataset a = Dataset (Mat a)
 
 -- | Batches @VecDataset@ by grouping a given amount of samples into batches.
 batchVectors :: Int -> VecDataset a -> BatchedDataset a

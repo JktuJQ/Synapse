@@ -41,7 +41,7 @@ module Synapse.Autograd
       -- * @Gradients@ calculation
 
     , Gradients (unGradients)
-    , toList
+    , allGradients
     , getGradientsOf
     , wrt
     , nthPartialGradient
@@ -177,9 +177,9 @@ instance Symbolic a => Symbolic (Symbol a) where
     symbolicOne x = constSymbol $ symbolicOne $ unSymbol x
 
 
-type instance DType (SymbolVec a) = DType (Vec a)
+type instance DType (SymbolVec a) = a
 
-type instance DType (SymbolMat a) = DType (Mat a)
+type instance DType (SymbolMat a) = a
 
 
 -- | Converts unary operation into symbolic one.
@@ -293,14 +293,14 @@ newtype Gradients a = Gradients
     }
 
 -- | Returns key-value pairs of all gradients of symbol.
-toList :: Gradients a -> [(Symbol a, Symbol a)]
-toList = HM.toList . unGradients
+allGradients :: Gradients a -> [(Symbol a, Symbol a)]
+allGradients = HM.toList . unGradients
 
 
 -- Typeclasses
 
 instance Show a => Show (Gradients a) where
-    show gradients = show $ toList gradients
+    show gradients = show $ allGradients gradients
 
 
 -- | Generates @Gradients@ for given symbol.
