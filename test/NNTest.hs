@@ -36,14 +36,15 @@ testSin = TestLabel "testSin" $ TestCase $ do
     let dataset = Dataset $ V.fromList $ [Sample (singleton x) (sinFn $ singleton x) | x <- [-pi, -pi+0.2 .. pi]]
     (trainedModel, losses, _) <- train model
                                        (SGD 0.2 False)
-                                       (Hyperparameters 500 16 (LearningRate $ const 0.01) (Loss mse) V.empty)
-                                       (dataset, mkStdGen 1)
+                                       (Hyperparameters 500 16 dataset (LearningRate $ const 0.01) (Loss mse) V.empty)
+                                       emptyCallbacks
+                                       (mkStdGen 1)
     _ <- plot (PNG "test/plots/sin.png")
               [ Data2D [Title "predicted sin", Style Lines, Color Red] [Range (-pi) pi] [(x, unSingleton $ forward (singleton x) trainedModel) | x <- [-pi, -pi+0.05 .. pi]]
               , Data2D [Title "true sin", Style Lines, Color Green] [Range (-pi) pi] [(x, sinFn x) | x <- [-pi, -pi+0.05 .. pi]]
               ]
 
-    let unpackedLosses = unRecordedMetrics (unsafeIndex losses 0)
+    let unpackedLosses = unRecordedMetric (unsafeIndex losses 0)
     let lastLoss = unsafeIndex unpackedLosses (V.size unpackedLosses - 1)
 
     assertBool "trained well enough" (lastLoss < 0.01)
@@ -59,14 +60,15 @@ testSqrt = TestLabel "testSqrt" $ TestCase $ do
     let dataset = Dataset $ V.fromList $ [Sample (singleton x) (sqrtFn $ singleton x) | x <- [0.0, 0.2 .. 4.0]]
     (trainedModel, losses, _) <- train model
                                        (SGD 0.2 True)
-                                       (Hyperparameters 500 16 (LearningRate $ const 0.01) (Loss mse) V.empty)
-                                       (dataset, mkStdGen 1)
+                                       (Hyperparameters 500 16 dataset (LearningRate $ const 0.01) (Loss mse) V.empty)
+                                       emptyCallbacks
+                                       (mkStdGen 1)
     _ <- plot (PNG "test/plots/sqrt.png")
                [ Data2D [Title "predicted sqrt", Style Lines, Color Red] [Range 0.0 6.0] $ [(x, unSingleton $ forward (singleton x) trainedModel) | x <- [0.0, 0.05 .. 4.0]]
                , Data2D [Title "true sqrt", Style Lines, Color Green] [Range 0.0 6.0] $ [(x, sqrtFn x) | x <- [0.0, 0.05 .. 4.0]]
                ]
 
-    let unpackedLosses = unRecordedMetrics (unsafeIndex losses 0)
+    let unpackedLosses = unRecordedMetric (unsafeIndex losses 0)
     let lastLoss = unsafeIndex unpackedLosses (V.size unpackedLosses - 1)
 
     assertBool "trained well enough" (lastLoss < 0.01)
@@ -85,15 +87,16 @@ testTrigonometry = TestLabel "testTrigonometry" $ TestCase $ do
                                          
     (trainedModel, losses, _) <- train model
                                        (SGD 0.3 True)
-                                       (Hyperparameters 1000 1 (LearningRate $ const 0.001) (Loss mse) V.empty)
-                                       (dataset, mkStdGen 1)
+                                       (Hyperparameters 1000 1 dataset (LearningRate $ const 0.001) (Loss mse) V.empty)
+                                       emptyCallbacks
+                                       (mkStdGen 1)
 
     _ <- plot (PNG "test/plots/trigonometry.png")
                [ Data2D [Title "predicted trigonometry", Style Lines, Color Red] [Range ((-2.0) * pi) (2.0 * pi)] $ [(x, unSingleton $ forward (singleton x) trainedModel) | x <- [-(2.0 * pi),((-(2.0 * pi)) + 0.1)..(2.0 * pi)]]
                , Data2D [Title "true trigonometry", Style Lines, Color Green] [Range ((-2.0) * pi) (2.0 * pi)] $ [(x, trigonometryFn x) | x <- [-(2.0 * pi),((-(2.0 * pi)) + 0.1)..(2.0 * pi)]]
                ]
 
-    let unpackedLosses = unRecordedMetrics (unsafeIndex losses 0)
+    let unpackedLosses = unRecordedMetric (unsafeIndex losses 0)
     let lastLoss = unsafeIndex unpackedLosses (V.size unpackedLosses - 1)
 
     assertBool "trained well enough" (lastLoss < 0.01)
