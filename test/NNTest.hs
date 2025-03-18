@@ -1,4 +1,4 @@
--- | Tests @Synapse.NN@ module and its submodules.
+-- | Tests "Synapse.NN" module and its submodules.
 
 
 module NNTest

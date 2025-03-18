@@ -2,16 +2,16 @@
 -}
 
 
--- @TypeFamilies@ are needed to instantiate @DType@.
+-- 'TypeFamilies' are needed to instantiate 'DType'.
 {-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.NN.Batching
-    ( -- * @Sample@ datatype
+    ( -- * 'Sample' datatype
     
       Sample (Sample, sampleInput, sampleOutput)
 
-      -- * @Dataset@ datatype
+      -- * 'Dataset' datatype
 
     , Dataset (Dataset, unDataset)
 
@@ -42,7 +42,7 @@ import Data.Vector (thaw, unsafeFreeze)
 import Data.Vector.Mutable (swap)
 
 
--- | @Sample@ datatype represents known pair of inputs and outputs of function that is unknown.
+-- | 'Sample' datatype represents known pair of inputs and outputs of function that is unknown.
 data Sample a = Sample
     { sampleInput  :: a  -- ^ Sample input.
     , sampleOutput :: a  -- ^ Sample output.
@@ -51,9 +51,9 @@ data Sample a = Sample
 type instance DType (Sample a) = DType a
 
 
--- | @Dataset@ newtype wraps vector of @Sample@s - it represents known information about unknown function.
+-- | 'Dataset' newtype wraps vector of 'Sample's - it represents known information about unknown function.
 newtype Dataset a = Dataset 
-    { unDataset :: Vec (Sample a)  -- ^ Unwraps @Dataset@ newtype.
+    { unDataset :: Vec (Sample a)  -- ^ Unwraps 'Dataset' newtype.
     } deriving (Eq, Show)
 
 type instance DType (Dataset a) = DType a
@@ -63,7 +63,7 @@ datasetSize :: Dataset a -> Int
 datasetSize = V.size . unDataset
 
 
--- | Shuffles any @Dataset@ using Fisher-Yates algorithm.
+-- | Shuffles any 'Dataset' using Fisher-Yates algorithm.
 shuffleDataset :: RandomGen g => Dataset a -> g -> (Dataset a, g)
 shuffleDataset (Dataset dataset) gen
     | V.size dataset <= 1 = (Dataset dataset, gen)
@@ -83,12 +83,12 @@ splitDataset (Dataset dataset) ratio = let (left, right) = V.splitAt (round $ fr
                                        in (Dataset left, Dataset right)
 
 
--- | @VecDataset@ type alias represents @Dataset@s with samples of vector functions.
+-- | 'VecDataset' type alias represents 'Dataset's with samples of vector functions.
 type VecDataset a = Dataset (Vec a)
--- | @BatchedDataset@ type alias represents @Dataset@s with samples of vector functions where multiple samples were batched together.
+-- | 'BatchedDataset' type alias represents 'Dataset's with samples of vector functions where multiple samples were batched together.
 type BatchedDataset a = Dataset (Mat a)
 
--- | Batches @VecDataset@ by grouping a given amount of samples into batches.
+-- | Batches 'VecDataset' by grouping a given amount of samples into batches.
 batchVectors :: Int -> VecDataset a -> BatchedDataset a
 batchVectors batchSize (Dataset dataset) = Dataset $ V.fromList $ map groupBatch $ split dataset
   where

@@ -1,24 +1,19 @@
 {- | Implementation of mathematical vector.
 
-@Vec@ is only a newtype wrapper around @Vector@, which
+'Vec' is only a newtype wrapper around 'Data.Vector', which
 implements several mathematical operations on itself.
 
-@Vec@ offers meaningful abstraction and easy interface
+'Vec' offers meaningful abstraction and easy interface
 (you can unwrap it to perform more complex tasks).
 -}
 
 
-{- @ConstrainedClassMethods@, @FlexibleContexts@, @TypeFamilies@ are needed
-to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@ typeclasses.
--}
-
-{-# LANGUAGE ConstrainedClassMethods #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE TypeFamilies            #-}
+-- 'TypeFamilies' are needed to instantiate 'Indexable', 'ElementwiseScalarOps', 'SingletonOps', 'VecOps' typeclasses.
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.Tensors.Vec
-    ( -- * @Vec@ datatype and simple getters.
+    ( -- * 'Vec' datatype and simple getters.
 
       Vec (Vec, unVec)
 
@@ -67,7 +62,7 @@ module Synapse.Tensors.Vec
     ) where
 
 
-import Synapse.Tensors (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..))
+import Synapse.Tensors (DType, Indexable(..), ElementwiseScalarOps(..), SingletonOps(..), VecOps(..))
 
 import Prelude hiding ((++), concat, splitAt, map, replicate, zip, zipWith)
 import Data.Foldable (Foldable(..))
@@ -188,43 +183,43 @@ instance Traversable Vec where
 
 -- Constructors
 
--- | Creates empty @Vec@.
+-- | Creates empty 'Vec'.
 empty :: Vec a
 empty = Vec V.empty
 
--- | Creates @Vec@ from list.
+-- | Creates 'Vec' from list.
 fromList :: [a] -> Vec a
 fromList = Vec . V.fromList
 
--- | Creates @Vec@ of given length using generating function.
+-- | Creates 'Vec' of given length using generating function.
 generate :: Int -> (Int -> a) -> Vec a
 generate n = Vec . V.generate n
 
--- | Creates @Vec@ of given length filled with given element.
+-- | Creates 'Vec' of given length filled with given element.
 replicate :: Int -> a -> Vec a
 replicate n = generate n . const
 
 
 -- Concatenation and splitting
 
--- | Prepend @Vec@ with given element.
+-- | Prepend 'Vec' with given element.
 cons :: a -> Vec a -> Vec a
 cons x = Vec . V.cons x . unVec
 
--- | Append @Vec@ with given element.
+-- | Append 'Vec' with given element.
 snoc :: Vec a -> a -> Vec a
 snoc (Vec vec) x = Vec $ V.snoc vec x
 
--- | Concatenate two @Vec@s.
+-- | Concatenate two 'Vec's.
 infixr 5 ++
 (++) :: Vec a -> Vec a -> Vec a
 (++) (Vec x) (Vec y) = Vec $ x V.++ y
 
--- | Concatenate all @Vec@s.
+-- | Concatenate all 'Vec's.
 concat :: [Vec a] -> Vec a
 concat = foldr1 (++)
 
--- | Splits @Vec@ into two @Vec@s at a given index.
+-- | Splits 'Vec' into two 'Vec's at a given index.
 splitAt :: Int -> Vec a -> (Vec a, Vec a)
 splitAt i (Vec v) = let (v1, v2) = V.splitAt i v
                     in (Vec v1, Vec v2)
@@ -232,78 +227,69 @@ splitAt i (Vec v) = let (v1, v2) = V.splitAt i v
 
 -- Combining
 
--- | Map a function over a @Vec@.
+-- | Map a function over a 'Vec'.
 map :: (a -> b) -> Vec a -> Vec b
 map = fmap
 
--- | Apply a function to every element of a @Vec@ and its index.
+-- | Apply a function to every element of a 'Vec' and its index.
 imap :: (Int -> a -> b) -> Vec a -> Vec b
 imap f = Vec . V.imap f . unVec
 
--- | @map@ with its arguments flipped.
+-- | 'map' with its arguments flipped.
 for :: Vec a -> (a -> b) -> Vec b
 for = flip fmap
 
--- | Zips two @Vec@s with the given function.
+-- | Zips two 'Vec's with the given function.
 zipWith :: (a -> b -> c) -> Vec a -> Vec b -> Vec c
 zipWith f (Vec a) (Vec b) = Vec $ V.zipWith f a b
 
--- | Zips two @Vec@s.
+-- | Zips two 'Vec's.
 zip :: Vec a -> Vec b -> Vec (a, b)
 zip = zipWith (,)
 
 
 -- Functions that work on mathematical vector (type constraint refers to a number)
 
--- | Creates @Vec@ of given length filled with zeroes.
+-- | Creates 'Vec' of given length filled with zeroes.
 zeroes :: Num a => Int -> Vec a
 zeroes = flip generate (const 0)
 
--- | Creates @Vec@ of given length filled with ones.
+-- | Creates 'Vec' of given length filled with ones.
 ones :: Num a => Int -> Vec a
 ones = flip generate (const 1)
 
 
--- | Squared magnitude of a @Vec@.
+-- | Squared magnitude of a 'Vec'.
 squaredMagnitude :: Num a => Vec a -> a
 squaredMagnitude x = sum (fmap (^ (2 :: Int)) x)
 
--- | Magnitude of a @Vec@.
+-- | Magnitude of a 'Vec'.
 magnitude :: Floating a => Vec a -> a
 magnitude = sqrt . squaredMagnitude
 
--- | Clamps @Vec@ magnitude.
+-- | Clamps 'Vec' magnitude.
 clampMagnitude :: (Floating a, Ord a) => a -> Vec a -> Vec a
 clampMagnitude m x = x *. (min (magnitude x) m / magnitude x)
 
--- | Normalizes @Vec@ by dividing each component by @Vec@ magnitude.
+-- | Normalizes 'Vec' by dividing each component by 'Vec' magnitude.
 normalized :: Floating a => Vec a -> Vec a
 normalized x = x /. magnitude x
 
 
--- | Computes linear combination of @Vec@s. Returns empty @Vec@ if empty list was passed to this function.
+-- | Computes linear combination of 'Vec's. Returns empty 'Vec' if empty list was passed to this function.
 linearCombination :: Num a => [(a, Vec a)] -> Vec a
 linearCombination [] = empty
 linearCombination (x:xs) = foldl' (\acc (a, vec) -> acc + vec *. a) (snd x *. fst x) xs
 
 
-{- | @VecOps@ typeclass provides vector-specific operations.
-
-This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
-The best example is @Symbol@ from @Synapse.Autograd@.
--}
-class VecOps f where
-    -- | Calculates dot product of two vectors.
-    dot :: Num (DType f) => f -> f -> f
-
 instance Num a => VecOps (Vec a) where
     dot a b = elementsSum $ a * b
 
 
--- | Calculates an angle between two @Vec@s.
+-- | Calculates an angle between two 'Vec's.
 angleBetween :: Floating a => Vec a -> Vec a -> a
 angleBetween a b = acos $ unSingleton (a `dot` b) / (magnitude a * magnitude b)
 
--- | Linearly interpolates between two @Vec@s. Given parameter will be clamped between [0.0, 1.0].
+-- | Linearly interpolates between two 'Vec's. Given parameter will be clamped between [0.0, 1.0].
 lerp :: (Floating a, Ord a) => a -> Vec a -> Vec a -> Vec a
 lerp k a b = b - (b - a) *. clamp (0.0, 1.0) k

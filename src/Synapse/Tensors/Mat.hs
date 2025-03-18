@@ -4,18 +4,16 @@ Matrices are a backbone of any machine learning library,
 since most of the operations are implemented by the matrices
 combinations (matrix multiplication, elementwise operations).
 
-@Mat@ datatype provides interface for all of those operations.
+'Mat' datatype provides interface for all of those operations.
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
--}
-
+-- 'TypeFamilies' are needed to instantiate 'Indexable', 'ElementwiseScalarOps', 'SingletonOps', 'MatOps' typeclasses.
 {-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.Tensors.Mat
-    ( --  * @Mat@ datatype and simple getters.
+    ( --  * 'Mat' datatype and simple getters.
 
       Mat (nRows, nCols)
 
@@ -118,8 +116,8 @@ Those include splitting matrices into submatrices, transposing - their asymptoti
 However there are few downsides:
 the first is that severely splitted matrix is hard to garbage collect and is not cache-friendly
 and the second is that mass traversal operations on those sparse matrices might not fuse and combine well.
-@force@ and @forced*@ functions address those issues, but most of the time those problems are not
-significant enough and you are just better using convenient functions instead of workarounds.
+'force' function and some functions that by their nature are forced address those issues,
+but most of the time those problems are not significant enough and you are just better using convenient functions instead of workarounds.
 -}
 data Mat a = Mat
     { nRows     :: {-# UNPACK #-} !Int         -- ^ Number of rows. 
@@ -140,7 +138,7 @@ size :: Mat a -> (Int, Int)
 size mat = (nRows mat, nCols mat)
 
 
--- | Whether the matrix is transposed. If the matrix consists of only one element, it is considered never transposed.
+-- | Returns whether the matrix is transposed. If the matrix consists of only one element, it is considered never transposed.
 isTransposed :: Mat a -> Bool
 isTransposed mat = colStride mat /= 1 && rowStride mat == 1
 
@@ -284,11 +282,11 @@ instance Traversable Mat where
 
 -- Constructors
 
--- | Creates empty @Mat@.
+-- | Creates empty 'Mat'.
 empty :: Mat a
 empty = Mat 0 0 0 0 0 0 V.empty
 
--- | Creates @Mat@ from list (will throw an error, if elements of that list do not form a matrix of given size).
+-- | Creates 'Mat' from list (will throw an error, if elements of that list do not form a matrix of given size).
 fromList :: (Int, Int) -> [a] -> Mat a
 fromList (rows, cols) xs
     | V.length m /= rows * cols = error "Given dimensions do not match with list length"
@@ -296,58 +294,58 @@ fromList (rows, cols) xs
   where
     m = V.fromList xs
 
--- | Creates @Mat@ from list of lists (alias for @fromLists (rows, cols) (concat xs)@).
+-- | Creates 'Mat' from list of lists (alias for @fromLists (rows, cols) (concat xs)@).
 fromLists :: (Int, Int) -> [[a]] -> Mat a
 fromLists (rows, cols) xs = fromList (rows, cols) (concat xs)
 
--- | Creates @Mat@ of given size using generating function.
+-- | Creates 'Mat' of given size using generating function.
 generate :: (Int, Int) -> ((Int, Int) -> a) -> Mat a
 generate (rows, cols) f = Mat rows cols cols 1 0 0 (V.generate (rows * cols) (f . flip quotRem cols))
 
--- | Creates @Mat@ of given size filled with given element.
+-- | Creates 'Mat' of given size filled with given element.
 replicate :: (Int, Int) -> a -> Mat a
 replicate (rows, cols) x = Mat rows cols cols 1 0 0 (V.replicate (rows * cols) x)
 
 
 -- Vec operations
 
--- | Converts @Vec@ to a one row @Mat@.
+-- | Converts 'Synapse.Tensors.Vec.Vec' to a one row 'Mat'.
 rowVec :: Vec a -> Mat a
 rowVec (Vec x) = Mat 1 (V.length x) (V.length x) 1 0 0 x
 
--- | Converts @Vec@ to a one column @Mat@.
+-- | Converts 'Synapse.Tensors.Vec.Vec' to a one column 'Mat'.
 colVec :: Vec a -> Mat a
 colVec (Vec x) = Mat (V.length x) 1 1 1 0 0 x
 
--- | Initializes @Mat@ from given @Vec@.
+-- | Initializes 'Mat' from given 'Synapse.Tensors.Vec.Vec'.
 fromVec :: (Int, Int) -> Vec a -> Mat a
 fromVec (rows, cols) (Vec x)
     | V.length x /= rows * cols = error "Given dimensions do not match with vector length"
     | otherwise                 = Mat rows cols cols 1 0 0 x
 
 
--- | Extracts row from @Mat@. If row is not present, an error is thrown.
+-- | Extracts row from 'Mat'. If row is not present, an error is thrown.
 indexRow :: Mat a -> Int -> Vec a
 indexRow mat@(Mat rows cols _ _ _ _ x) r
     | r < 0 || r >= rows = error "Given row is not present in the matrix"
     | isTransposed mat   = Vec $ V.fromList [unsafeIndex mat (r, c) | c <- [0 .. cols - 1]]
     | otherwise          = Vec $ V.slice (indexMatToVec mat (r, 0)) cols x
 
--- | Extracts column from @Mat@. If column is not present, an error is thrown.
+-- | Extracts column from 'Mat'. If column is not present, an error is thrown.
 indexCol :: Mat a -> Int -> Vec a
 indexCol mat@(Mat rows cols _ _ _ _ x) c
     | c < 0 || c >= cols = error "Given column is not present in the matrix"
     | isTransposed mat   = Vec $ V.slice (indexMatToVec mat (0, c)) rows x
     | otherwise          = Vec $ V.fromList [unsafeIndex mat (r, c) | r <- [0 .. rows - 1]]
 
--- | Extracts row from @Mat@.
+-- | Extracts row from 'Mat'.
 safeIndexRow :: Mat a -> Int -> Maybe (Vec a)
 safeIndexRow mat@(Mat rows cols _ _ _ _ x) r
     | r < 0 || r >= rows = Nothing
     | isTransposed mat   = Just $ Vec $ V.fromList [unsafeIndex mat (r, c) | c <- [0 .. cols - 1]]
     | otherwise          = Just $ Vec $ V.slice (indexMatToVec mat (r, 0)) cols x
 
--- | Extracts column from @Mat@.
+-- | Extracts column from 'Mat'.
 safeIndexCol :: Mat a -> Int -> Maybe (Vec a)
 safeIndexCol mat@(Mat rows cols _ _ _ _ x) c
     | c < 0 || c >= cols = Nothing
@@ -355,40 +353,40 @@ safeIndexCol mat@(Mat rows cols _ _ _ _ x) c
     | otherwise          = Just $ Vec $ V.fromList [unsafeIndex mat (r, c) | r <- [0 .. rows - 1]]
 
 
--- | Extracts diagonal from @Mat@.
+-- | Extracts diagonal from 'Mat'.
 diagonal :: Mat a -> Vec a
 diagonal x = Vec $ V.fromList [unsafeIndex x (n, n) | n <- [0 .. min (nRows x) (nCols x) - 1]]
 
--- | Flattens @Mat@ to a @Vec@.
+-- | Flattens 'Mat' to a 'Vec'.
 flatten :: Mat a -> Vec a
 flatten = Vec . storage . force
 
 
 -- Combining
 
--- | Applies function to every element of @Mat@.
+-- | Applies function to every element of 'Mat'.
 map :: (a -> b) -> Mat a -> Mat b
 map = fmap
 
--- | Applies function to a given row. If new @Vec@ is longer then кщц, it is truncated.
+-- | Applies function to a given row. If new 'Synapse.Tensors.Vec.Vec' is longer then кщц, it is truncated.
 mapRow :: Int -> (Vec a -> Vec a) -> Mat a -> Mat a
 mapRow row f mat = let newRow = f $ indexRow mat row
                    in imap (\(r, c) x -> if r == row then unsafeIndex newRow c else x) mat
 
--- | Applies function to a given column. If new @Vec@ is longer then column, it is truncated.
+-- | Applies function to a given column. If new 'Synapse.Tensors.Vec.Vec' is longer then column, it is truncated.
 mapCol :: Int -> (Vec a -> Vec a) -> Mat a -> Mat a
 mapCol col f mat = let newCol = f $ indexCol mat col
                    in imap (\(r, c) x -> if c == col then unsafeIndex newCol r else x) mat
 
--- | Flipped @map@.
+-- | Flipped 'map'.
 for :: Mat a -> (a -> b) -> Mat b
 for = flip map
 
--- | Applies function to every element and its position of @Mat@.
+-- | Applies function to every element and its position of 'Mat'.
 imap :: ((Int, Int) -> a -> b) -> Mat a -> Mat b
 imap f mat@(Mat rows cols rk ck r0 c0 x) = Mat rows cols rk ck r0 c0 (V.imap (f . indexVecToMat mat) x)
 
--- | Zips two @Mat@s together using given function.
+-- | Zips two 'Mat's together using given function.
 elementwise :: (a -> b -> c) -> Mat a -> Mat b -> Mat c
 elementwise f a b
     | size a /= size b = error "Two matrices have different sizes"
@@ -481,11 +479,11 @@ infixl 9 <->
 
 -- Functions that work on mathematical matrix (type constraint refers to a number)
 
--- | Creates @Mat@ that is filled with zeroes.
+-- | Creates 'Mat' that is filled with zeroes.
 zeroes :: Num a => (Int, Int) -> Mat a
 zeroes = flip replicate 0
 
--- | Creates @Mat@ that is filled with ones.
+-- | Creates 'Mat' that is filled with ones.
 ones :: Num a => (Int, Int) -> Mat a
 ones = flip replicate 1
 

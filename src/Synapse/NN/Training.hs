@@ -1,12 +1,13 @@
-{- | This module provides functions that implement neural networks training.
+{- | This module provides datatypes and functions that implement neural networks training.
 -}
 
 
+-- | 'OverloadedStrings' are needed to use strings in progress bar.
 {-# LANGUAGE OverloadedStrings #-}
 
 
 module Synapse.NN.Training
-    ( -- * @Callbacks@ datatype and associated type aliases
+    ( -- * 'Callbacks' datatype and associated type aliases
 
       CallbackFnOnTrainBegin
     , CallbackFnOnEpochBegin
@@ -26,7 +27,7 @@ module Synapse.NN.Training
           )
     , emptyCallbacks
 
-    -- * @Hyperparameters@ datatype
+    -- * 'Hyperparameters' datatype
 
     , Hyperparameters
           ( Hyperparameters
@@ -41,6 +42,7 @@ module Synapse.NN.Training
     , RecordedMetric (RecordedMetric, unRecordedMetric)
 
       -- * Training
+
     , train
     ) where
 
@@ -49,10 +51,10 @@ import Synapse.Tensors (SingletonOps(unSingleton))
 import Synapse.Tensors.Vec (Vec(Vec), unVec)
 import Synapse.Tensors.Mat (Mat)
 
-import Synapse.Autograd (Symbolic, unSymbol, constSymbol, getGradientsOf, wrt, symbol)
+import Synapse.Autograd (Symbolic, unSymbol, constSymbol, getGradientsOf, symbol)
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..))
-import Synapse.NN.Optimizers (Optimizer(..))
+import Synapse.NN.Optimizers (Optimizer(..), optimizerUpdateParameters)
 import Synapse.NN.Batching (Sample(Sample), unDataset, shuffleDataset, VecDataset, batchVectors, BatchedDataset)
 import Synapse.NN.LearningRates (LearningRate(LearningRate))
 import Synapse.NN.Losses (Loss(Loss))
@@ -117,7 +119,7 @@ type CallbackFnOnTrainEnd model optimizer a
     -> IORef (Vec (RecordedMetric a))             -- ^ Recorded metrics.
     -> IO ()
 
--- | @Callbacks@ record datatype holds all callbacks for the training.
+-- | 'Callbacks' record datatype holds all callbacks for the training.
 data Callbacks model optimizer a = Callbacks
     { callbacksOnTrainBegin :: [CallbackFnOnTrainBegin model optimizer a]  -- ^ Callbacks that will be called at the beginning of training.
     , callbacksOnEpochBegin :: [CallbackFnOnEpochBegin model optimizer a]  -- ^ Callbacks that will be called at the beginning of training epoch processing.
@@ -127,36 +129,37 @@ data Callbacks model optimizer a = Callbacks
     , callbacksOnTrainEnd   :: [CallbackFnOnTrainEnd   model optimizer a]  -- ^ Callbacks that will be called at the end of training.
     }
 
--- | Returns empty @Callbacks@ record. It could also be used to build your own callbacks upon.
+-- | Returns empty 'Callbacks' record. It could also be used to build your own callbacks upon.
 emptyCallbacks :: Callbacks model optimizer a
 emptyCallbacks = Callbacks [] [] [] [] [] []
 
 
--- | @Hyperparamters@ datatype represents configuration of a training.
+-- | 'Hyperparameters' datatype represents configuration of a training.
 data Hyperparameters a = Hyperparameters
     { hyperparametersEpochs       :: Int             -- ^ Number of epochs in the training.
     , hyperparametersBatchSize    :: Int             -- ^ Size of batches that will be used in the training.
 
     , hyperparametersDataset      :: VecDataset a    -- ^ Dataset with samples of vector functions.
 
-    , hyperparametersLearningRate :: LearningRate a  -- ^ @LearningRate@ that will be used in the training.
-    , hyperparametersLoss         :: Loss a          -- ^ @Loss@ that will be used in the training.
+    , hyperparametersLearningRate :: LearningRate a  -- ^ 'LearningRate' that will be used in the training.
+    , hyperparametersLoss         :: Loss a          -- ^ 'Loss' that will be used in the training.
 
-    , hyperparametersMetrics      :: Vec (Metric a)  -- ^ @Metric@s that will be recorded during training.
+    , hyperparametersMetrics      :: Vec (Metric a)  -- ^ 'Metric's that will be recorded during training.
     }
 
--- | @RecordedMetrics@ newtype wraps vector of results of metrics.
+-- | 'RecordedMetric' newtype wraps vector of results of metrics.
 newtype RecordedMetric a = RecordedMetric
     { unRecordedMetric :: Vec a  -- ^ Results of metric recording.
     }
 
 
+-- | 'whileM_' function implements a monadic @while@ loop which can be @break@ed if the condition becomes false.
 whileM_ :: (Monad m) => m Bool -> m a -> m ()
 whileM_ p f = go
   where
     go = p >>= flip when (f >> go)
 
--- | @train@ function is the heart of @Synapse@ library. It allows training neural networks on datasets with specified parameters.
+-- | 'train' function is the heart of "Synapse" library. It allows training neural networks on datasets with specified parameters.
 train
     :: (Symbolic a, Floating a, Ord a, Show a, RandomGen g, AbstractLayer model, Optimizer optimizer)
     => model a                                                                     -- ^ Trained model.
@@ -221,7 +224,7 @@ train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr
 
             parameters <- readIORef modelRef <&> getParameters "m"
             optimizerParameters <- readIORef optimizerParametersRef
-            let (parameters', optimizerParameters') = unzip $ trainParameters optimizer (lrValue, getGradientsOf $ lossValue + regularizersLoss)
+            let (parameters', optimizerParameters') = unzip $ optimizerUpdateParameters optimizer (lrValue, getGradientsOf $ lossValue + regularizersLoss)
                                                                                         (zip parameters optimizerParameters)
 
             _ <- modifyIORef' modelRef (`updateParameters` parameters')
@@ -250,9 +253,4 @@ train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr
     recordedMetrics <- readIORef recordedMetricsRef
     gen'' <- readIORef gen
 
-    return (trainedModel, trainedOptimizerParameters, recordedMetrics, gen'')
-  where
-    trainParameters _ _ [] = []
-    trainParameters opt (lrValue, gradients) ((parameter, optimizerParameter):xs) =
-        optimizerUpdateStep opt (lrValue, unSymbol $ gradients `wrt` parameter) (unSymbol parameter, optimizerParameter)
-        : trainParameters opt (lrValue, gradients) xs
+    return (trainedModel, trainedOptimizerParameters, recordedMetrics, gen'')    

@@ -1,18 +1,16 @@
 {- | Provides dense layer implementation.
 
-@Dense@ datatype represents densely-connected neural network layer and
+'Dense' datatype represents densely-connected neural network layer and
 it performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
+-- 'TypeFamilies' are needed to instantiate 'DType'.
 {-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.NN.Layers.Dense
-    ( -- * @Dense@ datatype
+    ( -- * 'Dense' datatype
 
       Dense (Dense, denseWeights, denseBias, denseConstraints, denseRegularizers)
     , layerDenseWith
@@ -20,12 +18,6 @@ module Synapse.NN.Layers.Dense
     ) where
 
 
-import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
-import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes, ones)
-import Synapse.NN.Layers.Constraints (Constraint(Constraint))
-import Synapse.NN.Layers.Regularizers (Regularizer(Regularizer))
-
-import Synapse.Autograd (SymbolMat, Symbolic, symbol)
 
 import Synapse.Tensors (DType, SingletonOps(singleton), MatOps(addMatRow, matMul))
 
@@ -34,10 +26,17 @@ import Synapse.Tensors.Vec (Vec)
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
+import Synapse.Autograd (SymbolMat, Symbolic, symbol)
 
-{- | @Dense@ datatype represents densely-connected neural network layer.
+import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
+import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes, ones)
+import Synapse.NN.Layers.Constraints (Constraint(Constraint))
+import Synapse.NN.Layers.Regularizers (Regularizer(Regularizer))
 
-@Dense@ performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
+
+{- | 'Dense' datatype represents densely-connected neural network layer.
+
+'Dense' performs following operation: @x `matMul` w + b@, where @w@ is weights and @b@ is bias (if present) of a layer.
 -}
 data Dense a = Dense
     { denseWeights      :: Mat a                           -- ^ Matrix that represents weights of dense layer.
@@ -81,7 +80,7 @@ layerDenseWith
     :: Symbolic a
     => (Initializer a, Constraint a, Regularizer a)  -- ^ Weights initializer, constraint and regularizer.
     -> (Initializer a, Constraint a, Regularizer a)  -- ^ Bias initializer, constraint and regularizer.
-    -> Int                              -- ^ Amount of neurons.
+    -> Int                                           -- ^ Amount of neurons.
     -> LayerConfiguration (Dense a)
 layerDenseWith (Initializer weightsInitializer, weightsConstraints, weightsRegularizer)
                (Initializer biasInitializer, biasConstraints, biasRegularizer)

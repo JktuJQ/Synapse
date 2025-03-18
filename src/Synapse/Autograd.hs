@@ -4,29 +4,27 @@ Machine learning and training of models are based on calculating gradients of op
 This can be done symbolically by dynamically creating a graph of all operations,
 which is then traversed to obtain the gradient.
 
-@Synapse@ provides several operations that support automatic differentiation,
+"Synapse" provides several operations that support automatic differentiation,
 but you could easily extend list of those: you just need to define function
-that returns @Symbol@ with correct local gradients.
+that returns 'Symbol' with correct local gradients.
 You can check out implementations in the source to give yourself a reference
-and read more about it in @Symbol@ datatype docs.
+and read more about it in 'Symbol' datatype docs.
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
--}
-
+-- 'FlexibleInstances' and 'TypeFamilies' are needed to instantiate 'Indexable', 'ElementwiseScalarOps', 'SingletonOps', 'VecOps', 'MatOps' typeclasses.
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies      #-}
 
 
 module Synapse.Autograd
-    ( -- * @Symbol@ and @Symbolic@
+    ( -- * 'Symbolic' and 'Symbol'
 
-      Symbol (Symbol, symbolName, unSymbol, symbolGradients)
+      Symbolic (symbolicZero, symbolicOne, symbolicN)
+
+    , Symbol (Symbol, symbolName, unSymbol, symbolGradients)
     , SymbolVec
     , SymbolMat
-
-    , Symbolic (symbolicZero, symbolicOne, symbolicN)
 
     , symbol
     , constSymbol
@@ -35,10 +33,7 @@ module Synapse.Autograd
     , symbolicUnaryOp
     , symbolicBinaryOp
 
-    , transpose
-    , matMul
-
-      -- * @Gradients@ calculation
+      -- * 'Gradients' calculation
 
     , Gradients (unGradients)
     , allGradients
@@ -64,16 +59,17 @@ import Data.Hashable (Hashable(..))
 import qualified Data.HashMap.Lazy as HM
 
 
-{- | @Symbolic@ typeclass describes types with few properties that are needed for autogradient.
+{- | 'Symbolic' typeclass describes types with few properties that are needed for autogradient.
 
-Members of this typeclass could have default implementation due to @Num@, but such implementation is not always correct.
-@Vec@s and @Mat@s do not have only one zero or identity element, and so numerical literal is not enough.
-@symbolZero@ and @symbolOne@ function additionally take reference value to consider dimensions.
+Members of this typeclass could have default implementation due to 'Num', but such implementation is not always correct.
+'Synapse.Tensors.Vec.Vec's and 'Synapse.Tensors.Mat.Mat's do not have only one zero or identity element, and so numerical literal is not enough.
+'symbolicZero' and 'symbolicOne' function additionally take reference value to consider dimensions.
 Absence of default implementations forces to manually ensure correctness of those functions.
 
-@Synapse@ provides implementations for primitive types (@Int@, @Float@, @Double@), and for containers types (@Vec@, @Mat@).
+"Synapse" provides implementations for primitive types ('Int', 'Float', 'Double'),
+and for containers types ('Synapse.Tensors.Vec.Vec', 'Synapse.Tensors.Vec.Vec').
 
-Detailed laws of @Symbolic@ properties are in the docs for associated functions.
+Detailed laws of 'Symbolic' properties are in the docs for associated functions.
 -}
 class (Eq a, Num a) => Symbolic a where
     -- | Returns additive and multiplicative (elementwise) zero element. Argument is passed for the reference of the dimension.
@@ -82,7 +78,7 @@ class (Eq a, Num a) => Symbolic a where
     -- | Returns multiplicative (elementwise) identity element. Argument is passed for the reference of the dimension.
     symbolicOne :: a -> a
 
-    -- | Returns what could be considered @N@ constant (sum of n @symbolicOne@s). Argument is passed for the reference of the dimension.
+    -- | Returns what could be considered @N@ constant (sum of @N@ 'symbolicOne's). Argument is passed for the reference of the dimension.
     symbolicN :: Int -> a -> a
     symbolicN n c
         | n < 0     = negate $ go (abs n) c
@@ -123,9 +119,9 @@ instance Symbolic a => Symbolic (Mat a) where
 
 {- | Datatype that represents symbol variable (variable which operations are recorded to symbolically obtain derivatives).
 
-Any operation returning @Symbol a@ where @a@ is @Symbolic@ could be autogradiented - returned @Symbol@ has @symbolGradients@ list,
-which allows @Synapse@ to build a graph of computation and obtain needed gradients.
-@symbolGradients@ list contains pairs: first element in that pair is symbol wrt which you can take gradient and
+Any operation returning @Symbol a@ where @a@ is 'Symbolic' could be autogradiented - returned 'Symbol' has 'symbolGradients' list,
+which allows "Synapse" to build a graph of computation and obtain needed gradients.
+'symbolGradients' list contains pairs: first element in that pair is symbol wrt which you can take gradient and
 the second element is closure that represents chain rule - it takes incoming local gradient of said symbol and multiplies it by local derivative.
 You can check out implementations of those operations in the source to give yourself a reference.
 -}
@@ -221,7 +217,7 @@ instance (Symbolic a, Floating a) => Floating (Symbol a) where
     acosh x = symbolicUnaryOp acosh x [(x, (* recip (sqrt (x * x - symbolicOne x))))]
     atanh x = symbolicUnaryOp atanh x [(x, (* recip (symbolicOne x - x * x)))]
 
-instance Symbolic a => ElementwiseScalarOps (SymbolVec a) where
+instance Symbolic a => ElementwiseScalarOps (Symbol (Vec a)) where
     (+.) x n = x + constSymbol (V.replicate (V.size $ unSymbol x) n)
     (-.) x n = x - constSymbol (V.replicate (V.size $ unSymbol x) n)
     (*.) x n = x * constSymbol (V.replicate (V.size $ unSymbol x) n)
@@ -285,9 +281,10 @@ instance Symbolic a => MatOps (SymbolMat a) where
 
     matMul a b = symbolicBinaryOp M.matMul a b [(a, (`matMul` transpose b)), (b, (transpose a `matMul`))]
 
+
 -- Gradients calculation
 
--- | Datatype that holds all gradients of one symbol with respect to other symbols.
+-- | 'Gradients' datatype holds all gradients of one symbol with respect to other symbols.
 newtype Gradients a = Gradients
     { unGradients :: HM.HashMap (Symbol a) (Symbol a)  -- ^ Map of gradients.
     }
@@ -303,7 +300,7 @@ instance Show a => Show (Gradients a) where
     show gradients = show $ allGradients gradients
 
 
--- | Generates @Gradients@ for given symbol.
+-- | Generates 'Gradients' for given symbol.
 getGradientsOf :: Symbolic a => Symbol a -> Gradients a
 getGradientsOf differentiatedSymbol = Gradients $ HM.insert differentiatedSymbol wrtItself $
                                                   HM.delete (Symbol "" undefined []) $
@@ -329,6 +326,6 @@ nthPartialGradient = foldl' $ \y x -> getGradientsOf y `wrt` x
 
 -- | Takes nth order gradient of one symbol wrt other symbol. If n is negative number, an error is returned.
 nthGradient :: Symbolic a => Int -> Symbol a -> Symbol a -> Symbol a
-nthGradient n y
+nthGradient n y x
     | n < 0 = error "Cannot take negative order gradient"
-    | otherwise = nthPartialGradient y . replicate n
+    | otherwise = nthPartialGradient y (replicate n x)

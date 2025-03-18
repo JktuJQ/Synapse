@@ -2,14 +2,8 @@
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
-{-# LANGUAGE TypeFamilies #-}
-
-
 module Synapse.NN.LearningRates
-    ( -- * @LearningRateFn@ type alias and @LearningRate@ newtype
+    ( -- * 'LearningRateFn' type alias and 'LearningRate' newtype
 
       LearningRateFn
     , LearningRate (LearningRate, unLearningRate)
@@ -24,21 +18,14 @@ module Synapse.NN.LearningRates
     ) where
 
 
-import Synapse.Tensors (DType)
-
-
--- | @LearningRateFn@ type alias represents functions that return coefficient which modulates how big are updates of parameters in training.
+-- | 'LearningRateFn' type alias represents functions that return coefficient which modulates how big are updates of parameters in training.
 type LearningRateFn a = Int -> a
 
-type instance DType (LearningRateFn a) = a
 
-
--- | @LearningRate@ newtype wraps @LearningRateFn@s - functions that modulate how big are updates of parameters in training.
+-- | 'LearningRate' newtype wraps 'LearningRateFn's - functions that modulate how big are updates of parameters in training.
 newtype LearningRate a = LearningRate
-    { unLearningRate :: LearningRateFn a  -- ^ Unwraps @LearningRate@ newtype.
+    { unLearningRate :: LearningRateFn a  -- ^ Unwraps 'LearningRate' newtype.
     }
-
-type instance DType (LearningRate a) = a
 
 
 -- Learning rate decay functions

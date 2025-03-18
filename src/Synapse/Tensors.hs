@@ -1,30 +1,29 @@
 {- | Module that provides mathematical base for neural networks.
 
-This module implements @Vec@ and @Mat@ datatypes and provides
+This module implements 'Synapse.Tensors.Vec.Vec' and 'Synapse.Tensors.Mat.Mat' datatypes and provides
 several useful function to work with them.
 
-Most of typeclasses of this module are multiparameter typeclasses.
+Most of typeclasses of this module are working with 'DType' type family.
 That is to permit instances on types that are not exactly containers, but rather wrappers of containers,
 and it allows imposing additional constraints on inner type.
-The best example is @Symbol@ from @Synapse.Autograd@.
+The best example is 'Synapse.Autograd.Symbol' from "Synapse.Autograd".
 -}
 
 
-{- @ConstrainedClassMethods@, @FlexibleContexts@, @TypeFamilies@, 
-are needed to define @Container@, @Indexable@, @ElementwiseScalarOps@, @SingletonOps@, @VecOps@, @MatOps@ typeclasses.
+{- 'ConstrainedClassMethods', 'FlexibleContexts', 'TypeFamilies', 
+are needed to define 'DType' typefamily, 'Indexable', 'ElementwiseScalarOps', 'SingletonOps', 'VecOps', 'MatOps' typeclasses.
 -}
-
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE TypeFamilies            #-}  
 
 
 module Synapse.Tensors
-    ( -- * @DType@ type family
+    ( -- * 'DType' type family
       
       DType
         
-      -- * @Indexable@ typeclass
+      -- * 'Indexable' typeclass
 
     , Indexable (Index, unsafeIndex, (!), (!?))
 
@@ -41,14 +40,14 @@ module Synapse.Tensors
 import Data.Kind (Type)
 
 
--- | @Container@ type family allows to get type of element for any container of that type - even for nested ones!
+-- | 'DType' type family allows to get type of element for any container of that type - even for nested ones!
 type family DType f :: Type
 
 
 infixl 9 !, !?
--- | @Indexable@ typeclass provides indexing interface for datatypes. 
+-- | 'Indexable' typeclass provides indexing interface for datatypes. 
 class Indexable f where
-    -- | Type of index for @Indexable@ container.
+    -- | Type of index for 'Indexable' container.
     type Index f :: Type
 
     -- | Unsafe indexing.
@@ -64,10 +63,10 @@ class Indexable f where
 infixl 6 +., -.
 infixl 7 *., /.
 infixr 8 **.
-{- | @ElementwiseScalarOps@ typeclass allows containers over numerical values easily work with scalars by using elementwise operations.
+{- | 'ElementwiseScalarOps' typeclass allows containers over numerical values easily work with scalars by using elementwise operations.
 
-This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
-The best example is @Symbol@ from @Synapse.Autograd@.
+This typeclass operates on 'DType' to permit instances on types that are not exactly containers, but rather wrappers of containers.
+The best example is 'Synapse.Autograd.Symbol' from "Synapse.Autograd".
 -}
 class ElementwiseScalarOps f where
     -- | Adds given value to every element of the container.
@@ -81,17 +80,17 @@ class ElementwiseScalarOps f where
     -- | Exponentiates every element of the functor by given value.
     (**.) :: Floating (DType f) => f -> DType f -> f
 
-    -- | Applies @min@ operation with given value to every element.
+    -- | Applies 'min' operation with given value to every element.
     elementsMin :: Ord (DType f) => f -> DType f -> f
-    -- | Applies @max@ operation with given value to every element.
+    -- | Applies 'max' operation with given value to every element.
     elementsMax :: Ord (DType f) => f -> DType f -> f
 
-{- | @Singleton@ typeclass provides operations that relate to singleton containers (scalars that are wrapped in said container).
+{- | 'SingletonOps' typeclass provides operations that relate to singleton containers (scalars that are wrapped in said container).
 
 All functions of that typeclass must return singletons (scalars that are wrapped in container).
 
-This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
-The best example is @Symbol@ from @Synapse.Autograd@.
+This typeclass operates on 'DType' to permit instances on types that are not exactly containers, but rather wrappers of containers.
+The best example is 'Synapse.Autograd.Symbol' from "Synapse.Autograd".
 -}
 class SingletonOps f where
     -- | Initializes singleton container.
@@ -106,7 +105,7 @@ class SingletonOps f where
 
     -- | Sums all elements of container.
     elementsSum :: Num (DType f) => f -> f
-    -- | Multiplies all elements of container (@Fractional@ constraint is needed for efficient gradient calculation).
+    -- | Multiplies all elements of container ('Fractional' constraint is needed for efficient gradient calculation, although it may be overly restrictive in some situations).
     elementsProduct :: Fractional (DType f) => f -> f
     
     -- | Calculates the mean of all elements of container.
@@ -116,19 +115,19 @@ class SingletonOps f where
     norm :: Floating (DType f) => f -> f
 
 
-{- | @VecOps@ typeclass provides vector-specific operations.
+{- | 'VecOps' typeclass provides vector-specific operations.
 
-This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
-The best example is @Symbol@ from @Synapse.Autograd@.
+This typeclass operates on 'DType' to permit instances on types that are not exactly containers, but rather wrappers of containers.
+The best example is 'Synapse.Autograd.Symbol' from "Synapse.Autograd".
 -}
 class VecOps f where
     -- | Calculates dot product of two vectors.
     dot :: Num (DType f) => f -> f -> f
 
-{- | @MatOps@ typeclass provides matrix-specific operations.
+{- | 'MatOps' typeclass provides matrix-specific operations.
 
-This typeclass is a multiparameter typeclass to permit instances on types that are not exactly containers, but rather wrappers of containers.
-The best example is @Symbol@ from @Synapse.Autograd@. 
+This typeclass operates on 'DType' to permit instances on types that are not exactly containers, but rather wrappers of containers.
+The best example is 'Synapse.Autograd.Symbol' from "Synapse.Autograd".
 -}
 class MatOps f where
     -- | Transposes matrix.

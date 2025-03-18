@@ -1,4 +1,4 @@
--- | Tests @Synapse.Tensors@ module and its submodules.
+-- | Tests "Synapse.Tensors" module and its submodules.
 
 
 module TensorsTest
@@ -137,12 +137,12 @@ testMatComplicatedOps = TestLabel "testMatComplicatedOps" $ TestList
 
 tests :: Test
 tests = TestLabel "TensorsTest" $ TestList
-    [ -- @Vec@
+    [ -- 'Vec'
       testVecOps
     , testVecMagnitude
     , testVecAngle
 
-      -- @Mat@
+      -- 'Mat'
     , testMatExtracting
     , testMatOps
     , testMatSubmatrices

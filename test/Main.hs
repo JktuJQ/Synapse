@@ -1,4 +1,4 @@
--- | Test suite for @Synapse@ library.
+-- | Test suite for "Synapse" library.
 
 
 module Main (main) where

@@ -8,8 +8,8 @@ module AutogradTest
 
 import Synapse.Autograd
 
+import Synapse.Tensors (MatOps(..))
 import qualified Synapse.Tensors.Vec as V
-
 import qualified Synapse.Tensors.Mat as M
 
 import Test.HUnit

@@ -1,20 +1,14 @@
 {- | Allows to constraint values of layers parameters.
 
-@ConstraintFn@ type alias represents functions that are able to constrain the values of matrix
-and @Constraint@ newtype wraps @ConstraintFn@s.
+'ConstraintFn' type alias represents functions that are able to constrain the values of matrix
+and 'Constraint' newtype wraps 'ConstraintFn's.
 
-@ConstraintFn@s should be applied on matrices from the @updateParameters@ function.
+'ConstraintFn's should be applied on matrices from the 'Synapse.NN.Layers.Layer.updateParameters' function.
 -}
-
-
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
-{-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.NN.Layers.Constraints
-    ( -- * @ConstraintFn@ type alias and @Constraint@ newtype
+    ( -- * 'ConstraintFn' type alias and 'Constraint' newtype
       
       ConstraintFn
 
@@ -33,25 +27,21 @@ module Synapse.NN.Layers.Constraints
     ) where
 
 
-import Synapse.Tensors (DType, ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
+import Synapse.Tensors (ElementwiseScalarOps((+.), (-.)), SingletonOps(unSingleton, mean))
 
 import Synapse.Tensors.Mat (Mat)
 
 import Data.Ord (clamp)
 
 
--- | @ConstraintFn@ type alias represents functions that are able to constrain the values of matrix.
+-- | 'ConstraintFn' type alias represents functions that are able to constrain the values of matrix.
 type ConstraintFn a = Mat a -> Mat a
 
-type instance DType (ConstraintFn a) = a
 
-
--- | @Constraint@ newtype wraps @ConstraintFn@s - functions that are able to constrain the values of matrix.
+-- | 'Constraint' newtype wraps 'ConstraintFn's - functions that are able to constrain the values of matrix.
 newtype Constraint a = Constraint
-    { unConstraint :: ConstraintFn a  -- ^ Unwraps @Constraint@ newtype.
+    { unConstraint :: ConstraintFn a  -- ^ Unwraps 'Constraint' newtype.
     }
-
-type instance DType (Constraint a) = a
 
 
 -- Value constraints

@@ -2,24 +2,15 @@
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @Container@ typeclass.
--}
-
+-- 'TypeFamilies' are needed to instantiate 'Synapse.Tensors.DType'.
 {-# LANGUAGE TypeFamilies #-}
-
-{- @FlexibleContexts@, @FlexibleInstances@, @MultiParamTypeClasses@ are needed to define @Model@ typeclass.
--}
-
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 
 module Synapse.NN.Models
     ( -- * Common for models
       InputSize (InputSize)
 
-      -- * @SequentialModel@ datatype
+      -- * 'SequentialModel' datatype
       
     , SequentialModel (SequentialModel, unSequentialModel)
     , buildSequentialModel
@@ -34,13 +25,20 @@ import Data.Maybe (fromMaybe)
 import Data.Foldable (foldl')
 
 
--- | @InputSize@ newtype wraps @Int@ - amount of features of input that the model should support (@InputSize 3@ means that model supports any matrix with size (x, 3)).
+-- | 'InputSize' newtype wraps 'Int' - amount of features of input that the model should support (@InputSize 3@ means that model supports any matrix with size (x, 3)).
 newtype InputSize = InputSize Int
 
--- | @SequentialModel@ datatype represents any model grouping layers linearly.
+
+-- | 'SequentialModel' datatype represents any model grouping layers linearly.
 newtype SequentialModel a = SequentialModel
-    { unSequentialModel :: [Layer a]  -- ^ Returns layers of @SequentialModel@.
+    { unSequentialModel :: [Layer a]  -- ^ Returns layers of 'SequentialModel'.
     }
+
+instance Show a => Show (SequentialModel a) where
+    show (SequentialModel layers) = go 1 layers
+      where
+        go _ [] = ""
+        go i (x:xs) = "Layer " ++ show i ++ " parameters: " ++ show (getParameters (layerPrefix "" i) x) ++ ";\n" ++ go (i + 1) xs
 
 -- | Builds sequential model using input size and layer configurations to ensure that layers are compatible with each other.
 buildSequentialModel :: InputSize -> [LayerConfiguration (Layer a)] -> SequentialModel a
@@ -52,9 +50,10 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ go i layerCo
                              output = fromMaybe prevSize outputMaybe
                          in layer : go output ls
 
-
 type instance DType (SequentialModel a) = a
 
+
+-- | Forms prefix for layers.
 layerPrefix :: String -> Int -> String
 layerPrefix prefix i = prefix ++ "l" ++ show i ++ "w"
 

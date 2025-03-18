@@ -2,20 +2,18 @@
 -}
 
 
-{- @FlexibleContexts@, @TypeFamilies@ are needed to
-use @DType@ and define @Optimizer@ typeclass.
--}
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies     #-}
+-- 'TypeFamilies' are needed to use 'DType' and define 'Optimizer' typeclass.
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Synapse.NN.Optimizers
-    ( -- @Optimizer@ typeclass
+    ( -- * 'Optimizer' typeclass
       
       Optimizer (OptimizerParameters, optimizerInitialParameters, optimizerUpdateStep)
+
+    , optimizerUpdateParameters
     
-      -- Optimizers
+      -- * Optimizers
 
     , SGD (SGD, sgdMomentum, sgdNesterov)
     ) where
@@ -26,14 +24,16 @@ import Synapse.Tensors (DType, ElementwiseScalarOps((*.)))
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
+import Synapse.Autograd (Symbolic, Symbol(unSymbol), SymbolMat, Gradients, wrt)
+
 import Synapse.NN.Layers.Initializers (zeroes)
 
 import Data.Kind (Type)
 
 
--- | @Optimizer@ typeclass represents optimizer - algorithm that defines an update rule of neural network parameters.
+-- | 'Optimizer' typeclass represents optimizer - algorithm that defines an update rule of neural network parameters.
 class Optimizer optimizer where
-    -- | @OptimizerParameters@ represent optimizer-specific parameters that it needs to implement update rule.
+    -- | 'OptimizerParameters' represent optimizer-specific parameters that it needs to implement update rule.
     type OptimizerParameters optimizer a :: Type
 
     -- | Returns initial state of optimizer-specific parameters for given variable.
@@ -47,12 +47,24 @@ class Optimizer optimizer where
         -> (Mat a, OptimizerParameters optimizer a)  -- ^ Given parameter and current state of optimizer-specific parameters.
         -> (Mat a, OptimizerParameters optimizer a)  -- ^ Updated parameter and a new state of optimizer-specific parameters.
 
+-- | 'optimizerUpdateParameters' function updates whole model using optimizer by performing 'optimizerUpdateStep' for every parameter.
+optimizerUpdateParameters
+    :: (Symbolic a, Optimizer optimizer)
+    => optimizer a                                       -- ^ Optimizer itself.
+    -> (a, Gradients (Mat a))                            -- ^ Learning rate and gradients of all parameters. 
+    -> [(SymbolMat a, OptimizerParameters optimizer a)]  -- ^ Given parameters and current state of optimizer-specific parameters.
+    -> [(Mat a, OptimizerParameters optimizer a)]        -- ^ Updated parameters and a new state of optimizer-specific parameters.
+optimizerUpdateParameters _ _ [] = []
+optimizerUpdateParameters optimizer (lrValue, gradients) ((parameter, optimizerParameter):xs) =
+    optimizerUpdateStep optimizer (lrValue, unSymbol $ gradients `wrt` parameter) (unSymbol parameter, optimizerParameter)
+    : optimizerUpdateParameters optimizer (lrValue, gradients) xs
 
--- | @SGD@ is a optimizer that implements stochastic gradient-descent algorithm.
+
+-- | 'SGD' is a optimizer that implements stochastic gradient-descent algorithm.
 data SGD a = SGD
     { sgdMomentum :: a     -- ^ Momentum coefficient.
     , sgdNesterov :: Bool  -- ^ Nesterov update rule.
-    }
+    } deriving (Eq, Show)
 
 type instance DType (SGD a) = a
 

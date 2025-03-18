@@ -2,14 +2,8 @@
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
-{-# LANGUAGE TypeFamilies #-}
-
-
 module Synapse.NN.Layers.Activations
-    ( -- * @ActivationFn@ type alias and @Activation@ newtype
+    ( -- * 'ActivationFn' type alias and 'Activation' newtype
 
       ActivationFn
     , activateScalar
@@ -27,7 +21,7 @@ module Synapse.NN.Layers.Activations
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.Tensors (DType, Indexable(unsafeIndex), SingletonOps(unSingleton))
+import Synapse.Tensors (Indexable(unsafeIndex), SingletonOps(unSingleton))
 
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
@@ -35,10 +29,9 @@ import qualified Synapse.Tensors.Mat as M
 import Synapse.Autograd (Symbol(unSymbol), SymbolMat, Symbolic, constSymbol)
 
 
--- | @ActivationFn@ is a type alias that represents unary functions that differentiable almost everywhere.
+-- | 'ActivationFn' is a type alias that represents unary functions that differentiable almost everywhere.
 type ActivationFn a = SymbolMat a -> SymbolMat a
 
-type instance DType (ActivationFn a) = a
 
 -- | Applies activation function to a scalar to produce new scalar.
 activateScalar :: Symbolic a => ActivationFn a -> a -> a
@@ -49,16 +42,14 @@ activateMat :: Symbolic a => ActivationFn a -> Mat a -> Mat a
 activateMat fn = unSymbol . fn . constSymbol
 
 
-{- | @Activation@ newtype wraps @ActivationFn@s - unary functions that can be thought of as activation functions for neural network layers.
+{- | 'Activation' newtype wraps 'ActivationFn's - unary functions that can be thought of as activation functions for neural network layers.
 
 Any activation function must be differentiable almost everywhere and so
-it must be function that operates on @Symbol@s, which is allows for function to be differentiated when needed.
+it must be function that operates on 'Synapse.Autograd.Symbol's, which is allows for function to be differentiated when needed.
 -}
 newtype Activation a = Activation 
-    { unActivation :: ActivationFn a  -- ^ Unwraps @Activation@ newtype.
+    { unActivation :: ActivationFn a  -- ^ Unwraps 'Activation' newtype.
     }
-
-type instance DType (Activation a) = a
 
 instance AbstractLayer Activation where
     inputSize _ = Nothing

@@ -1,9 +1,9 @@
 {- | Allows to initialize values of layers parameters.
 
-@InitializerFn@ type alias represents functions that are able to initialize matrix with given size
-and @Initializer@ newtype wraps @InitializerFn@s.
+'InitializerFn' type alias represents functions that are able to initialize matrix with given size
+and 'Initializer' newtype wraps 'InitializerFn's.
 
-@Synapse@ provides 4 types of initializers:
+"Synapse" provides 4 types of initializers:
 * Non-random constant initializers
 * Random uniform distribution initializers
 * Random normal distribution initializers
@@ -11,14 +11,8 @@ and @Initializer@ newtype wraps @InitializerFn@s.
 -}
 
 
-{- @TypeFamilies@ are needed to instantiate @DType@.
--}
-
-{-# LANGUAGE TypeFamilies #-}
-
-
 module Synapse.NN.Layers.Initializers
-    ( -- * @InitializerFn@ type alias and @Initializer@ newtype
+    ( -- * 'InitializerFn' type alias and 'Initializer' newtype
 
       InitializerFn
 
@@ -51,25 +45,20 @@ module Synapse.NN.Layers.Initializers
     ) where
 
 
-import Synapse.Tensors (DType)
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
 import System.Random (uniformListR, uniformRs, UniformRange, RandomGen)
 
 
--- | @InitializerFn@ type alias represents functions that are able to initialize matrix with given size.
+-- | 'InitializerFn' type alias represents functions that are able to initialize matrix with given size.
 type InitializerFn a = (Int, Int) -> Mat a
 
-type instance DType (InitializerFn a) = a
 
-
--- | @Initializer@ newtype wraps @InitializerFn@s - functions that are able to initialize matrix with given size.
+-- | 'Initializer' newtype wraps 'InitializerFn's - functions that are able to initialize matrix with given size.
 newtype Initializer a = Initializer 
-    { unInitializer :: InitializerFn a  -- ^ Unwraps @Initializer@ newtype.
+    { unInitializer :: InitializerFn a  -- ^ Unwraps 'Initializer' newtype.
     }
-
-type instance DType (Initializer a) = a
 
 
 -- Non-random constant initializers
@@ -91,14 +80,14 @@ ones = constants 1
 
 {- | Initializes list with samples from random uniform distribution in range.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 randomUniform :: (UniformRange a, RandomGen g) => (a, a) -> g -> InitializerFn a
 randomUniform range gen sizes@(input, output) = M.fromList sizes $ fst $ uniformListR (input * output) range gen
 
 {- | Initializes list with samples from random LeCun uniform distribution in range.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 lecunUniform :: (UniformRange a, Floating a, RandomGen g) => g -> InitializerFn a
 lecunUniform gen sizes@(input, _) = let limit = sqrt $ 3.0 / fromIntegral input
@@ -106,7 +95,7 @@ lecunUniform gen sizes@(input, _) = let limit = sqrt $ 3.0 / fromIntegral input
 
 {- | Initializes list with samples from random He uniform distribution in range.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 heUniform :: (UniformRange a, Floating a, RandomGen g) => g -> InitializerFn a
 heUniform gen sizes@(input, _) = let limit = sqrt $ 6.0 / fromIntegral input
@@ -114,7 +103,7 @@ heUniform gen sizes@(input, _) = let limit = sqrt $ 6.0 / fromIntegral input
 
 {- | Initializes list with samples from random Glorot uniform distribution in range.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 glorotUniform :: (UniformRange a, Floating a, RandomGen g) => g -> InitializerFn a
 glorotUniform gen sizes@(input, output) = let limit = sqrt $ 6.0 / fromIntegral (input + output)
@@ -125,7 +114,7 @@ glorotUniform gen sizes@(input, output) = let limit = sqrt $ 6.0 / fromIntegral 
 
 {- | Initializes list with samples from random normal distribution in range which could be truncated.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 randomNormal :: (UniformRange a, Floating a, Ord a, RandomGen g) => Maybe a -> a -> a -> g -> InitializerFn a
 randomNormal truncated mean stdDev gen sizes@(input, output) = let us = pairs $ uniformRs (0.0, 1.0) gen
@@ -147,7 +136,7 @@ randomNormal truncated mean stdDev gen sizes@(input, output) = let us = pairs $ 
 {- | Initializes list with samples from random LeCun normal distribution in range
 which is truncated for values more than two standard deviations from mean.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 lecunNormal :: (UniformRange a, Floating a, Ord a, RandomGen g) => g -> InitializerFn a
 lecunNormal gen sizes@(input, _) = let mean = 0
@@ -157,7 +146,7 @@ lecunNormal gen sizes@(input, _) = let mean = 0
 {- | Initializes list with samples from random He normal distribution in range
 which is truncated for values more than two standard deviations from mean.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 heNormal :: (UniformRange a, Floating a, Ord a, RandomGen g) => g -> InitializerFn a
 heNormal gen sizes@(input, _) = let mean = 0
@@ -167,7 +156,7 @@ heNormal gen sizes@(input, _) = let mean = 0
 {- | Initializes list with samples from random Glorot normal distribution in range
 which is truncated for values more than two standard deviations from mean.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 glorotNormal :: (UniformRange a, Floating a, Ord a, RandomGen g) => g -> InitializerFn a
 glorotNormal gen sizes@(input, output) = let mean = 0
@@ -186,7 +175,7 @@ identity (input, output)
 {- | Initializes float orthogonal matrix obtained from a random normal distribution
 that is truncated for values more than two standard deviations from mean.
 
-This function does not preserve seed generator - call @split@ on it before calling this function.
+This function does not preserve seed generator - split generator before calling this function.
 -}
 orthogonal :: (UniformRange a, Floating a, Ord a, RandomGen g) => g -> InitializerFn a
 orthogonal gen sizes = M.orthogonalized $ randomNormal Nothing 0.0 1.0 gen sizes
