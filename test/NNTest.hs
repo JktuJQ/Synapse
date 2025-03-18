@@ -34,7 +34,7 @@ testSin = TestLabel "testSin" $ TestCase $ do
                                                    ] :: SequentialModel Double
 
     let dataset = Dataset $ V.fromList $ [Sample (singleton x) (sinFn $ singleton x) | x <- [-pi, -pi+0.2 .. pi]]
-    (trainedModel, losses, _) <- train model
+    (trainedModel, _, losses, _) <- train model
                                        (SGD 0.2 False)
                                        (Hyperparameters 500 16 dataset (LearningRate $ const 0.01) (Loss mse) V.empty)
                                        emptyCallbacks
@@ -58,7 +58,7 @@ testSqrt = TestLabel "testSqrt" $ TestCase $ do
                                                    ] :: SequentialModel Double
 
     let dataset = Dataset $ V.fromList $ [Sample (singleton x) (sqrtFn $ singleton x) | x <- [0.0, 0.2 .. 4.0]]
-    (trainedModel, losses, _) <- train model
+    (trainedModel, _, losses, _) <- train model
                                        (SGD 0.2 True)
                                        (Hyperparameters 500 16 dataset (LearningRate $ const 0.01) (Loss mse) V.empty)
                                        emptyCallbacks
@@ -85,7 +85,7 @@ testTrigonometry = TestLabel "testTrigonometry" $ TestCase $ do
 
     let dataset = Dataset $ V.fromList $ [Sample (singleton x) (trigonometryFn $ singleton x) | x <- [-(2.0 * pi),((-(2.0 * pi)) + 0.1)..(2.0 * pi)]]
                                          
-    (trainedModel, losses, _) <- train model
+    (trainedModel, _, losses, _) <- train model
                                        (SGD 0.3 True)
                                        (Hyperparameters 1000 1 dataset (LearningRate $ const 0.001) (Loss mse) V.empty)
                                        emptyCallbacks
