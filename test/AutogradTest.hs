@@ -27,9 +27,9 @@ testNumOps = TestLabel "testIntOps" $ TestList
     , TestCase $ assertEqual "renamed symbol gradient" (2 * 25) (unSymbol $ getGradientsOf (c * c) `wrt` c)
     ]
   where
-    a = symbol "a" 4 :: Symbol Int
-    b = symbol "b" 3 :: Symbol Int
-    c = renameSymbol "c" ((a * a) + (b * b)) :: Symbol Int
+    a = symbol (SymbolIdentifier "a") 4 :: Symbol Int
+    b = symbol (SymbolIdentifier "b") 3 :: Symbol Int
+    c = renameSymbol (SymbolIdentifier "c") ((a * a) + (b * b)) :: Symbol Int
 
 testNthOrderGradients :: Test
 testNthOrderGradients = TestLabel "testNthOrderGradients" $ TestList
@@ -38,9 +38,9 @@ testNthOrderGradients = TestLabel "testNthOrderGradients" $ TestList
     , TestCase $ assertEqual "4th gradient" (unSymbol $ sin c) (unSymbol $ nthGradient 4 (sin c) c)
     ]
   where
-    a = symbol "a" 4 :: Symbol Int
-    b = symbol "b" 3 :: Symbol Int
-    c = symbol "c" 0.5 :: Symbol Float
+    a = symbol (SymbolIdentifier "a") 4 :: Symbol Int
+    b = symbol (SymbolIdentifier "b") 3 :: Symbol Int
+    c = symbol (SymbolIdentifier "c") 0.5 :: Symbol Float
 
 testVecOps :: Test
 testVecOps = TestLabel "testVecOps" $ TestList
@@ -49,8 +49,8 @@ testVecOps = TestLabel "testVecOps" $ TestList
     , TestCase $ assertEqual "vector op gradient" (V.map cos $ unSymbol a) (unSymbol $ getGradientsOf (sin a) `wrt` a)
     ]
   where
-    a = symbol "a" (V.fromList [1.0, 2.0, 3.0]) :: SymbolVec Float
-    b = symbol "b" (V.fromList [3.0, 2.0, 1.0]) :: SymbolVec Float
+    a = symbol (SymbolIdentifier "a") (V.fromList [1.0, 2.0, 3.0]) :: SymbolVec Float
+    b = symbol (SymbolIdentifier "b") (V.fromList [3.0, 2.0, 1.0]) :: SymbolVec Float
 
 testMatOps :: Test
 testMatOps = TestLabel "testMatOps" $ TestList
@@ -62,11 +62,11 @@ testMatOps = TestLabel "testMatOps" $ TestList
     , TestCase $ assertEqual "matrix composed multiplication gradient" (M.transpose $ unSymbol c) (unSymbol $ getGradientsOf (c `matMul` d `matMul` e) `wrt` d)
     ]
   where
-    a = symbol "a" (M.replicate (3, 3) 3.0) :: SymbolMat Float
-    b = symbol "b" (M.replicate (3, 3) (-3.0)) :: SymbolMat Float
-    c = symbol "c" (M.fromLists (1, 2) [[5.0, 3.0]]) :: SymbolMat Float
-    d = symbol "d" (M.fromLists (2, 1) [[1.0], [-2.0]]) :: SymbolMat Float
-    e = symbol "e" (M.fromLists (1, 1) [[1.0]]) :: SymbolMat Float
+    a = symbol (SymbolIdentifier "a") (M.replicate (3, 3) 3.0) :: SymbolMat Float
+    b = symbol (SymbolIdentifier "b") (M.replicate (3, 3) (-3.0)) :: SymbolMat Float
+    c = symbol (SymbolIdentifier "c") (M.fromLists (1, 2) [[5.0, 3.0]]) :: SymbolMat Float
+    d = symbol (SymbolIdentifier "d") (M.fromLists (2, 1) [[1.0], [-2.0]]) :: SymbolMat Float
+    e = symbol (SymbolIdentifier "e") (M.fromLists (1, 1) [[1.0]]) :: SymbolMat Float
 
 
 tests :: Test

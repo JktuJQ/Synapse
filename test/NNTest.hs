@@ -29,7 +29,7 @@ testSin :: Test  -- -3 sin (x + 5)
 testSin = TestLabel "testSin" $ TestCase $ do
     let sinFn x = (-3.0) * sin (x + 5.0)
     let model = buildSequentialModel (InputSize 1) [ Layer . layerDense 1
-                                                   , Layer . layerActivation cos
+                                                   , Layer . layerActivation (Activation cos)
                                                    , Layer . layerDense 1
                                                    ] :: SequentialModel Double
 
@@ -53,7 +53,7 @@ testSqrt :: Test  -- sqrt(x)
 testSqrt = TestLabel "testSqrt" $ TestCase $ do
     let sqrtFn x = sqrt x
     let model = buildSequentialModel (InputSize 1) [ Layer . layerDense 1
-                                                   , Layer . layerActivation tanh
+                                                   , Layer . layerActivation (Activation tanh)
                                                    , Layer . layerDense 1
                                                    ] :: SequentialModel Double
 
@@ -77,9 +77,9 @@ testTrigonometry :: Test  -- sin(2.0 * cos(x) + 3.0) + 2.5
 testTrigonometry = TestLabel "testTrigonometry" $ TestCase $ do
     let trigonometryFn x = sin (2.0 * cos x + 3.0) + 2.5
     let model = buildSequentialModel (InputSize 1) [ Layer . layerDense 1
-                                                   , Layer . layerActivation sin
+                                                   , Layer . layerActivation (Activation sin)
                                                    , Layer . layerDense 1
-                                                   , Layer . layerActivation sin
+                                                   , Layer . layerActivation (Activation sin)
                                                    , Layer . layerDense 1
                                                    ] :: SequentialModel Double
 

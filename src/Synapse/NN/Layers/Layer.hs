@@ -33,7 +33,7 @@ module Synapse.NN.Layers.Layer
 import Synapse.Tensors (DType)
 import Synapse.Tensors.Mat (Mat)
 
-import Synapse.Autograd (Symbolic, Symbol(unSymbol), SymbolMat, constSymbol)
+import Synapse.Autograd (Symbolic, SymbolIdentifier, Symbol(unSymbol), SymbolMat, constSymbol)
 
 
 {- | 'AbstractLayer' typeclass defines basic interface of all layers of neural network model.
@@ -47,36 +47,36 @@ Their implementations should match - that is 'getParameters' function should ret
 and 'updateParameters' should expect a list of the same length with the matrices in the same order as were they in 'getParameters'.
 
 "Synapse" manages gradients and parameters for layers with erased type information using prefix system.
-'String' is a prefix for name of symbolic parameters that are used in calculation.
-Every used parameter should have unique name to be recognised by the autograd - 
+'Synapse.Autograd.SymbolIdentifier' is a prefix for name of symbolic parameters that are used in calculation.
+Every used parameter should have unique name to be recognised by the autograd -
 it must start with given prefix and end with the numerical index of said parameter.
 For example 3rd layer with 2 parameters (weights and bias) should
-name its weights symbol "l3w1" and name its bias symbol "l3w2" ("l3w" prefix will be supplied).
+name its weights symbol \"ml3w1\" and name its bias symbol \"ml3w2\" (\"ml3w\" prefix will be supplied).
 
-Important: this typeclass correct implementation is very important for work of the neural network and training,
-read the docs thoroughly to ensure that all the invariants are met.
+Important: this typeclass correct implementation is very important (as it is the \'heart\' of "Synapse" library)
+for work of the neural network and training, read the docs thoroughly to ensure that all the invariants are met.
 -}
 class AbstractLayer l where
     -- | Returns the size of the input that is supported for 'forward' and 'symbolicForward' functions. 'Nothing' means size independence (activation functions are the example).
     inputSize :: l a -> Maybe Int
     -- | Returns the size of the output that is supported for 'forward' and 'symbolicForward' functions. 'Nothing' means size independence (activation functions are the example).
     outputSize :: l a -> Maybe Int
-
     -- | Returns the number of parameters of this layer.
     nParameters :: l a -> Int
+    
     -- | Returns a list of all parameters (those must be of the exact same order as they are named by the layer (check 'symbolicForward' docs)).
-    getParameters :: String -> l a -> [SymbolMat a]
+    getParameters :: SymbolIdentifier -> l a -> [SymbolMat a]
     -- | Updates parameters based on supplied list (length of that list, the order and the form of parameters is EXACTLY the same as those from 'getParameters')
     updateParameters :: l a -> [Mat a] -> l a
 
     {- | Passes symbolic matrix through to produce new symbolic matrix, while retaining gradients graph.
     Second matrix is a result of application of regularizer on a layer.
     -}
-    symbolicForward :: (Symbolic a, Floating a, Ord a) => String -> SymbolMat a -> l a -> (SymbolMat a, SymbolMat a)
+    symbolicForward :: (Symbolic a, Floating a, Ord a) => SymbolIdentifier -> SymbolMat a -> l a -> (SymbolMat a, SymbolMat a)
 
 -- | Passes matrix through to produce new matrix.
 forward :: (AbstractLayer l, Symbolic a, Floating a, Ord a) => Mat a -> l a -> Mat a
-forward input = unSymbol . fst . symbolicForward ""  (constSymbol input)
+forward input = unSymbol . fst . symbolicForward mempty (constSymbol input)
 
 
 -- | 'Layer' existential datatype wraps anything that implements 'AbstractLayer'.

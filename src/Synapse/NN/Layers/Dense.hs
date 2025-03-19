@@ -26,7 +26,7 @@ import Synapse.Tensors.Vec (Vec)
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
-import Synapse.Autograd (SymbolMat, Symbolic, symbol)
+import Synapse.Autograd (Symbolic, SymbolIdentifier(SymbolIdentifier), symbol, SymbolMat)
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 import Synapse.NN.Layers.Initializers (Initializer(Initializer), zeroes, ones)
@@ -47,13 +47,13 @@ data Dense a = Dense
     }
 
 -- | Creates symbol for weights.
-weightsSymbol :: String -> Mat a -> SymbolMat a
-weightsSymbol prefix = symbol (prefix ++ "1")
+weightsSymbol :: SymbolIdentifier -> Mat a -> SymbolMat a
+weightsSymbol prefix = symbol (prefix <> SymbolIdentifier "1")
 
 
 -- | Creates symbol for bias.
-biasSymbol :: String -> Vec a -> SymbolMat a
-biasSymbol prefix = symbol (prefix ++ "2") . M.rowVec
+biasSymbol :: SymbolIdentifier -> Vec a -> SymbolMat a
+biasSymbol prefix = symbol (prefix <> SymbolIdentifier "2") . M.rowVec
 
 type instance DType (Dense a) = a
 

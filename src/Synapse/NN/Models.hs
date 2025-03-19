@@ -14,12 +14,16 @@ module Synapse.NN.Models
       
     , SequentialModel (SequentialModel, unSequentialModel)
     , buildSequentialModel
+
+    , layerPrefix
     ) where
 
 
-import Synapse.NN.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
-
 import Synapse.Tensors (DType, SingletonOps(singleton))
+
+import Synapse.Autograd (SymbolIdentifier (SymbolIdentifier))
+
+import Synapse.NN.Layers.Layer(AbstractLayer(..), Layer, LayerConfiguration)
 
 import Data.Maybe (fromMaybe)
 import Data.Foldable (foldl')
@@ -38,7 +42,7 @@ instance Show a => Show (SequentialModel a) where
     show (SequentialModel layers) = go 1 layers
       where
         go _ [] = ""
-        go i (x:xs) = "Layer " ++ show i ++ " parameters: " ++ show (getParameters (layerPrefix "" i) x) ++ ";\n" ++ go (i + 1) xs
+        go i (x:xs) = "Layer " ++ show i ++ " parameters: " ++ show (getParameters (layerPrefix mempty i) x) ++ ";\n" ++ go (i + 1) xs
 
 -- | Builds sequential model using input size and layer configurations to ensure that layers are compatible with each other.
 buildSequentialModel :: InputSize -> [LayerConfiguration (Layer a)] -> SequentialModel a
@@ -53,9 +57,9 @@ buildSequentialModel (InputSize i) layerConfigs = SequentialModel $ go i layerCo
 type instance DType (SequentialModel a) = a
 
 
--- | Forms prefix for layers.
-layerPrefix :: String -> Int -> String
-layerPrefix prefix i = prefix ++ "l" ++ show i ++ "w"
+-- | Forms prefix for layers according to 'Synapse.NN.Layers.Layer.AbstractLayer' requirements.
+layerPrefix :: SymbolIdentifier -> Int -> SymbolIdentifier
+layerPrefix prefix i = mconcat [prefix, SymbolIdentifier "l", SymbolIdentifier (show i), SymbolIdentifier "w"]
 
 instance AbstractLayer SequentialModel where
     inputSize = inputSize . head . unSequentialModel

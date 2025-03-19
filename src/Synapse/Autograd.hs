@@ -22,6 +22,8 @@ module Synapse.Autograd
 
       Symbolic (symbolicZero, symbolicOne, symbolicN)
 
+    , SymbolIdentifier (SymbolIdentifier, unSymbolIdentifier)
+
     , Symbol (Symbol, symbolName, unSymbol, symbolGradients)
     , SymbolVec
     , SymbolMat
@@ -53,6 +55,7 @@ import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
 
 import Data.Foldable (foldl')
+import Data.String (IsString(..))
 
 import Data.Hashable (Hashable(..))
 
@@ -117,6 +120,20 @@ instance Symbolic a => Symbolic (Mat a) where
     symbolicN n reference = M.replicate (M.size reference) (fromIntegral n)
 
 
+-- | 'SymbolIdentifier' is a newtype that wraps string, which needs to uniquely represent symbol.
+newtype SymbolIdentifier = SymbolIdentifier 
+    { unSymbolIdentifier :: String  -- ^ Identifier of a symbol.
+    } deriving (Eq, Show)
+
+instance IsString SymbolIdentifier where
+    fromString = SymbolIdentifier
+
+instance Semigroup SymbolIdentifier where
+    (<>) (SymbolIdentifier a) (SymbolIdentifier b) = SymbolIdentifier $ a <> b
+
+instance Monoid SymbolIdentifier where
+    mempty = SymbolIdentifier ""
+
 {- | Datatype that represents symbol variable (variable which operations are recorded to symbolically obtain derivatives).
 
 Any operation returning @Symbol a@ where @a@ is 'Symbolic' could be autogradiented - returned 'Symbol' has 'symbolGradients' list,
@@ -126,22 +143,21 @@ the second element is closure that represents chain rule - it takes incoming loc
 You can check out implementations of those operations in the source to give yourself a reference.
 -}
 data Symbol a = Symbol
-    { symbolName      :: String                              -- ^ Name of a symbol (identifier for differentiation).
+    { symbolName      :: SymbolIdentifier                    -- ^ Name of a symbol (identifier for differentiation).
     , unSymbol        :: a                                   -- ^ Value of a symbol.
     , symbolGradients :: [(Symbol a, Symbol a -> Symbol a)]  -- ^ List of gradients (wrt to what Symbol and closure to calculate gradient). 
     }
 
-
 -- | Creates new symbol that refers to a variable (so it must have a name to be able to be differentiated wrt).
-symbol :: String -> a -> Symbol a
+symbol :: SymbolIdentifier -> a -> Symbol a
 symbol name value = Symbol name value []
 
 -- | Creates new symbol that refers to constant (so it does not have name and thus its gradients are not saved).
 constSymbol :: a -> Symbol a
-constSymbol = symbol ""
+constSymbol = symbol mempty
 
 -- | Renames symbol which allows differentiating wrt it. Note: renaming practically creates new symbol for the gradient calculation.
-renameSymbol :: String -> Symbol a -> Symbol a
+renameSymbol :: SymbolIdentifier -> Symbol a -> Symbol a
 renameSymbol name (Symbol _ value localGradients) = Symbol name value localGradients
 
 
@@ -163,7 +179,7 @@ instance Eq (Symbol a) where
 
 
 instance Hashable (Symbol a) where
-    hashWithSalt salt (Symbol name _ _) = hashWithSalt salt name
+    hashWithSalt salt (Symbol (SymbolIdentifier name) _ _) = hashWithSalt salt name
 
 
 -- Symbolic symbols
@@ -180,11 +196,11 @@ type instance DType (SymbolMat a) = a
 
 -- | Converts unary operation into symbolic one.
 symbolicUnaryOp :: (a -> a) -> Symbol a -> [(Symbol a, Symbol a -> Symbol a)] -> Symbol a
-symbolicUnaryOp op x = Symbol "" (op (unSymbol x))
+symbolicUnaryOp op x = Symbol mempty (op (unSymbol x))
 
 -- | Converts binary operation into symbolic one.
 symbolicBinaryOp :: (a -> a -> a) -> Symbol a -> Symbol a -> [(Symbol a, Symbol a -> Symbol a)] -> Symbol a
-symbolicBinaryOp op a b = Symbol "" (op (unSymbol a) (unSymbol b))
+symbolicBinaryOp op a b = Symbol mempty (op (unSymbol a) (unSymbol b))
 
 instance Symbolic a => Num (Symbol a) where
     (+) a b = symbolicBinaryOp (+) a b [(a, id), (b, id)]
@@ -303,7 +319,7 @@ instance Show a => Show (Gradients a) where
 -- | Generates 'Gradients' for given symbol.
 getGradientsOf :: Symbolic a => Symbol a -> Gradients a
 getGradientsOf differentiatedSymbol = Gradients $ HM.insert differentiatedSymbol wrtItself $
-                                                  HM.delete (Symbol "" undefined []) $
+                                                  HM.delete (Symbol mempty undefined []) $
                                                   go HM.empty differentiatedSymbol wrtItself
   where
     wrtItself = symbolicOne differentiatedSymbol

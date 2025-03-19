@@ -14,14 +14,14 @@ module Synapse.NN.Layers.Activations
 
       -- * Activation functions
 
-    , reluWith
     , relu
+    , sigmoid
     ) where
 
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..), LayerConfiguration)
 
-import Synapse.Tensors (Indexable(unsafeIndex), SingletonOps(unSingleton))
+import Synapse.Tensors (ElementwiseScalarOps((+.), (/.)), SingletonOps(unSingleton))
 
 import Synapse.Tensors.Mat (Mat)
 import qualified Synapse.Tensors.Mat as M
@@ -47,7 +47,7 @@ activateMat fn = unSymbol . fn . constSymbol
 Any activation function must be differentiable almost everywhere and so
 it must be function that operates on 'Synapse.Autograd.Symbol's, which is allows for function to be differentiated when needed.
 -}
-newtype Activation a = Activation 
+newtype Activation a = Activation
     { unActivation :: ActivationFn a  -- ^ Unwraps 'Activation' newtype.
     }
 
@@ -62,28 +62,16 @@ instance AbstractLayer Activation where
     symbolicForward _ input (Activation fn) = (fn input, M.singleton 0)
 
 -- | Creates configuration for activation layer.
-layerActivation :: ActivationFn a -> LayerConfiguration (Activation a)
-layerActivation fn = const $ Activation fn
+layerActivation :: Activation a -> LayerConfiguration (Activation a)
+layerActivation = const
 
 
 -- Activation functions
 
--- | Configurable ReLU function.
-reluWith 
-  :: (Symbolic a, Ord a)
-  => a        -- ^ Threshold of ReLU function.
-  -> a        -- ^ Left slope coefficient - slope of ReLU function on the left of threshold.
-  -> Maybe a  -- ^ Maximum value clamping - all values greater than this will be clamped.
-  -> ActivationFn a
-reluWith threshold leftSlope Nothing s =
-    s * constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
-                                                             in if x < threshold then leftSlope else 1))
-reluWith threshold leftSlope (Just maxValue) s =
-    s * constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
-                                                             in if x < threshold then leftSlope else 1))
-    - constSymbol (M.generate (M.size $ unSymbol s) (\i -> let x = unsafeIndex (unSymbol s) i
-                                                           in if x >= maxValue then x - maxValue else 0))
+-- | ReLU function.
+relu :: (Symbolic a, Fractional a) => ActivationFn a
+relu x = (x + abs x) /. 2.0
 
--- | Default version of ReLU - threshold and left slope coefficient are set to 0 and no maximum clamping is done.
-relu :: (Symbolic a, Ord a) => ActivationFn a
-relu = reluWith 0 0 Nothing
+-- | Sigmoid function.
+sigmoid :: (Symbolic a, Floating a) => ActivationFn a
+sigmoid x = recip $ exp (negate x) +. 1.0

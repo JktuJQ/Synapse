@@ -51,7 +51,7 @@ import Synapse.Tensors (SingletonOps(unSingleton))
 import Synapse.Tensors.Vec (Vec(Vec), unVec)
 import Synapse.Tensors.Mat (Mat)
 
-import Synapse.Autograd (Symbolic, unSymbol, constSymbol, getGradientsOf, symbol)
+import Synapse.Autograd (Symbolic, SymbolIdentifier(SymbolIdentifier), unSymbol, symbol, constSymbol, getGradientsOf)
 
 import Synapse.NN.Layers.Layer (AbstractLayer(..))
 import Synapse.NN.Optimizers (Optimizer(..), optimizerUpdateParameters)
@@ -119,7 +119,13 @@ type CallbackFnOnTrainEnd model optimizer a
     -> IORef (Vec (RecordedMetric a))             -- ^ Recorded metrics.
     -> IO ()
 
--- | 'Callbacks' record datatype holds all callbacks for the training.
+{- | 'Callbacks' record datatype holds all callbacks for the training.
+
+All callbacks take 'IORef's to various training parameters,
+which allows to affect training in any way possible.
+
+This interface should be used with caution, because some changes might break the training completely.
+-}
 data Callbacks model optimizer a = Callbacks
     { callbacksOnTrainBegin :: [CallbackFnOnTrainBegin model optimizer a]  -- ^ Callbacks that will be called at the beginning of training.
     , callbacksOnEpochBegin :: [CallbackFnOnEpochBegin model optimizer a]  -- ^ Callbacks that will be called at the beginning of training epoch processing.
@@ -159,7 +165,7 @@ whileM_ p f = go
   where
     go = p >>= flip when (f >> go)
 
--- | 'train' function is the heart of "Synapse" library. It allows training neural networks on datasets with specified parameters.
+-- | 'train' function allows training neural networks on datasets with specified parameters.
 train
     :: (Symbolic a, Floating a, Ord a, Show a, RandomGen g, AbstractLayer model, Optimizer optimizer)
     => model a                                                                     -- ^ Trained model.
@@ -168,7 +174,10 @@ train
     -> Callbacks model optimizer a                                                 -- ^ Callbacks that will be used during training.
     -> g                                                                           -- ^ Generator of random values that will be used to shuffle dataset.
     -> IO (model a, [OptimizerParameters optimizer a], Vec (RecordedMetric a), g)  -- ^ Updated model, optimizer parameters at the end of training, vector of recorded metrics (loss is also recorded and is the first in vector), updated generator of random values.
-train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr) (Loss loss) (Vec metrics)) callbacks gen0 = do
+train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr) (Loss loss) (Vec metrics)) callbacks gen0 = 
+    let modelIdentifier = SymbolIdentifier "m"
+        inputIdentifier = SymbolIdentifier "input"
+    in do
     let totalIterations = epochs * ((V.length (unVec $ unDataset dataset) + batchSize - 1) `div` batchSize)
     progressBar <- newProgressBar
         (defStyle { stylePrefix = exact <> msg " iterations"
@@ -180,7 +189,7 @@ train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr
 
     modelRef <- newIORef model
 
-    optimizerParametersRef <- newIORef $ optimizerInitialParameters optimizer . unSymbol <$> getParameters "m" model
+    optimizerParametersRef <- newIORef $ optimizerInitialParameters optimizer . unSymbol <$> getParameters modelIdentifier model
 
     mapM_ (\fn -> fn modelRef optimizerParametersRef) (callbacksOnTrainBegin callbacks)
 
@@ -217,12 +226,12 @@ train model optimizer (Hyperparameters epochs batchSize dataset (LearningRate lr
 
             (Sample batchInput batchOutput) <- readIORef batchRef
 
-            (prediction, regularizersLoss) <- readIORef modelRef <&> symbolicForward "m" (symbol "input" batchInput)
+            (prediction, regularizersLoss) <- readIORef modelRef <&> symbolicForward modelIdentifier (symbol inputIdentifier batchInput)
 
             lrValue <- readIORef lrValueRef
             let lossValue = loss (constSymbol batchOutput) prediction
 
-            parameters <- readIORef modelRef <&> getParameters "m"
+            parameters <- readIORef modelRef <&> getParameters modelIdentifier
             optimizerParameters <- readIORef optimizerParametersRef
             let (parameters', optimizerParameters') = unzip $ optimizerUpdateParameters optimizer (lrValue, getGradientsOf $ lossValue + regularizersLoss)
                                                                                         (zip parameters optimizerParameters)
