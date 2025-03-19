@@ -15,9 +15,9 @@ license-file:       LICENSE
 
 
 synopsis:
-    Synapse is a machine learning library written in pure Haskell.
+    Synapse is a machine learning library written in pure Haskell, that makes creating and training neural networks an easy job.
 description:
-    Synapse is a machine learning library written in pure Haskell.
+    Synapse is a machine learning library written in pure Haskell, that makes creating and training neural networks an easy job.
 category:           Math
 
 
