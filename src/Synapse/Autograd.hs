@@ -24,7 +24,7 @@ module Synapse.Autograd
 
     , SymbolIdentifier (SymbolIdentifier, unSymbolIdentifier)
 
-    , Symbol (Symbol, symbolName, unSymbol, symbolGradients)
+    , Symbol (Symbol, symbolIdentifier, unSymbol, symbolGradients)
     , SymbolVec
     , SymbolMat
 
@@ -143,9 +143,9 @@ the second element is closure that represents chain rule - it takes incoming loc
 You can check out implementations of those operations in the source to give yourself a reference.
 -}
 data Symbol a = Symbol
-    { symbolName      :: SymbolIdentifier                    -- ^ Name of a symbol (identifier for differentiation).
-    , unSymbol        :: a                                   -- ^ Value of a symbol.
-    , symbolGradients :: [(Symbol a, Symbol a -> Symbol a)]  -- ^ List of gradients (wrt to what Symbol and closure to calculate gradient). 
+    { symbolIdentifier :: SymbolIdentifier                    -- ^ Name of a symbol (identifier for differentiation).
+    , unSymbol         :: a                                   -- ^ Value of a symbol.
+    , symbolGradients  :: [(Symbol a, Symbol a -> Symbol a)]  -- ^ List of gradients (wrt to what Symbol and closure to calculate gradient). 
     }
 
 -- | Creates new symbol that refers to a variable (so it must have a name to be able to be differentiated wrt).
