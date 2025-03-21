@@ -11,6 +11,7 @@ maintainer:         odmamontov@gmail.com
 homepage:           https://github.com/JktuJQ/Synapse
 extra-doc-files:    README.md
                   , CHANGELOG.md
+                  , SynapseLogo.png
 
 license:            MIT
 license-file:       LICENSE
@@ -35,7 +36,7 @@ library
     import:           warnings
     default-language: Haskell2010
 
-    build-depends:    base ^>= 4.17.2.1
+    build-depends:    base >= 4.0.0.0 && < 4.21.0.0
 
                     , vector >= 0.13.2 && < 0.14
 
