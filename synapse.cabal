@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               Synapse
+name:               synapse
 version:            0.1.0.0
 build-type:         Simple
 
@@ -93,8 +93,8 @@ test-suite Synapse-test
     default-language: Haskell2010
     type:             exitcode-stdio-1.0
 
-    build-depends:    base ^>=4.17.2.1
-                    , Synapse
+    build-depends:    base >= 4.0.0.0 && <= 4.21.0.0
+                    , synapse
 
                     , random >= 1.3.0 && < 1.4
 
