@@ -13,7 +13,18 @@ module Synapse.Tensor
     Float32,
     Float64,
     KnownShape,
+    arange,
+    eye,
+    fill,
+    fromGen,
     fromList,
+    full,
+    fullLike,
+    identity,
+    linspace,
+    logspace,
+    ones,
+    onesLike,
     run,
     runCPU,
     runGPU,
@@ -23,12 +34,31 @@ module Synapse.Tensor
     scalar,
     toList,
     unsafeFromList,
+    zeros,
+    zerosLike,
     broadcast,
   )
 where
 
 import Synapse.Tensor.Backend (Backend (..), TensorValue, run, runCPU, runGPU, toList)
-import Synapse.Tensor.Construction (fromList, scalar, unsafeFromList)
+import Synapse.Tensor.Construction
+  ( arange,
+    eye,
+    fill,
+    fromGen,
+    fromList,
+    full,
+    fullLike,
+    identity,
+    linspace,
+    logspace,
+    ones,
+    onesLike,
+    scalar,
+    unsafeFromList,
+    zeros,
+    zerosLike,
+  )
 import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import Synapse.Tensor.Shape (KnownShape, shape, shapeSize)
