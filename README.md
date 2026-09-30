@@ -1,5 +1,10 @@
 # ![Synapse logo](SynapseLogo.png) Synapse ![Synapse logo](SynapseLogo.png)
 
+> [!WARNING]
+> Synapse is being rewritten for the 2.0 architecture on `main`.
+> The archived 1.x codebase is available from the `v1` branch and the
+> `v1-archive` tag.
+
 `Synapse` is a machine learning library written in pure Haskell,
 that makes creating and training neural networks an easy job.
 

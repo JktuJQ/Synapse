@@ -1,11 +1,7 @@
-{- | Synapse
+{- | Synapse 2.0 public entry point.
 
-"Synapse" is a machine learning library written in pure Haskell,
-that makes creating and training neural networks an easy job.
-
-There are examples of "Synapse" usage at <https://github.com/JktuJQ/Synapse>,
-you are encouraged to look at library's repository to get yourself
-a grasp on basic concepts.
+The 2.0 API is currently being rebuilt from scratch. The archived 1.x
+codebase is available from the @v1@ branch and the @v1-archive@ tag.
 -}
 
 module Synapse () where
