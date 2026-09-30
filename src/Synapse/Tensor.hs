@@ -60,6 +60,7 @@ import Synapse.Tensor.Construction
     zerosLike,
   )
 import Synapse.Tensor.DType (DType, Float32, Float64)
+import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import Synapse.Tensor.Shape (KnownShape, shape, shapeSize)
 import Synapse.Tensor.Type (Tensor)

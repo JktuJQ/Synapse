@@ -11,10 +11,8 @@ module Synapse.Tensor.Ops.Shape
   )
 where
 
-import Data.Proxy (Proxy (..))
-
 import qualified Data.Array.Accelerate as A
-
+import Data.Proxy (Proxy (..))
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shape
   ( CanBroadcast,
