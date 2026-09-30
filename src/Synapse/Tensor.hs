@@ -17,15 +17,19 @@ module Synapse.Tensor
     run,
     runCPU,
     runGPU,
+    reshape,
     shape,
     shapeSize,
     scalar,
     toList,
     unsafeFromList,
+    broadcast,
   )
 where
 
 import Synapse.Tensor.Backend (Backend (..), TensorValue, run, runCPU, runGPU, toList)
-import Synapse.Tensor.Core (Tensor, fromList, scalar, unsafeFromList)
+import Synapse.Tensor.Construction (fromList, scalar, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
+import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import Synapse.Tensor.Shape (KnownShape, shape, shapeSize)
+import Synapse.Tensor.Type (Tensor)

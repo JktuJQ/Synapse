@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -25,9 +26,9 @@ import qualified Data.Array.Accelerate.LLVM.PTX as GPU
 #endif
 
 import GHC.TypeLits (Nat)
-import Synapse.Tensor.Core (Tensor (..))
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shape (KnownShape, ShapeToDIM)
+import Synapse.Tensor.Type (Tensor (..))
 
 -- | Execution backend.
 data Backend

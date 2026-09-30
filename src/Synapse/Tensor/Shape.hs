@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -7,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | Type-level tensor shapes.
 --
@@ -14,14 +16,19 @@
 -- module provides runtime helpers for those type-level shapes.
 module Synapse.Tensor.Shape
   ( ShapeToDIM,
-    KnownShape (..),
+    ShapeSize,
+    KnownShape,
+    CanBroadcast,
+    CanReshape,
+    shapeVal,
+    shapeList,
     shape,
     shapeSize,
   )
 where
 
 import qualified Data.Array.Accelerate as A
-import Data.Kind (Type)
+import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits
   ( ErrorMessage (ShowType, Text, (:<>:)),
@@ -29,91 +36,60 @@ import GHC.TypeLits
     Nat,
     TypeError,
     natVal,
+    type (*),
   )
 
--- | Convert a type-level Synapse shape to the internal backend shape type.
-type family ShapeToDIM (sh :: [Nat]) :: Type where
-  ShapeToDIM '[] = A.DIM0
-  ShapeToDIM '[d1] = A.DIM1
-  ShapeToDIM '[d1, d2] = A.DIM2
-  ShapeToDIM '[d1, d2, d3] = A.DIM3
-  ShapeToDIM '[d1, d2, d3, d4] = A.DIM4
-  ShapeToDIM '[d1, d2, d3, d4, d5] = A.DIM5
-  ShapeToDIM '[d1, d2, d3, d4, d5, d6] = A.DIM6
-  ShapeToDIM '[d1, d2, d3, d4, d5, d6, d7] = A.DIM7
-  ShapeToDIM '[d1, d2, d3, d4, d5, d6, d7, d8] = A.DIM8
-  ShapeToDIM '[d1, d2, d3, d4, d5, d6, d7, d8, d9] = A.DIM9
-  ShapeToDIM sh =
-    TypeError
-      ( 'Text "Synapse tensors currently support rank 0..9, but got shape: "
-          ':<>: 'ShowType sh
-      )
+-- | Reverse a type-level list.
+--
+-- Synapse exposes shapes left-to-right, e.g. @'[batch, features]@. Accelerate
+-- shapes are built by appending axes on the right, e.g. @Z :. batch :. features@.
+-- Reversing first lets the recursive builder preserve the user-facing order.
+type family Reverse (xs :: [Nat]) :: [Nat] where
+  Reverse xs = ReverseAcc xs '[]
 
--- | Runtime representation of a type-level tensor shape.
-class (A.Shape (ShapeToDIM sh)) => KnownShape (sh :: [Nat]) where
-  -- | Convert the type-level shape to the internal backend shape value.
-  shapeVal :: proxy sh -> ShapeToDIM sh
+-- | Tail-recursive worker for 'Reverse'.
+type family ReverseAcc (xs :: [Nat]) (acc :: [Nat]) :: [Nat] where
+  ReverseAcc '[] acc = acc
+  ReverseAcc (x ': xs) acc = ReverseAcc xs (x ': acc)
 
-  -- | Convert the type-level shape to a list of runtime dimensions.
-  shapeList :: proxy sh -> [Int]
+-- | Recursive builder for Accelerate shape types from a reversed Synapse shape.
+type family ShapeToDIMRev (sh :: [Nat]) :: Type where
+  ShapeToDIMRev '[] = A.Z
+  ShapeToDIMRev (dim ': rest) = ShapeToDIMRev rest A.:. Int
 
-instance KnownShape '[] where
-  shapeVal _ = A.Z
-  shapeList _ = []
+-- | Convert a Synapse shape to Accelerate's recursive shape type.
+--
+-- The Synapse shape @'[d1, d2, d3]@ maps to Accelerate's @Z :. Int :. Int :. Int@,
+-- preserving the same left-to-right axis order at the value level.
+type ShapeToDIM (sh :: [Nat]) = ShapeToDIMRev (Reverse sh)
 
-instance (KnownNat d1) => KnownShape '[d1] where
-  shapeVal _ = A.Z A.:. dimVal @d1
-  shapeList _ = [dimVal @d1]
+-- | Runtime witness builder for reversed Synapse shapes.
+class KnownShapeRev (sh :: [Nat]) where
+  -- | Build the Accelerate shape value for a reversed Synapse shape.
+  shapeValRev :: proxy sh -> ShapeToDIMRev sh
 
-instance (KnownNat d1, KnownNat d2) => KnownShape '[d1, d2] where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2
-  shapeList _ = [dimVal @d1, dimVal @d2]
+  -- | Build the user-facing dimension list for a reversed Synapse shape.
+  shapeListRev :: proxy sh -> [Int]
 
-instance (KnownNat d1, KnownNat d2, KnownNat d3) => KnownShape '[d1, d2, d3] where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3]
+instance KnownShapeRev '[] where
+  shapeValRev _ = A.Z
+  shapeListRev _ = []
 
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4) =>
-  KnownShape '[d1, d2, d3, d4]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4]
+instance (KnownNat dim, KnownShapeRev rest) => KnownShapeRev (dim ': rest) where
+  shapeValRev _ = shapeValRev (Proxy @rest) A.:. dimVal @dim
+  shapeListRev _ = shapeListRev (Proxy @rest) <> [dimVal @dim]
 
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4, KnownNat d5) =>
-  KnownShape '[d1, d2, d3, d4, d5]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4 A.:. dimVal @d5
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4, dimVal @d5]
+-- | Constraint proving that a shape can be materialized at runtime.
+type KnownShape (sh :: [Nat]) =
+  (A.Shape (ShapeToDIM sh), KnownShapeRev (Reverse sh))
 
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4, KnownNat d5, KnownNat d6) =>
-  KnownShape '[d1, d2, d3, d4, d5, d6]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4 A.:. dimVal @d5 A.:. dimVal @d6
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4, dimVal @d5, dimVal @d6]
+-- | Convert the type-level shape to the internal backend shape value.
+shapeVal :: forall sh proxy. (KnownShape sh) => proxy sh -> ShapeToDIM sh
+shapeVal _ = shapeValRev (Proxy @(Reverse sh))
 
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4, KnownNat d5, KnownNat d6, KnownNat d7) =>
-  KnownShape '[d1, d2, d3, d4, d5, d6, d7]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4 A.:. dimVal @d5 A.:. dimVal @d6 A.:. dimVal @d7
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4, dimVal @d5, dimVal @d6, dimVal @d7]
-
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4, KnownNat d5, KnownNat d6, KnownNat d7, KnownNat d8) =>
-  KnownShape '[d1, d2, d3, d4, d5, d6, d7, d8]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4 A.:. dimVal @d5 A.:. dimVal @d6 A.:. dimVal @d7 A.:. dimVal @d8
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4, dimVal @d5, dimVal @d6, dimVal @d7, dimVal @d8]
-
-instance
-  (KnownNat d1, KnownNat d2, KnownNat d3, KnownNat d4, KnownNat d5, KnownNat d6, KnownNat d7, KnownNat d8, KnownNat d9) =>
-  KnownShape '[d1, d2, d3, d4, d5, d6, d7, d8, d9]
-  where
-  shapeVal _ = A.Z A.:. dimVal @d1 A.:. dimVal @d2 A.:. dimVal @d3 A.:. dimVal @d4 A.:. dimVal @d5 A.:. dimVal @d6 A.:. dimVal @d7 A.:. dimVal @d8 A.:. dimVal @d9
-  shapeList _ = [dimVal @d1, dimVal @d2, dimVal @d3, dimVal @d4, dimVal @d5, dimVal @d6, dimVal @d7, dimVal @d8, dimVal @d9]
+-- | Convert the type-level shape to a list of runtime dimensions.
+shapeList :: forall sh proxy. (KnownShape sh) => proxy sh -> [Int]
+shapeList _ = shapeListRev (Proxy @(Reverse sh))
 
 -- | Runtime dimensions for a type-level shape.
 shape :: forall sh. (KnownShape sh) => [Int]
@@ -126,3 +102,57 @@ shapeSize = product (shape @sh)
 -- | Convert a type-level natural number to an 'Int'.
 dimVal :: forall n. (KnownNat n) => Int
 dimVal = fromInteger . toInteger $ natVal (Proxy @n)
+
+-- | Type-level product of all dimensions in a shape.
+type family ShapeSize (sh :: [Nat]) :: Nat where
+  ShapeSize '[] = 1
+  ShapeSize (dim ': rest) = dim * ShapeSize rest
+
+-- | Constraint proving that two shapes have the same number of elements.
+type CanReshape from to =
+  CheckReshape from to (ShapeSize from) (ShapeSize to)
+
+-- | Implementation of 'CanReshape' with a readable type error.
+type family CheckReshape (from :: [Nat]) (to :: [Nat]) (fromSize :: Nat) (toSize :: Nat) :: Constraint where
+  CheckReshape from to size size = ()
+  CheckReshape from to fromSize toSize =
+    TypeError
+      ( 'Text "Cannot reshape tensor from shape "
+          ':<>: 'ShowType from
+          ':<>: 'Text " with "
+          ':<>: 'ShowType fromSize
+          ':<>: 'Text " element(s) to shape "
+          ':<>: 'ShowType to
+          ':<>: 'Text " with "
+          ':<>: 'ShowType toSize
+          ':<>: 'Text " element(s)"
+      )
+
+-- | Check whether a single source dimension can broadcast to a target dimension.
+type family CanBroadcastDim (fromDim :: Nat) (toDim :: Nat) :: Constraint where
+  CanBroadcastDim 1 toDim = ()
+  CanBroadcastDim dim dim = ()
+  CanBroadcastDim fromDim toDim =
+    TypeError
+      ( 'Text "Cannot broadcast dimension "
+          ':<>: 'ShowType fromDim
+          ':<>: 'Text " to "
+          ':<>: 'ShowType toDim
+      )
+
+-- | Compare reversed shapes dimension-by-dimension for broadcast compatibility.
+type family BroadcastSuffix (from :: [Nat]) (to :: [Nat]) :: Constraint where
+  BroadcastSuffix '[] _ = ()
+  BroadcastSuffix (fromDim ': fromRest) '[] =
+    TypeError
+      ( 'Text "Cannot broadcast source shape with extra leading dimension "
+          ':<>: 'ShowType fromDim
+      )
+  BroadcastSuffix (fromDim ': fromRest) (toDim ': toRest) =
+    (CanBroadcastDim fromDim toDim, BroadcastSuffix fromRest toRest)
+
+-- | Constraint proving that one shape can be broadcast to another.
+--
+-- Broadcast compatibility is checked from trailing dimensions, matching NumPy
+-- and PyTorch semantics, so both shapes are reversed before comparison.
+type CanBroadcast from to = BroadcastSuffix (Reverse from) (Reverse to)

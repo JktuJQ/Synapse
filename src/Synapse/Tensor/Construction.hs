@@ -1,12 +1,11 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Core tensor type and basic value conversion.
-module Synapse.Tensor.Core
-  ( Tensor (..),
-    fromList,
+-- | Tensor construction and host value conversion.
+module Synapse.Tensor.Construction
+  ( fromList,
     scalar,
     unsafeFromList,
   )
@@ -14,13 +13,10 @@ where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
-import GHC.TypeLits (Nat)
-import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shape (KnownShape (..), ShapeToDIM, shape, shapeSize)
 
--- | A staged tensor expression.
-newtype Tensor (sh :: [Nat]) a
-  = Tensor {unTensor :: A.Acc (A.Array (ShapeToDIM sh) a)}
+import Synapse.Tensor.DType (DType)
+import Synapse.Tensor.Shape (KnownShape, shape, shapeSize, shapeVal)
+import Synapse.Tensor.Type (Tensor (..))
 
 -- | Create a scalar tensor.
 scalar :: (DType a) => a -> Tensor '[] a

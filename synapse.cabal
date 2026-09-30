@@ -50,9 +50,11 @@ library
                     , Synapse.Tensor
 
     other-modules:    Synapse.Tensor.Backend
-                    , Synapse.Tensor.Core
+                    , Synapse.Tensor.Construction
                     , Synapse.Tensor.DType
+                    , Synapse.Tensor.Ops.Shape
                     , Synapse.Tensor.Shape
+                    , Synapse.Tensor.Type
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
