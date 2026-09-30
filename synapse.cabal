@@ -57,3 +57,17 @@ library
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
         build-depends: accelerate-llvm-ptx >= 1.3 && < 1.5
+
+test-suite synapse-test
+    import:           warnings
+    default-language: Haskell2010
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    other-modules:    TensorTest
+
+    build-depends:    base >= 4.19 && < 4.22
+                    , synapse
+                    , hedgehog >= 1.5 && < 1.8
+                    , tasty >= 1.5 && < 1.6
+                    , tasty-hedgehog >= 1.4 && < 1.5
