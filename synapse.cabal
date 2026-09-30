@@ -28,6 +28,12 @@ source-repository head
   location: https://github.com/JktuJQ/Synapse
 
 
+flag gpu
+    description: Enable the Accelerate LLVM PTX backend.
+    default:     False
+    manual:      True
+
+
 common warnings
     ghc-options: -Wall
 
@@ -36,6 +42,18 @@ library
     default-language: Haskell2010
 
     build-depends:    base >= 4.19 && < 4.22
+                    , accelerate >= 1.3 && < 1.5
+                    , accelerate-llvm-native >= 1.3 && < 1.5
 
     hs-source-dirs:   src
     exposed-modules:  Synapse
+                    , Synapse.Tensor
+
+    other-modules:    Synapse.Tensor.Backend
+                    , Synapse.Tensor.Core
+                    , Synapse.Tensor.DType
+                    , Synapse.Tensor.Shape
+
+    if flag(gpu)
+        cpp-options:   -DSYNAPSE_GPU
+        build-depends: accelerate-llvm-ptx >= 1.3 && < 1.5

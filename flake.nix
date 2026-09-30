@@ -17,21 +17,11 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         haskellPackages = pkgs.haskell.packages.ghc98;
-
-        synapse = haskellPackages.callCabal2nix "synapse" ./. { };
       in
       {
-        packages.default = synapse;
-
-        checks.default = synapse;
-
         formatter = pkgs.nixfmt;
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [
-            synapse.env
-          ];
-
           packages = [
             haskellPackages.cabal-install
             haskellPackages.ghc
@@ -39,8 +29,14 @@
             haskellPackages.haskell-language-server
             haskellPackages.hlint
             haskellPackages.ormolu
+            pkgs.clang
+            pkgs.llvm
+            pkgs.libffi
             pkgs.nixfmt
+            pkgs.pkg-config
           ];
+
+          ACCELERATE_LLVM_CLANG_PATH = "${pkgs.clang}/bin/clang";
 
           shellHook = ''
             echo "Synapse dev shell: GHC ${haskellPackages.ghc.version}"
