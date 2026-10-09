@@ -3,10 +3,7 @@
 
 module TensorTest.Construction (tests) where
 
-import Control.Exception (ErrorCall, evaluate, try)
 import qualified Hedgehog as H
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
 import qualified Synapse.Tensor as T
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
@@ -16,13 +13,9 @@ tests :: TestTree
 tests =
   testGroup
     "construction"
-    [ testProperty "fromList round-trips through CPU backend" propFromListRoundTrip,
-      testProperty "fromList rejects excess elements" (H.withTests 1 propFromListExcess),
-      testProperty "fromList supports scalars and empty tensors" (H.withTests 1 propFromListEdges),
-      testProperty "arange supports negative and zero steps" (H.withTests 1 propArangeSteps),
+    [ testProperty "arange supports negative and zero steps" (H.withTests 1 propArangeSteps),
       testProperty "linspace supports descending endpoints" (H.withTests 1 propDescendingLinspace),
       testProperty "eye supports tall matrices" (H.withTests 1 propTallEye),
-      testProperty "fromList rejects invalid element count" (H.withTests 1 propFromListRejectsInvalidSize),
       testProperty "fromGen initializes by row-major index" (H.withTests 1 propFromGen),
       testProperty "fromGen composes element expressions" (H.withTests 1 propElementExpressions),
       testProperty "constructors handle empty and singleton shapes" (H.withTests 1 propConstructorEdges),
@@ -38,18 +31,19 @@ tests =
       testProperty "identity creates square identity matrix" (H.withTests 1 propIdentity)
     ]
 
-propFromListRoundTrip :: H.Property
-propFromListRoundTrip = H.property $ do
-  xs <- H.forAll $ Gen.list (Range.singleton 6) (Gen.float (Range.linearFracFrom 0 (-100) 100))
-  let tensor = T.fromList @'[2, 3] xs :: T.Tensor '[2, 3] T.Float32
-  T.toList (T.runCPU tensor) H.=== xs
+propArangeSteps :: H.Property
+propArangeSteps = H.property $ do
+  T.toList (T.runCPU (T.arange @4 (5 :: Int) (-2))) H.=== [5, 3, 1, -1]
+  T.toList (T.runCPU (T.arange @4 (5 :: Int) 0)) H.=== [5, 5, 5, 5]
+  approxList (T.toList (T.runCPU (T.arange @4 (0.5 :: T.Float64) 0.25))) [0.5, 0.75, 1, 1.25]
 
-propFromListRejectsInvalidSize :: H.Property
-propFromListRejectsInvalidSize = H.property $ do
-  result <- H.evalIO $ try @ErrorCall $ evaluate $ T.fromList @'[2, 3] [1.0, 2.0 :: T.Float32]
-  case result of
-    Left _ -> H.success
-    Right _ -> H.failure
+propDescendingLinspace :: H.Property
+propDescendingLinspace = H.property $ do
+  approxList (T.toList (T.runCPU (T.linspace @4 (3 :: T.Float64) 0))) [3, 2, 1, 0]
+
+propTallEye :: H.Property
+propTallEye = H.property $ do
+  T.toList (T.runCPU (T.eye @3 @2 :: T.Tensor '[3, 2] Int)) H.=== [1, 0, 0, 1, 0, 0]
 
 propFromGen :: H.Property
 propFromGen = H.property $ do
@@ -126,29 +120,3 @@ propIdentity :: H.Property
 propIdentity = H.property $ do
   let tensor = T.identity @3 :: T.Tensor '[3, 3] Int
   T.toList (T.runCPU tensor) H.=== [1, 0, 0, 0, 1, 0, 0, 0, 1]
-
-propFromListExcess :: H.Property
-propFromListExcess = H.property $ do
-  result <- H.evalIO $ try @ErrorCall $ evaluate $ T.fromList @'[2] [1, 2, 3 :: Int]
-  case result of
-    Left _ -> H.success
-    Right _ -> H.failure
-
-propFromListEdges :: H.Property
-propFromListEdges = H.property $ do
-  T.toList (T.runCPU (T.fromList @'[] [True])) H.=== [True]
-  T.toList (T.runCPU (T.fromList @'[2, 0, 3] [] :: T.Tensor '[2, 0, 3] Int)) H.=== []
-
-propArangeSteps :: H.Property
-propArangeSteps = H.property $ do
-  T.toList (T.runCPU (T.arange @4 (5 :: Int) (-2))) H.=== [5, 3, 1, -1]
-  T.toList (T.runCPU (T.arange @4 (5 :: Int) 0)) H.=== [5, 5, 5, 5]
-  approxList (T.toList (T.runCPU (T.arange @4 (0.5 :: T.Float64) 0.25))) [0.5, 0.75, 1, 1.25]
-
-propDescendingLinspace :: H.Property
-propDescendingLinspace = H.property $ do
-  approxList (T.toList (T.runCPU (T.linspace @4 (3 :: T.Float64) 0))) [3, 2, 1, 0]
-
-propTallEye :: H.Property
-propTallEye = H.property $ do
-  T.toList (T.runCPU (T.eye @3 @2 :: T.Tensor '[3, 2] Int)) H.=== [1, 0, 0, 1, 0, 0]

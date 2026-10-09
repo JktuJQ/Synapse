@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module TensorTest.Shape (tests) where
+module TensorTest.Ops.Shape (tests) where
 
 import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H

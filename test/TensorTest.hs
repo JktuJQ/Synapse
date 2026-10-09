@@ -2,20 +2,18 @@ module TensorTest (tests) where
 
 import qualified TensorTest.Backend
 import qualified TensorTest.Construction
-import qualified TensorTest.Dimensions
-import qualified TensorTest.Elementwise
-import qualified TensorTest.Math
-import qualified TensorTest.Shape
+import qualified TensorTest.Conversion
+import qualified TensorTest.Ops
+import qualified TensorTest.Shapes
 import Test.Tasty (TestTree, testGroup)
 
 tests :: TestTree
 tests =
   testGroup
     "tensor"
-    [ TensorTest.Dimensions.tests,
+    [ TensorTest.Backend.tests,
       TensorTest.Construction.tests,
-      TensorTest.Elementwise.tests,
-      TensorTest.Math.tests,
-      TensorTest.Shape.tests,
-      TensorTest.Backend.tests
+      TensorTest.Conversion.tests,
+      TensorTest.Ops.tests,
+      TensorTest.Shapes.tests
     ]

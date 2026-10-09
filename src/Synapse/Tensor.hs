@@ -42,12 +42,16 @@ module Synapse.Tensor
     reshape,
     shape,
     shapeSize,
+    shapeRank,
     scalar,
     toList,
     unsafeFromList,
     zeros,
     zerosLike,
     broadcast,
+    squeeze,
+    unsqueeze,
+    permuteAxes,
   )
 where
 
@@ -70,9 +74,10 @@ import Synapse.Tensor.Construction
   )
 import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
+import Synapse.Tensor.Ops.Axes (permuteAxes, squeeze, unsqueeze)
 import Synapse.Tensor.Ops.Elementwise (map, zip, zipWith)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
-import Synapse.Tensor.Shapes (Shape, shape, shapeSize)
+import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, constant, fromIntegral)
 import Prelude hiding (fromIntegral, map, zip, zipWith)

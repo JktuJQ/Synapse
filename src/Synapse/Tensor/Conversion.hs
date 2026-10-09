@@ -15,7 +15,7 @@ where
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize, shapeVal)
+import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shape, shapeSize)
 import Synapse.Tensor.Type (Tensor (..), TensorData (..))
 
 -- | Create a tensor from a row-major list without validating its length.
@@ -23,7 +23,7 @@ import Synapse.Tensor.Type (Tensor (..), TensorData (..))
 -- The caller must ensure that the list contains exactly the number of elements
 -- required by the target shape.
 unsafeFromList :: forall sh a. (Shape sh, DType a) => [a] -> Tensor sh a
-unsafeFromList = Tensor . A.use . A.fromList (shapeVal (Proxy @sh))
+unsafeFromList = Tensor . A.use . A.fromList (backendShape (Proxy @sh))
 
 -- | Create a tensor from a row-major list.
 fromList :: forall sh a. (Shape sh, DType a) => [a] -> Tensor sh a

@@ -18,8 +18,8 @@ import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions
   ( Shape,
     ShapeToDIM,
+    backendShape,
     shape,
-    shapeVal,
   )
 import Synapse.Tensor.Shapes.Reshape (CanReshape)
 import Synapse.Tensor.Type (Tensor (..))
@@ -37,8 +37,8 @@ reshape (Tensor acc) =
       sourceIndex
       acc
   where
-    sourceShape = A.constant (shapeVal (Proxy @from))
-    targetShape = A.constant (shapeVal (Proxy @to))
+    sourceShape = A.constant (backendShape (Proxy @from))
+    targetShape = A.constant (backendShape (Proxy @to))
 
     sourceIndex :: A.Exp (ShapeToDIM to) -> A.Exp (ShapeToDIM from)
     sourceIndex ix =
@@ -60,14 +60,14 @@ broadcast ::
 broadcast (Tensor acc) =
   Tensor $
     A.backpermute
-      (A.constant (shapeVal (Proxy @to)))
+      (A.constant (backendShape (Proxy @to)))
       sourceIndex
       acc
   where
     sourceIndex :: A.Exp (ShapeToDIM to) -> A.Exp (ShapeToDIM from)
     sourceIndex ix =
       A.fromIndex
-        (A.constant (shapeVal (Proxy @from)))
+        (A.constant (backendShape (Proxy @from)))
         (sourceLinearIndex ix)
 
     -- Compute the source linear index corresponding to a target index.
@@ -75,7 +75,7 @@ broadcast (Tensor acc) =
     sourceLinearIndex ix =
       foldr addAxis 0 axisMappings
       where
-        targetLinear = A.toIndex (A.constant (shapeVal (Proxy @to))) ix
+        targetLinear = A.toIndex (A.constant (backendShape (Proxy @to))) ix
 
         addAxis :: (Int, Int, (Int, Int)) -> A.Exp Int -> A.Exp Int
         addAxis (fromDim, toDim, (fromStride, toStride)) linearAcc

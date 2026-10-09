@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module TensorTest.Dimensions (tests) where
+module TensorTest.Shapes.Dimensions (tests) where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
@@ -39,14 +39,18 @@ propShapeSize = H.property $ do
 propDimensionEdges :: H.Property
 propDimensionEdges = H.property $ do
   T.shape @'[] H.=== []
+  T.shapeRank @'[] H.=== 0
+  T.shapeRank @'[1] H.=== 1
+  T.shapeRank @'[2, 0, 3] H.=== 3
+  T.shapeRank @'[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] H.=== 10
   T.shapeSize @'[] H.=== 1
   T.shape @'[2, 0, 3] H.=== [2, 0, 3]
   T.shapeSize @'[2, 0, 3] H.=== 0
 
 propDimensionOrder :: H.Property
 propDimensionOrder = H.property $ do
-  D.shapeList (Proxy @'[2, 3, 4]) H.=== [2, 3, 4]
-  D.shapeVal (Proxy @'[2, 3, 4]) H.=== (A.Z A.:. (2 :: Int) A.:. (3 :: Int) A.:. (4 :: Int))
+  D.shape @'[2, 3, 4] H.=== [2, 3, 4]
+  D.backendShape (Proxy @'[2, 3, 4]) H.=== (A.Z A.:. (2 :: Int) A.:. (3 :: Int) A.:. (4 :: Int))
 
 propTypeDimensions :: H.Property
 propTypeDimensions = H.property $ do

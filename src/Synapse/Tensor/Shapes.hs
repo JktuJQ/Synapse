@@ -5,16 +5,34 @@
 module Synapse.Tensor.Shapes
   ( ShapeToDIM,
     ShapeSize,
-    Shape,
+    Shape (..),
     CanBroadcast,
     CanReshape,
-    shapeVal,
-    shapeList,
-    shape,
-    shapeSize,
+    Rank,
+    AxisSize,
+    RemoveAxis,
+    InsertAxis,
+    SelectAxes,
+    PermuteAxes,
+    CanSelectAxes,
+    CanPermuteAxes,
+    CanSqueeze,
+    Axes (..),
   )
 where
 
+import Synapse.Tensor.Shapes.Axes
+  ( Axes (..),
+    AxisSize,
+    CanPermuteAxes,
+    CanSelectAxes,
+    CanSqueeze,
+    InsertAxis,
+    PermuteAxes,
+    Rank,
+    RemoveAxis,
+    SelectAxes,
+  )
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
-import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeSize, ShapeToDIM, shape, shapeList, shapeSize, shapeVal)
+import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)

@@ -11,6 +11,9 @@ extra-doc-files:    README.md
                   , CHANGELOG.md
                   , SynapseLogo.png
 
+extra-source-files: test/TensorTest/Ops/Axes/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Ops/Axes/Fixtures/Rejected/*.hs
+
 license:            MIT
 license-file:       LICENSE
 
@@ -52,10 +55,12 @@ library
                     , Synapse.Tensor.Construction
                     , Synapse.Tensor.Conversion
                     , Synapse.Tensor.DType
+                    , Synapse.Tensor.Ops.Axes
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Shape
                     , Synapse.Tensor.Shapes
+                    , Synapse.Tensor.Shapes.Axes
                     , Synapse.Tensor.Shapes.Broadcast
                     , Synapse.Tensor.Shapes.Dimensions
                     , Synapse.Tensor.Shapes.Reshape
@@ -74,10 +79,16 @@ test-suite synapse-test
     other-modules:    TensorTest
                     , TensorTest.Backend
                     , TensorTest.Construction
-                    , TensorTest.Dimensions
-                    , TensorTest.Elementwise
-                    , TensorTest.Math
-                    , TensorTest.Shape
+                    , TensorTest.Conversion
+                    , TensorTest.Ops
+                    , TensorTest.Ops.Axes
+                    , TensorTest.Ops.Axes.Operations
+                    , TensorTest.Ops.Axes.Types
+                    , TensorTest.Ops.Elementwise
+                    , TensorTest.Ops.Math
+                    , TensorTest.Ops.Shape
+                    , TensorTest.Shapes
+                    , TensorTest.Shapes.Dimensions
                     , TensorTest.Support
 
     build-depends:    base >= 4.19 && < 4.22
@@ -86,3 +97,4 @@ test-suite synapse-test
                     , hedgehog >= 1.5 && < 1.8
                     , tasty >= 1.5 && < 1.6
                     , tasty-hedgehog >= 1.4 && < 1.5
+                    , process >= 1.6 && < 1.7

@@ -3,8 +3,6 @@ module TensorTest.Support (approxList) where
 import Control.Monad (forM_)
 import qualified Hedgehog as H
 
--- | Compare finite floating-point results with absolute and relative tolerance.
--- Report each failing pair rather than a single opaque boolean.
 approxList :: (RealFloat a, Show a) => [a] -> [a] -> H.PropertyT IO ()
 approxList actual expected = do
   length actual H.=== length expected

@@ -27,7 +27,7 @@ import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize, shapeVal)
+import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
 import Synapse.Tensor.Type (FromIntegral, Tensor (..), TensorElement (..), constant)
 import qualified Synapse.Tensor.Type as E
 
@@ -40,11 +40,11 @@ fromGen :: forall sh a. (Shape sh, DType a) => (TensorElement Int -> TensorEleme
 fromGen f = Tensor $ A.generate dims $ \ix ->
   unTensorElement (f (TensorElement (A.toIndex dims ix)))
   where
-    dims = A.constant (shapeVal (Proxy @sh))
+    dims = A.constant (backendShape (Proxy @sh))
 
 -- | Create a tensor filled with the same value in every element.
 full :: forall sh a. (Shape sh, DType a) => a -> Tensor sh a
-full x = Tensor $ A.fill (A.constant (shapeVal (Proxy @sh))) (A.constant x)
+full x = Tensor $ A.fill (A.constant (backendShape (Proxy @sh))) (A.constant x)
 
 -- | Alias for 'full'.
 fill :: forall sh a. (Shape sh, DType a) => a -> Tensor sh a

@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module TensorTest.Math (tests) where
+module TensorTest.Ops.Math (tests) where
 
 import Control.Monad (forM_)
 import qualified Hedgehog as H

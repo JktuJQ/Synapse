@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module TensorTest.Elementwise (tests) where
+module TensorTest.Ops.Elementwise (tests) where
 
 import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
