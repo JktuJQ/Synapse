@@ -7,10 +7,12 @@ module TensorTest
 where
 
 import Control.Exception (ErrorCall, evaluate, try)
+import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Synapse.Tensor as T
+import qualified Synapse.Tensor.Type as Internal
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
@@ -24,6 +26,9 @@ tests =
       testProperty "fromList round-trips through CPU backend" propFromListRoundTrip,
       testProperty "fromList rejects invalid element count" propFromListRejectsInvalidSize,
       testProperty "fromGen initializes by row-major index" propFromGen,
+      testProperty "fromGen composes element expressions" propElementExpressions,
+      testProperty "constructors handle empty and singleton shapes" propConstructorEdges,
+      testProperty "Accelerate representations can be unpacked and reused" propAccelerateAccess,
       testProperty "full creates repeated values" propFull,
       testProperty "fill aliases full" propFill,
       testProperty "zeros creates zero values" propZeros,
@@ -35,6 +40,10 @@ tests =
       testProperty "eye creates rectangular identity matrix" propEye,
       testProperty "identity creates square identity matrix" propIdentity,
       testProperty "Num instance is elementwise" propNumInstance,
+      testProperty "map can change element type" propMap,
+      testProperty "zip pairs different element types" propZip,
+      testProperty "zipWith supports distinct input and output types" propZipWith,
+      testProperty "element operations handle empty tensors and scalars" propElementOperationEdges,
       testProperty "Fractional instance is elementwise" propFractionalInstance,
       testProperty "Floating instance is elementwise" propFloatingInstance,
       testProperty "reshape preserves row-major order" propReshape,
@@ -70,8 +79,40 @@ propFromListRejectsInvalidSize = H.property $ do
 
 propFromGen :: H.Property
 propFromGen = H.property $ do
-  let tensor = T.fromGen @'[2, 3] fromIntegral :: T.Tensor '[2, 3] Int
+  let tensor = T.fromGen @'[2, 3] id :: T.Tensor '[2, 3] Int
   T.toList (T.runCPU tensor) H.=== [0, 1, 2, 3, 4, 5]
+
+propElementExpressions :: H.Property
+propElementExpressions = H.property $ do
+  let tensor = T.fromGen @'[2, 3] $ \i ->
+        sqrt (T.fromIntegral i + T.constant (4 :: T.Float32)) / 2
+  approxList (T.toList (T.runCPU tensor)) (map (\i -> sqrt (i + 4) / 2) [0 .. 5])
+
+propConstructorEdges :: H.Property
+propConstructorEdges = H.property $ do
+  T.toList (T.runCPU (T.fromGen @'[] (\i -> i + 7))) H.=== [7]
+  T.toList (T.runCPU (T.fromGen @'[2, 0] (\i -> i + 7))) H.=== []
+  T.toList (T.runCPU (T.eye @2 @0 :: T.Tensor '[2, 0] Int)) H.=== []
+  T.toList (T.runCPU (T.linspace @0 (2 :: T.Float32) 5)) H.=== []
+  T.toList (T.runCPU (T.linspace @1 (2 :: T.Float32) 5)) H.=== [2]
+  T.toList (T.runCPU (T.logspace @0 (2 :: T.Float32) 5 10)) H.=== []
+  T.toList (T.runCPU (T.logspace @1 (2 :: T.Float32) 5 10)) H.=== [100]
+
+propAccelerateAccess :: H.Property
+propAccelerateAccess = H.property $ do
+  let source = T.arange @3 (1 :: Int) 1
+      modified =
+        Internal.Tensor (A.map (+ 10) (Internal.unTensor source)) ::
+          T.Tensor '[3] Int
+      result = T.runCPU modified
+      reused =
+        Internal.Tensor (A.use (Internal.unTensorData result)) ::
+          T.Tensor '[3] Int
+      element = T.fromGen @'[3] $ \i ->
+        Internal.TensorElement (Internal.unTensorElement i * 2)
+  A.toList (Internal.unTensorData result) H.=== [11, 12, 13]
+  T.toList (T.runCPU reused) H.=== [11, 12, 13]
+  T.toList (T.runCPU element) H.=== [0, 2, 4]
 
 propFull :: H.Property
 propFull = H.property $ do
@@ -141,6 +182,46 @@ propNumInstance = H.property $ do
   T.toList (T.runCPU (signum lhs)) H.=== [1, -1, 1, -1]
   T.toList (T.runCPU literal) H.=== [3, 3, 3, 3]
 
+propMap :: H.Property
+propMap = H.property $ do
+  xs <- H.forAll $ Gen.list (Range.singleton 6) (Gen.int (Range.linear (-100) 100))
+  let input = T.fromList @'[2, 3] xs
+      output = T.map (\x -> T.fromIntegral x + 0.5) input :: T.Tensor '[2, 3] T.Float32
+  T.toList (T.runCPU output) H.=== Prelude.map (\x -> fromIntegral x + 0.5) xs
+
+propZip :: H.Property
+propZip = H.property $ do
+  let lhs = T.fromList @'[3] [1, 2, 3 :: Int]
+      rhs = T.fromList @'[3] [True, False, True]
+      paired = T.zip lhs rhs
+      nested = T.zip paired lhs
+  T.toList (T.runCPU paired) H.=== [(1, True), (2, False), (3, True)]
+  T.toList (T.runCPU nested) H.=== [((1, True), 1), ((2, False), 2), ((3, True), 3)]
+
+propZipWith :: H.Property
+propZipWith = H.property $ do
+  let lhs = T.fromList @'[3] [1, 2, 3 :: Int]
+      rhs = T.fromList @'[3] [True, False, True]
+      output =
+        T.zipWith
+          ( \x flag ->
+              let converted = Internal.unTensorElement (T.fromIntegral x :: T.TensorElement T.Float32)
+               in Internal.TensorElement (A.cond (Internal.unTensorElement flag) (converted + 0.5) (converted - 0.5))
+          )
+          lhs
+          rhs
+  T.toList (T.runCPU output) H.=== [1.5, 1.5, 3.5 :: T.Float32]
+
+propElementOperationEdges :: H.Property
+propElementOperationEdges = H.property $ do
+  let empty = T.zeros @'[2, 0] :: T.Tensor '[2, 0] Int
+      mapped = T.map (\_ -> T.constant True) empty
+  T.toList (T.runCPU mapped) H.=== []
+  T.toList (T.runCPU (T.zip empty mapped)) H.=== []
+  T.toList (T.runCPU (T.zipWith (\x _ -> x + 1) empty mapped)) H.=== []
+  T.toList (T.runCPU (T.map (+ 1) (T.scalar (2 :: Int)))) H.=== [3]
+  T.toList (T.runCPU (T.zip (T.scalar (2 :: Int)) (T.scalar True))) H.=== [(2, True)]
+
 propFractionalInstance :: H.Property
 propFractionalInstance = H.property $ do
   let lhs = T.fromList @'[2] [8.0, 9.0] :: T.Tensor '[2] T.Float32
@@ -188,4 +269,6 @@ propBroadcastSingletonDimension = H.property $ do
 
 approxList :: [T.Float32] -> [T.Float32] -> H.PropertyT IO ()
 approxList actual expected =
-  H.assert $ and (zipWith (\x y -> abs (x - y) < 1e-5) actual expected)
+  do
+    length actual H.=== length expected
+    H.assert $ and (zipWith (\x y -> abs (x - y) < 1e-5) actual expected)

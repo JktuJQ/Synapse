@@ -37,3 +37,5 @@ instance DType Word32
 instance DType Word64
 
 instance DType Bool
+
+instance (DType a, DType b) => DType (a, b)

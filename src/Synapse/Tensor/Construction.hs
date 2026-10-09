@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -29,19 +30,23 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shape (KnownShape, shape, shapeSize, shapeVal)
-import Synapse.Tensor.Type (Tensor (..))
+import Synapse.Tensor.Type (FromIntegral, Tensor (..), TensorElement (..), constant)
+import qualified Synapse.Tensor.Type as E
 
 -- | Create a scalar tensor.
 scalar :: (DType a) => a -> Tensor '[] a
-scalar x = fromList @'[] [x]
+scalar = full @'[]
 
--- | Create a tensor by generating each row-major element from its linear index.
-fromGen :: forall sh a. (KnownShape sh, DType a) => (Int -> a) -> Tensor sh a
-fromGen f = unsafeFromList @sh (map f [0 .. shapeSize @sh - 1])
+-- | Generate elements from row-major linear indices.
+fromGen :: forall sh a. (KnownShape sh, DType a) => (TensorElement Int -> TensorElement a) -> Tensor sh a
+fromGen f = Tensor $ A.generate dims $ \ix ->
+  unTensorElement (f (TensorElement (A.toIndex dims ix)))
+  where
+    dims = A.constant (shapeVal (Proxy @sh))
 
 -- | Create a tensor filled with the same value in every element.
 full :: forall sh a. (KnownShape sh, DType a) => a -> Tensor sh a
-full x = unsafeFromList @sh (replicate (shapeSize @sh) x)
+full x = Tensor $ A.fill (A.constant (shapeVal (Proxy @sh))) (A.constant x)
 
 -- | Alias for 'full'.
 fill :: forall sh a. (KnownShape sh, DType a) => a -> Tensor sh a
@@ -68,43 +73,41 @@ onesLike :: forall sh a b. (KnownShape sh, DType a, Num a) => Tensor sh b -> Ten
 onesLike _ = ones @sh
 
 -- | Create a vector with evenly spaced values @start, start + step, ...@.
-arange :: forall n a. (KnownShape '[n], DType a, Num a) => a -> a -> Tensor '[n] a
+arange :: forall n a. (KnownShape '[n], DType a, Num (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> Tensor '[n] a
 arange start step =
-  fromGen @'[n] $ \ix -> start + fromIntegral ix * step
+  fromGen @'[n] $ \ix -> constant start + E.fromIntegral ix * constant step
 
 -- | Create a vector with @n@ evenly spaced values from @start@ to @end@.
-linspace :: forall n a. (KnownShape '[n], DType a, Fractional a) => a -> a -> Tensor '[n] a
+linspace :: forall n a. (KnownShape '[n], DType a, Fractional a, Fractional (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> Tensor '[n] a
 linspace start end =
   case shapeSize @'[n] of
-    0 -> unsafeFromList @'[n] []
-    1 -> unsafeFromList @'[n] [start]
+    0 -> full @'[n] start
+    1 -> full @'[n] start
     count ->
-      let step = (end - start) / fromIntegral (count - 1)
-       in fromGen @'[n] $ \ix -> start + fromIntegral ix * step
+      let step :: TensorElement a
+          step = (constant end - constant start) / constant (fromIntegral (count - 1))
+       in fromGen @'[n] $ \ix -> constant start + E.fromIntegral ix * step
 
 -- | Create a vector with values spaced evenly on a log scale.
-logspace :: forall n a. (KnownShape '[n], DType a, Floating a) => a -> a -> a -> Tensor '[n] a
+logspace :: forall n a. (KnownNat n, KnownShape '[n], DType a, Floating a, Floating (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> a -> Tensor '[n] a
 logspace start end base =
-  case shapeSize @'[n] of
-    0 -> unsafeFromList @'[n] []
-    1 -> unsafeFromList @'[n] [base ** start]
-    count ->
-      let step = (end - start) / fromIntegral (count - 1)
-       in fromGen @'[n] $ \ix -> base ** (start + fromIntegral ix * step)
+  case linspace @n @a start end of
+    Tensor exponents -> Tensor $ A.map (\x -> unTensorElement (constant base ** TensorElement x)) exponents
 
 -- | Create a matrix with ones on the main diagonal and zeros elsewhere.
 eye ::
   forall rows cols a.
-  (KnownShape '[rows, cols], KnownNat cols, DType a, Num a) =>
+  (KnownShape '[rows, cols], KnownNat cols, DType a, Num (TensorElement a)) =>
   Tensor '[rows, cols] a
 eye =
-  fromGen @'[rows, cols] $ \ix ->
-    let cols = fromInteger (natVal (Proxy @cols))
-        (row, col) = ix `quotRem` cols
-     in if row == col then 1 else 0
+  fromGen @'[rows, cols] $ \(TensorElement ix) ->
+    let cols = A.constant (fromInteger (natVal (Proxy @cols)) :: Int)
+        row = ix `quot` cols
+        col = ix `rem` cols
+     in TensorElement (A.cond (row A.== col) (unTensorElement (1 :: TensorElement a)) (unTensorElement (0 :: TensorElement a)))
 
 -- | Create a square identity matrix.
-identity :: forall n a. (KnownShape '[n, n], KnownNat n, DType a, Num a) => Tensor '[n, n] a
+identity :: forall n a. (KnownShape '[n, n], KnownNat n, DType a, Num (TensorElement a)) => Tensor '[n, n] a
 identity = eye @n @n
 
 -- | Create a tensor from a row-major list without validating its length.

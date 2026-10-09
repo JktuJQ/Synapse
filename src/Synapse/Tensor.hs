@@ -5,9 +5,16 @@
 -- @
 -- import qualified Synapse.Tensor as T
 -- @
+--
+-- 'Tensor' is an array computation, 'TensorElement' an element expression,
+-- and 'TensorData' a materialized array.
 module Synapse.Tensor
   ( Tensor,
-    TensorValue,
+    TensorData,
+    TensorElement,
+    FromIntegral,
+    constant,
+    fromIntegral,
     Backend (..),
     DType,
     Float32,
@@ -23,6 +30,9 @@ module Synapse.Tensor
     identity,
     linspace,
     logspace,
+    map,
+    zip,
+    zipWith,
     ones,
     onesLike,
     run,
@@ -40,7 +50,7 @@ module Synapse.Tensor
   )
 where
 
-import Synapse.Tensor.Backend (Backend (..), TensorValue, run, runCPU, runGPU, toList)
+import Synapse.Tensor.Backend (Backend (..), run, runCPU, runGPU, toList)
 import Synapse.Tensor.Construction
   ( arange,
     eye,
@@ -60,7 +70,9 @@ import Synapse.Tensor.Construction
     zerosLike,
   )
 import Synapse.Tensor.DType (DType, Float32, Float64)
+import Synapse.Tensor.Ops.Elementwise (map, zip, zipWith)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import Synapse.Tensor.Shape (KnownShape, shape, shapeSize)
-import Synapse.Tensor.Type (Tensor)
+import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, constant, fromIntegral)
+import Prelude hiding (fromIntegral, map, zip, zipWith)
