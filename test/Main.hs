@@ -1,8 +1,7 @@
 module Main (main) where
 
-import Test.Tasty (defaultMain, testGroup)
-
 import qualified TensorTest
+import Test.Tasty (defaultMain, testGroup)
 
 main :: IO ()
 main =

@@ -12,11 +12,11 @@ module Synapse.Tensor.Ops.Math () where
 import Synapse.Tensor.Construction (full)
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Ops.Elementwise (map, zipWith)
-import Synapse.Tensor.Shape (KnownShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Tensor (..), TensorElement (..))
 import Prelude hiding (map, zip, zipWith)
 
-instance (KnownShape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) where
+instance (Shape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) where
   (+) = zipWith (+)
   (-) = zipWith (-)
   (*) = zipWith (*)
@@ -25,12 +25,12 @@ instance (KnownShape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor s
   signum = map signum
   fromInteger = full @sh . fromInteger
 
-instance (KnownShape sh, DType a, Fractional a, Fractional (TensorElement a)) => Fractional (Tensor sh a) where
+instance (Shape sh, DType a, Fractional a, Fractional (TensorElement a)) => Fractional (Tensor sh a) where
   (/) = zipWith (/)
   recip = map recip
   fromRational = full @sh . fromRational
 
-instance (KnownShape sh, DType a, Floating a, Floating (TensorElement a)) => Floating (Tensor sh a) where
+instance (Shape sh, DType a, Floating a, Floating (TensorElement a)) => Floating (Tensor sh a) where
   pi = full @sh pi
   exp = map exp
   log = map log

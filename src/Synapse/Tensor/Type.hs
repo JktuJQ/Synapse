@@ -20,7 +20,7 @@ where
 import qualified Data.Array.Accelerate as A
 import GHC.TypeLits (Nat)
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shape (ShapeToDIM)
+import Synapse.Tensor.Shapes.Dimensions (ShapeToDIM)
 import Prelude hiding (fromIntegral)
 
 -- | A staged tensor expression.

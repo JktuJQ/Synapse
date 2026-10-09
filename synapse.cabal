@@ -50,11 +50,15 @@ library
                     , Synapse.Tensor
                     , Synapse.Tensor.Backend
                     , Synapse.Tensor.Construction
+                    , Synapse.Tensor.Conversion
                     , Synapse.Tensor.DType
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Shape
-                    , Synapse.Tensor.Shape
+                    , Synapse.Tensor.Shapes
+                    , Synapse.Tensor.Shapes.Broadcast
+                    , Synapse.Tensor.Shapes.Dimensions
+                    , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Type
 
     if flag(gpu)
@@ -68,6 +72,13 @@ test-suite synapse-test
     hs-source-dirs:   test
     main-is:          Main.hs
     other-modules:    TensorTest
+                    , TensorTest.Backend
+                    , TensorTest.Construction
+                    , TensorTest.Dimensions
+                    , TensorTest.Elementwise
+                    , TensorTest.Math
+                    , TensorTest.Shape
+                    , TensorTest.Support
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse

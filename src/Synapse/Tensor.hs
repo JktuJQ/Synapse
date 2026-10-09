@@ -19,12 +19,13 @@ module Synapse.Tensor
     DType,
     Float32,
     Float64,
-    KnownShape,
+    Shape,
     arange,
     eye,
     fill,
     fromGen,
     fromList,
+    fromData,
     full,
     fullLike,
     identity,
@@ -50,13 +51,12 @@ module Synapse.Tensor
   )
 where
 
-import Synapse.Tensor.Backend (Backend (..), run, runCPU, runGPU, toList)
+import Synapse.Tensor.Backend (Backend (..), run, runCPU, runGPU)
 import Synapse.Tensor.Construction
   ( arange,
     eye,
     fill,
     fromGen,
-    fromList,
     full,
     fullLike,
     identity,
@@ -65,14 +65,14 @@ import Synapse.Tensor.Construction
     ones,
     onesLike,
     scalar,
-    unsafeFromList,
     zeros,
     zerosLike,
   )
+import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Elementwise (map, zip, zipWith)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
-import Synapse.Tensor.Shape (KnownShape, shape, shapeSize)
+import Synapse.Tensor.Shapes (Shape, shape, shapeSize)
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, constant, fromIntegral)
 import Prelude hiding (fromIntegral, map, zip, zipWith)

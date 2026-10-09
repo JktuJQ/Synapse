@@ -14,20 +14,20 @@ where
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shape
-  ( CanBroadcast,
-    CanReshape,
-    KnownShape,
+import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
+import Synapse.Tensor.Shapes.Dimensions
+  ( Shape,
     ShapeToDIM,
     shape,
     shapeVal,
   )
+import Synapse.Tensor.Shapes.Reshape (CanReshape)
 import Synapse.Tensor.Type (Tensor (..))
 
 -- | Reshape a tensor without changing its row-major element order.
 reshape ::
   forall to from a.
-  (KnownShape from, KnownShape to, CanReshape from to, DType a) =>
+  (Shape from, Shape to, CanReshape from to, DType a) =>
   Tensor from a ->
   Tensor to a
 reshape (Tensor acc) =
@@ -54,7 +54,7 @@ reshape (Tensor acc) =
 -- @
 broadcast ::
   forall to from a.
-  (KnownShape from, KnownShape to, CanBroadcast from to, DType a) =>
+  (Shape from, Shape to, CanBroadcast from to, DType a) =>
   Tensor from a ->
   Tensor to a
 broadcast (Tensor acc) =

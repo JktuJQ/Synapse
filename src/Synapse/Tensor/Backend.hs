@@ -15,18 +15,16 @@ module Synapse.Tensor.Backend
     run,
     runCPU,
     runGPU,
-    toList,
   )
 where
 
-import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.LLVM.Native as CPU
 #ifdef SYNAPSE_GPU
 import qualified Data.Array.Accelerate.LLVM.PTX as GPU
 #endif
 
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shape (KnownShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Tensor (..), TensorData (..))
 
 -- | Execution backend.
@@ -36,25 +34,21 @@ data Backend
   deriving (Eq, Show)
 
 -- | Execute a tensor graph and materialize the result.
-run :: forall sh a. (KnownShape sh, DType a) => Backend -> Tensor sh a -> TensorData sh a
+run :: forall sh a. (Shape sh, DType a) => Backend -> Tensor sh a -> TensorData sh a
 run backend tensor =
   case backend of
     CPU -> runCPU tensor
     GPU -> runGPU tensor
 
 -- | Execute a tensor graph on the CPU backend.
-runCPU :: (KnownShape sh, DType a) => Tensor sh a -> TensorData sh a
+runCPU :: (Shape sh, DType a) => Tensor sh a -> TensorData sh a
 runCPU = TensorData . CPU.run . unTensor
 
 -- | Execute a tensor graph on the GPU backend.
-runGPU :: forall sh a. (KnownShape sh, DType a) => Tensor sh a -> TensorData sh a
+runGPU :: forall sh a. (Shape sh, DType a) => Tensor sh a -> TensorData sh a
 #ifdef SYNAPSE_GPU
 runGPU = TensorData . GPU.run . unTensor
 #else
 runGPU _ =
   error "Synapse.Tensor.run: GPU backend is not enabled in this build"
 #endif
-
--- | Convert a materialized tensor result to a row-major list.
-toList :: (KnownShape sh, DType a) => TensorData sh a -> [a]
-toList = A.toList . unTensorData
