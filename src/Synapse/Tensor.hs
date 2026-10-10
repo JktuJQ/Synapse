@@ -67,6 +67,14 @@ module Synapse.Tensor
     broadcast,
     squeeze,
     unsqueeze,
+    sum,
+    sumAxes,
+    mean,
+    meanAxes,
+    minimum,
+    minimumAxes,
+    maximum,
+    maximumAxes,
   )
 where
 
@@ -92,8 +100,9 @@ import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Elementwise (Eq, Ord, map, max, min, zip, zipWith, (/=), (<), (<=), (==), (>), (>=))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
 import Synapse.Tensor.Ops.Math ()
+import Synapse.Tensor.Ops.Reduction (maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, reshape, squeeze, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
-import Prelude hiding (Eq, Ord, fromIntegral, map, max, min, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))
+import Prelude hiding (Eq, Ord, fromIntegral, map, max, maximum, min, minimum, sum, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))

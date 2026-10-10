@@ -15,6 +15,8 @@ extra-source-files: test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
                   , test/TensorTest/Shapes/Axes/Fixtures/Rejected/*.hs
                   , test/TensorTest/Ops/Index/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Index/Fixtures/Rejected/*.hs
+                  , test/TensorTest/Ops/Reduction/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Ops/Reduction/Fixtures/Rejected/*.hs
                   , test/TensorTest/Ops/Math/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Math/Fixtures/Rejected/*.hs
 
@@ -63,6 +65,7 @@ library
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Index
                     , Synapse.Tensor.Ops.Shape
+                    , Synapse.Tensor.Ops.Reduction
                     , Synapse.Tensor.Shapes
                     , Synapse.Tensor.Shapes.Axes
                     , Synapse.Tensor.Shapes.Broadcast
@@ -93,6 +96,9 @@ test-suite synapse-test
                     , TensorTest.Ops.Index.Operations
                     , TensorTest.Ops.Index.Types
                     , TensorTest.Ops.Shape
+                    , TensorTest.Ops.Reduction
+                    , TensorTest.Ops.Reduction.Operations
+                    , TensorTest.Ops.Reduction.Types
                     , TensorTest.Shapes
                     , TensorTest.Shapes.Axes
                     , TensorTest.Shapes.Dimensions

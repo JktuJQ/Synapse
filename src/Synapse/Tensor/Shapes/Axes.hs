@@ -20,6 +20,10 @@ module Synapse.Tensor.Shapes.Axes
     SelectAxes,
     CanSelectAxes,
     CanSqueeze,
+    ReduceShape,
+    CanReduce,
+    CanReduceNonEmpty,
+    NonEmpty,
   )
 where
 
@@ -35,6 +39,7 @@ import GHC.TypeLits
     type (+),
     type (-),
   )
+import Synapse.Tensor.Shapes.Dimensions (ShapeSize)
 
 -- | Reflect an axis list in its declared order.
 -- Bounds and uniqueness are checked by operation-specific constraints.
@@ -129,3 +134,42 @@ type family CheckSingleton (axis :: Nat) (sh :: [Nat]) (dim :: Nat) :: Constrain
 
 -- | Only a singleton dimension can be squeezed without removing elements.
 type CanSqueeze axis sh = CheckSingleton axis sh (AxisSize axis sh)
+
+type family KeepAxis (selected :: Bool) (dim :: Nat) (rest :: [Nat]) :: [Nat] where
+  KeepAxis 'True dim rest = rest
+  KeepAxis 'False dim rest = dim ': rest
+
+type family ReduceShapeAt (axis :: Nat) (xs :: [Nat]) (sh :: [Nat]) :: [Nat] where
+  ReduceShapeAt axis xs '[] = '[]
+  ReduceShapeAt axis xs (dim ': rest) =
+    KeepAxis (Contains axis xs) dim (ReduceShapeAt (axis + 1) xs rest)
+
+-- | Remove selected axes while retaining the original order of all other axes.
+-- Bounds and uniqueness are checked separately by 'CanReduce'.
+type ReduceShape xs sh = ReduceShapeAt 0 xs sh
+
+-- | Validate reduction axes against the original input shape.
+type CanReduce xs sh = CanSelectAxes xs sh
+
+type family CheckReductionDimension (axis :: Nat) (sh :: [Nat]) (dim :: Nat) :: Constraint where
+  CheckReductionDimension axis sh 0 =
+    TypeError ('Text "Cannot reduce empty axis " ':<>: 'ShowType axis ':<>: 'Text " of shape " ':<>: 'ShowType sh ':<>: 'Text " without an identity")
+  CheckReductionDimension axis sh dim = ()
+
+type family CheckReductionAxes (xs :: [Nat]) (sh :: [Nat]) :: Constraint where
+  CheckReductionAxes '[] sh = ()
+  CheckReductionAxes (axis ': rest) sh =
+    (CheckReductionDimension axis sh (AxisSize axis sh), CheckReductionAxes rest sh)
+
+-- | Validate axes and require every selected dimension to have at least one element.
+-- Unselected dimensions may be empty, in which case the output is empty.
+type CanReduceNonEmpty xs sh = (CanReduce xs sh, CheckReductionAxes xs sh)
+
+type family CheckNonEmpty (sh :: [Nat]) (size :: Nat) :: Constraint where
+  CheckNonEmpty sh 0 =
+    TypeError ('Text "Cannot reduce empty tensor of shape " ':<>: 'ShowType sh ':<>: 'Text " without an identity")
+  CheckNonEmpty sh size = ()
+
+-- | Require at least one element for a full reduction without an identity.
+-- Scalars satisfy this constraint because their element count is one.
+type NonEmpty sh = CheckNonEmpty sh (ShapeSize sh)
