@@ -8,20 +8,18 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Axes are numbered from zero, from left to right. Axis lists retain their
--- order and may not contain duplicates. Insertion also permits the final
--- position, immediately after the last axis.
+-- | Axes are numbered from zero, from left to right.
+-- Selection constraints reject repeated and out-of-bounds axes.
+-- Insertion also permits the position immediately after the last axis.
 module Synapse.Tensor.Shapes.Axes
-  ( Rank,
+  ( Axes (..),
+    Rank,
     AxisSize,
     RemoveAxis,
     InsertAxis,
     SelectAxes,
-    PermuteAxes,
     CanSelectAxes,
-    CanPermuteAxes,
     CanSqueeze,
-    Axes (..),
   )
 where
 
@@ -38,6 +36,18 @@ import GHC.TypeLits
     type (-),
   )
 
+-- | Reflect an axis list in its declared order.
+-- Bounds and uniqueness are checked by operation-specific constraints.
+class Axes (xs :: [Nat]) where
+  -- | Runtime axis numbers in the declared order.
+  axes :: [Int]
+
+instance Axes '[] where
+  axes = []
+
+instance (KnownNat axis, Axes rest) => Axes (axis ': rest) where
+  axes = fromInteger (toInteger (natVal (Proxy @axis))) : axes @rest
+
 -- | Number of dimensions (or entries in an axis list).
 type family Rank (sh :: [Nat]) :: Nat where
   Rank '[] = 0
@@ -52,7 +62,8 @@ type family LookupAxis (order :: Ordering) (axis :: Nat) (sh :: [Nat]) :: Nat wh
   LookupAxis order axis sh =
     TypeError ('Text "Axis " ':<>: 'ShowType axis ':<>: 'Text " is out of bounds for shape " ':<>: 'ShowType sh)
 
--- | Size of an existing axis. Scalars have no existing axes.
+-- | Size of an existing axis.
+-- Scalars have no existing axes.
 type AxisSize axis sh = LookupAxis (CmpNat axis (Rank sh)) axis sh
 
 type family RemoveAxisAt (axis :: Nat) (sh :: [Nat]) :: [Nat] where
@@ -95,14 +106,6 @@ type family SelectAxes (xs :: [Nat]) (sh :: [Nat]) :: [Nat] where
   SelectAxes '[] sh = '[]
   SelectAxes (axis ': rest) sh = SelectAxis (Contains axis rest) axis rest sh
 
-type family PermuteAxesChecked (order :: Ordering) (xs :: [Nat]) (sh :: [Nat]) :: [Nat] where
-  PermuteAxesChecked 'EQ xs sh = SelectAxes xs sh
-  PermuteAxesChecked order xs sh =
-    TypeError ('Text "Axis permutation " ':<>: 'ShowType xs ':<>: 'Text " must contain every axis of shape " ':<>: 'ShowType sh)
-
--- | Reorder all dimensions. Every source axis must occur exactly once.
-type PermuteAxes xs sh = PermuteAxesChecked (CmpNat (Rank xs) (Rank sh)) xs sh
-
 type family CheckAxis (order :: Ordering) (axis :: Nat) (sh :: [Nat]) :: Constraint where
   CheckAxis 'LT axis sh = ()
   CheckAxis order axis sh =
@@ -119,14 +122,6 @@ type family CanSelectAxes (xs :: [Nat]) (sh :: [Nat]) :: Constraint where
   CanSelectAxes (axis ': rest) sh =
     (CheckAxis (CmpNat axis (Rank sh)) axis sh, CheckDuplicate (Contains axis rest) axis, CanSelectAxes rest sh)
 
-type family CheckPermutationLength (order :: Ordering) (xs :: [Nat]) (sh :: [Nat]) :: Constraint where
-  CheckPermutationLength 'EQ xs sh = ()
-  CheckPermutationLength order xs sh =
-    TypeError ('Text "Axis permutation " ':<>: 'ShowType xs ':<>: 'Text " must contain every axis of shape " ':<>: 'ShowType sh)
-
--- | Check a complete permutation, including its length, bounds, and uniqueness.
-type CanPermuteAxes xs sh = (CanSelectAxes xs sh, CheckPermutationLength (CmpNat (Rank xs) (Rank sh)) xs sh)
-
 type family CheckSingleton (axis :: Nat) (sh :: [Nat]) (dim :: Nat) :: Constraint where
   CheckSingleton axis sh 1 = ()
   CheckSingleton axis sh dim =
@@ -134,13 +129,3 @@ type family CheckSingleton (axis :: Nat) (sh :: [Nat]) (dim :: Nat) :: Constrain
 
 -- | Only a singleton dimension can be squeezed without removing elements.
 type CanSqueeze axis sh = CheckSingleton axis sh (AxisSize axis sh)
-
--- | Materialize an axis list while preserving its order.
-class Axes (xs :: [Nat]) where
-  axes :: [Int]
-
-instance Axes '[] where
-  axes = []
-
-instance (KnownNat axis, Axes rest) => Axes (axis ': rest) where
-  axes = fromInteger (toInteger (natVal (Proxy @axis))) : axes @rest

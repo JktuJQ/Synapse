@@ -1,7 +1,7 @@
 -- | Tensor shape types, runtime dimensions, and operation constraints.
 --
--- Definitions live in the corresponding Shapes submodules. This module keeps
--- the shared shape interface available through a single import.
+-- Definitions live in the corresponding Shapes submodules.
+-- This module keeps the shared shape interface available through a single import.
 module Synapse.Tensor.Shapes
   ( ShapeToDIM,
     ShapeSize,
@@ -13,9 +13,7 @@ module Synapse.Tensor.Shapes
     RemoveAxis,
     InsertAxis,
     SelectAxes,
-    PermuteAxes,
     CanSelectAxes,
-    CanPermuteAxes,
     CanSqueeze,
     Axes (..),
     Index,
@@ -30,11 +28,9 @@ where
 import Synapse.Tensor.Shapes.Axes
   ( Axes (..),
     AxisSize,
-    CanPermuteAxes,
     CanSelectAxes,
     CanSqueeze,
     InsertAxis,
-    PermuteAxes,
     Rank,
     RemoveAxis,
     SelectAxes,

@@ -25,20 +25,30 @@ where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
-import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.DType (DType)
+import Synapse.Tensor.Ops.Elementwise (map)
+import Synapse.Tensor.Ops.Index (coordinate)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
-import Synapse.Tensor.Type (FromIntegral, Tensor (..), TensorElement (..), constant)
+import Synapse.Tensor.Type (FromIntegral, Tensor (..), TensorElement (..), TensorIndex (..), constant)
 import qualified Synapse.Tensor.Type as E
+import Prelude hiding (map)
 
--- | Create a scalar tensor.
+-- | Turn an element expression into a rank-zero tensor for execution.
+-- Numeric literals work directly; use 'constant' for existing host values.
 scalar :: (DType a) => TensorElement a -> Tensor '[] a
 scalar = Tensor . A.unit . unTensorElement
 
--- | Generate elements from row-major linear indices.
-fromGen :: forall sh a. (Shape sh, DType a) => (TensorElement Int -> TensorElement a) -> Tensor sh a
+-- | Generate each element from its complete multidimensional index.
+-- The callback builds element expressions.
+-- Use @coordinate \@axis@ to read an axis coordinate.
+-- Scalar indices have no coordinates; empty tensors have no elements.
+--
+-- @
+-- fromGen \@'[2, 3] (\ix -> coordinate \@0 ix * 10 + coordinate \@1 ix)
+-- @
+fromGen :: forall sh a. (Shape sh, DType a) => (TensorIndex sh -> TensorElement a) -> Tensor sh a
 fromGen f = Tensor $ A.generate dims $ \ix ->
-  unTensorElement (f (TensorElement (A.toIndex dims ix)))
+  unTensorElement (f (TensorIndex ix))
   where
     dims = A.constant (backendShape (Proxy @sh))
 
@@ -73,9 +83,12 @@ onesLike _ = ones @sh
 -- | Create a vector with evenly spaced values @start, start + step, ...@.
 arange :: forall n a. (Shape '[n], DType a, Num (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> Tensor '[n] a
 arange start step =
-  fromGen @'[n] $ \ix -> constant start + E.fromIntegral ix * constant step
+  fromGen @'[n] $ \ix -> constant start + E.fromIntegral (coordinate @0 ix) * constant step
 
 -- | Create a vector with @n@ evenly spaced values from @start@ to @end@.
+-- For @n >= 2@ both endpoints are included, with the last value taken directly from @end@ to avoid accumulated rounding.
+-- Zero elements produce an empty vector; one element produces @start@.
+-- Descending endpoints are supported.
 linspace :: forall n a. (Shape '[n], DType a, Fractional a, Fractional (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> Tensor '[n] a
 linspace start end =
   case shapeSize @'[n] of
@@ -84,26 +97,29 @@ linspace start end =
     count ->
       let step :: TensorElement a
           step = (constant end - constant start) / constant (fromIntegral (count - 1))
-       in fromGen @'[n] $ \ix -> constant start + E.fromIntegral ix * step
+       in fromGen @'[n] $ \ix ->
+            let i = unTensorElement (coordinate @0 ix)
+                value = constant start + E.fromIntegral (coordinate @0 ix) * step
+             in TensorElement (A.cond (i A.== A.constant (count - 1)) (A.constant end) (unTensorElement value))
 
--- | Create a vector with values spaced evenly on a log scale.
-logspace :: forall n a. (KnownNat n, Shape '[n], DType a, Floating a, Floating (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> a -> Tensor '[n] a
+-- | Exponentiate 'linspace' using the supplied base.
+-- Parameters are start exponent, end exponent, then base.
+-- Empty and singleton cases follow 'linspace'.
+logspace :: forall n a. (Shape '[n], DType a, Floating a, Floating (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> a -> Tensor '[n] a
 logspace start end base =
-  case linspace @n @a start end of
-    Tensor exponents -> Tensor $ A.map (\x -> unTensorElement (constant base ** TensorElement x)) exponents
+  map (constant base **) (linspace @n @a start end)
 
 -- | Create a matrix with ones on the main diagonal and zeros elsewhere.
 eye ::
   forall rows cols a.
-  (Shape '[rows, cols], KnownNat cols, DType a, Num (TensorElement a)) =>
+  (Shape '[rows, cols], DType a, Num (TensorElement a)) =>
   Tensor '[rows, cols] a
 eye =
-  fromGen @'[rows, cols] $ \(TensorElement ix) ->
-    let cols = A.constant (fromInteger (natVal (Proxy @cols)) :: Int)
-        row = ix `quot` cols
-        col = ix `rem` cols
+  fromGen @'[rows, cols] $ \ix ->
+    let row = unTensorElement (coordinate @0 ix)
+        col = unTensorElement (coordinate @1 ix)
      in TensorElement (A.cond (row A.== col) (unTensorElement (1 :: TensorElement a)) (unTensorElement (0 :: TensorElement a)))
 
 -- | Create a square identity matrix.
-identity :: forall n a. (Shape '[n, n], KnownNat n, DType a, Num (TensorElement a)) => Tensor '[n, n] a
+identity :: forall n a. (Shape '[n, n], DType a, Num (TensorElement a)) => Tensor '[n, n] a
 identity = eye @n @n

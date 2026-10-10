@@ -7,8 +7,7 @@
 
 -- | Tensor execution backends.
 --
--- The public 'run' function is the boundary between staged tensor graphs and
--- materialized tensor values.
+-- The public 'run' function is the boundary between staged tensor graphs and materialized tensor values.
 module Synapse.Tensor.Backend
   ( Backend (..),
     TensorData (..),

@@ -20,8 +20,7 @@ import Synapse.Tensor.Type (Tensor (..), TensorData (..))
 
 -- | Create a tensor from a row-major list without validating its length.
 --
--- The caller must ensure that the list contains exactly the number of elements
--- required by the target shape.
+-- The caller must ensure that the list contains exactly the number of elements required by the target shape.
 unsafeFromList :: forall sh a. (Shape sh, DType a) => [a] -> Tensor sh a
 unsafeFromList = Tensor . A.use . A.fromList (backendShape (Proxy @sh))
 

@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 
 module TensorTest.Ops.Index.Operations (tests) where
 
 import qualified Data.Array.Accelerate as A
+import Data.Proxy (Proxy (..))
+import GHC.TypeLits (Nat)
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -16,7 +19,8 @@ tests :: TestTree
 tests =
   testGroup
     "operations"
-    [ testProperty "index reads elements in row-major order" propIndex,
+    [ testProperty "index operators read coordinates and elements" (H.withTests 1 propOperators),
+      testProperty "index reads elements in row-major order" propIndex,
       testProperty "index composes with element expressions" (H.withTests 1 propIndexExpression),
       testProperty "mixed selections preserve axis order" propMixedSlice,
       testProperty "ranges retain singleton axes" (H.withTests 1 propRange),
@@ -39,7 +43,7 @@ propIndexExpression :: H.Property
 propIndexExpression = H.property $ do
   let source = T.fromList @'[2, 3] [0 .. 5 :: Int]
       value = T.index @'[1, 2] (source + 1)
-      repeated = T.fromGen @'[3] (value +)
+      repeated = T.fromGen @'[3] (\ix -> value + T.coordinate @0 ix)
   T.toList (T.runCPU (T.scalar (value * 2))) H.=== [12]
   T.toList (T.runCPU repeated) H.=== [6, 7, 8]
 
@@ -107,3 +111,14 @@ propBoolean :: H.Property
 propBoolean = H.property $ do
   let source = T.fromList @'[2] [False, True]
   T.toList (T.runCPU (T.scalar (T.index @'[1] source))) H.=== [True]
+
+propOperators :: H.Property
+propOperators = H.property $ do
+  let source = T.fromList @'[2, 3] [0 .. 5 :: Int]
+      generated = T.fromGen @'[2, 3] (\ix -> (ix T.!! Proxy @0) * 10 + ix T.!! Proxy @1)
+      copied = T.fromGen @'[2, 3] (source T.!!)
+      scalar = T.scalar (T.constant True)
+  T.toList (T.runCPU (T.scalar (source T.!! Proxy @'[1, 2]))) H.=== [5]
+  T.toList (T.runCPU generated) H.=== [0, 1, 2, 10, 11, 12]
+  T.toList (T.runCPU copied) H.=== [0 .. 5]
+  T.toList (T.runCPU (T.scalar (scalar T.!! Proxy @('[] :: [Nat])))) H.=== [True]

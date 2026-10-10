@@ -19,6 +19,8 @@ tests =
       ++ [ testProperty file (H.withTests 1 (Compiler.rejects (root ++ "Rejected/" ++ file ++ ".hs") diagnostic))
            | (file, diagnostic) <-
                [ ("IndexBounds", "Index 3 is out of bounds for axis 1"),
+                 ("OperatorBounds", "Index 3 is out of bounds for axis 1"),
+                 ("OperatorAxis", "Axis 2 is out of bounds"),
                  ("IndexShort", "Index has too few coordinates"),
                  ("IndexLong", "Index has too many coordinates"),
                  ("IndexEmpty", "Index 0 is out of bounds for axis 0"),

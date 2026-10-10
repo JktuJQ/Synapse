@@ -8,7 +8,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Static coordinates and per-axis selections. Every axis must be described.
+-- | Static coordinates and per-axis selections.
+-- Every axis must be described.
 module Synapse.Tensor.Shapes.Index
   ( SliceAxis (..),
     Index (..),
@@ -33,8 +34,8 @@ import GHC.TypeLits
     type (-),
   )
 
--- | Ranges use an exclusive stop and a positive step. RangeReverse selects
--- the same coordinates as Range, but returns them in reverse order.
+-- | Ranges use an exclusive stop and a positive step.
+-- RangeReverse selects the same coordinates as Range, but returns them in reverse order.
 data SliceAxis a = All | At a | Range a a a | RangeReverse a a a
 
 type family CheckCoordinate (order :: Ordering) (axis :: Nat) (coordinate :: Nat) (dim :: Nat) :: Constraint where
@@ -92,7 +93,8 @@ type family CheckSlice (axis :: Nat) (selections :: [SliceAxis Nat]) (sh :: [Nat
 -- | Exactly one selection per dimension, with strict bounds and nonzero strides.
 type CanSlice selections sh = CheckSlice 0 selections sh
 
--- | Shape of a selected region. At removes an axis; other selectors retain it.
+-- | Shape of a selected region.
+-- At removes an axis; other selectors retain it.
 -- Bounds are checked separately by CanSlice.
 type family SliceShape (spec :: [SliceAxis Nat]) (sh :: [Nat]) :: [Nat] where
   SliceShape '[] '[] = '[]

@@ -39,6 +39,5 @@ type family BroadcastSuffix (from :: [Nat]) (to :: [Nat]) :: Constraint where
 
 -- | Constraint proving that one shape can be broadcast to another.
 --
--- Broadcast compatibility is checked from trailing dimensions, matching NumPy
--- and PyTorch semantics.
+-- Broadcast compatibility is checked from trailing dimensions, matching NumPy and PyTorch semantics.
 type CanBroadcast from to = BroadcastSuffix (Reverse from) (Reverse to)

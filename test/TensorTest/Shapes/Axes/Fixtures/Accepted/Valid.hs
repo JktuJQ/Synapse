@@ -14,9 +14,6 @@ selection = ()
 validSelection :: ()
 validSelection = selection
 
-scalarPermutation :: T.Tensor '[] Int
-scalarPermutation = T.permuteAxes @'[] (T.scalar 7)
-
 appendDimension :: T.Tensor '[2, 3, 1] Int
 appendDimension = T.unsqueeze @2 (T.zeros @'[2, 3])
 
@@ -26,8 +23,8 @@ scalarExpansion = T.unsqueeze @0 (T.scalar 7)
 scalarSqueeze :: T.Tensor '[] Int
 scalarSqueeze = T.squeeze @0 (T.ones @'[1])
 
-reordered :: T.Tensor '[4, 2, 3] Int
-reordered = T.permuteAxes @'[2, 0, 1] (T.zeros @'[2, 3, 4])
-
 unsqueezed :: T.Tensor '[2, 1, 3] Int
 unsqueezed = T.unsqueeze @1 (T.zeros @'[2, 3])
+
+generated :: T.Tensor '[2, 3] Int
+generated = T.fromGen @'[2, 3] (\ix -> T.coordinate @0 ix * 10 + T.coordinate @1 ix)

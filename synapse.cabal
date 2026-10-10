@@ -11,8 +11,8 @@ extra-doc-files:    README.md
                   , CHANGELOG.md
                   , SynapseLogo.png
 
-extra-source-files: test/TensorTest/Ops/Axes/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Axes/Fixtures/Rejected/*.hs
+extra-source-files: test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Shapes/Axes/Fixtures/Rejected/*.hs
                   , test/TensorTest/Ops/Index/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Index/Fixtures/Rejected/*.hs
 
@@ -57,7 +57,6 @@ library
                     , Synapse.Tensor.Construction
                     , Synapse.Tensor.Conversion
                     , Synapse.Tensor.DType
-                    , Synapse.Tensor.Ops.Axes
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Index
@@ -86,9 +85,6 @@ test-suite synapse-test
                     , TensorTest.Conversion
                     , TensorTest.Compiler
                     , TensorTest.Ops
-                    , TensorTest.Ops.Axes
-                    , TensorTest.Ops.Axes.Operations
-                    , TensorTest.Ops.Axes.Types
                     , TensorTest.Ops.Elementwise
                     , TensorTest.Ops.Math
                     , TensorTest.Ops.Index
@@ -96,6 +92,7 @@ test-suite synapse-test
                     , TensorTest.Ops.Index.Types
                     , TensorTest.Ops.Shape
                     , TensorTest.Shapes
+                    , TensorTest.Shapes.Axes
                     , TensorTest.Shapes.Dimensions
                     , TensorTest.Support
 

@@ -1,7 +1,6 @@
 -- | Supported tensor element types.
 --
--- The 'DType' class is Synapse's public constraint for values that can be stored
--- inside tensors.
+-- The 'DType' class is Synapse's public constraint for values that can be stored inside tensors.
 module Synapse.Tensor.DType
   ( DType,
     Float32,

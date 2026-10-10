@@ -35,7 +35,7 @@ propAccelerateAccess = H.property $ do
         T.fromData result ::
           T.Tensor '[3] Int
       element = T.fromGen @'[3] $ \i ->
-        Internal.TensorElement (Internal.unTensorElement i * 2)
+        Internal.TensorElement (Internal.unTensorElement (T.coordinate @0 i) * 2)
   A.toList (Internal.unTensorData result) H.=== [11, 12, 13]
   T.toList (T.runCPU reused) H.=== [11, 12, 13]
   T.toList (T.runCPU element) H.=== [0, 2, 4]

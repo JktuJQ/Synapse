@@ -16,7 +16,9 @@ tests =
     [ testProperty "arange supports negative and zero steps" (H.withTests 1 propArangeSteps),
       testProperty "linspace supports descending endpoints" (H.withTests 1 propDescendingLinspace),
       testProperty "eye supports tall matrices" (H.withTests 1 propTallEye),
-      testProperty "fromGen initializes by row-major index" (H.withTests 1 propFromGen),
+      testProperty "fromGen exposes all axis coordinates" (H.withTests 1 propFromGen),
+      testProperty "fromGen supports higher-rank indices" (H.withTests 1 propHighRankGenerator),
+      testProperty "linspace returns its final endpoint exactly" (H.withTests 1 propLinspaceEndpoint),
       testProperty "fromGen composes element expressions" (H.withTests 1 propElementExpressions),
       testProperty "constructors handle empty and singleton shapes" (H.withTests 1 propConstructorEdges),
       testProperty "full creates repeated values" (H.withTests 1 propFull),
@@ -47,19 +49,20 @@ propTallEye = H.property $ do
 
 propFromGen :: H.Property
 propFromGen = H.property $ do
-  let tensor = T.fromGen @'[2, 3] id :: T.Tensor '[2, 3] Int
+  let tensor = T.fromGen @'[2, 3] (\ix -> T.coordinate @0 ix * 3 + T.coordinate @1 ix)
   T.toList (T.runCPU tensor) H.=== [0, 1, 2, 3, 4, 5]
 
 propElementExpressions :: H.Property
 propElementExpressions = H.property $ do
-  let tensor = T.fromGen @'[2, 3] $ \i ->
-        sqrt (T.fromIntegral i + T.constant (4 :: T.Float32)) / 2
+  let tensor = T.fromGen @'[2, 3] $ \ix ->
+        let i = T.coordinate @0 ix * 3 + T.coordinate @1 ix
+         in sqrt (T.fromIntegral i + T.constant (4 :: T.Float32)) / 2
   approxList (T.toList (T.runCPU tensor)) (map (\i -> sqrt (i + 4) / 2) [0 .. 5])
 
 propConstructorEdges :: H.Property
 propConstructorEdges = H.property $ do
-  T.toList (T.runCPU (T.fromGen @'[] (+ 7))) H.=== [7]
-  T.toList (T.runCPU (T.fromGen @'[2, 0] (+ 7))) H.=== []
+  T.toList (T.runCPU (T.fromGen @'[] (\_ -> T.constant (7 :: Int)))) H.=== [7]
+  T.toList (T.runCPU (T.fromGen @'[2, 0] (\_ -> T.constant (7 :: Int)))) H.=== []
   T.toList (T.runCPU (T.eye @2 @0 :: T.Tensor '[2, 0] Int)) H.=== []
   T.toList (T.runCPU (T.linspace @0 (2 :: T.Float32) 5)) H.=== []
   T.toList (T.runCPU (T.linspace @1 (2 :: T.Float32) 5)) H.=== [2]
@@ -120,3 +123,14 @@ propIdentity :: H.Property
 propIdentity = H.property $ do
   let tensor = T.identity @3 :: T.Tensor '[3, 3] Int
   T.toList (T.runCPU tensor) H.=== [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+propHighRankGenerator :: H.Property
+propHighRankGenerator = H.property $ do
+  let tensor = T.fromGen @'[1, 1, 1, 1, 1, 1, 1, 1, 1, 2] (T.coordinate @9)
+  T.toList (T.runCPU tensor) H.=== [0, 1]
+
+propLinspaceEndpoint :: H.Property
+propLinspaceEndpoint = H.property $ do
+  let result = T.toList (T.runCPU (T.linspace @3 (1e8 :: T.Float32) 1))
+  take 1 result H.=== [1e8]
+  drop 2 result H.=== [1]
