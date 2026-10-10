@@ -16,6 +16,16 @@ module Synapse.Tensor
     Indexable,
     (!!),
     FromIntegral,
+    Eq,
+    Ord,
+    (==),
+    (/=),
+    (<),
+    (<=),
+    (>),
+    (>=),
+    min,
+    max,
     constant,
     fromIntegral,
     Backend (..),
@@ -79,11 +89,11 @@ import Synapse.Tensor.Construction
   )
 import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
-import Synapse.Tensor.Ops.Elementwise (map, zip, zipWith)
+import Synapse.Tensor.Ops.Elementwise (Eq, Ord, map, max, min, zip, zipWith, (/=), (<), (<=), (==), (>), (>=))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape, squeeze, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
-import Prelude hiding (fromIntegral, map, zip, zipWith, (!!))
+import Prelude hiding (Eq, Ord, fromIntegral, map, max, min, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))
