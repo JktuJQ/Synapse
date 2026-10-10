@@ -13,6 +13,8 @@ extra-doc-files:    README.md
 
 extra-source-files: test/TensorTest/Ops/Axes/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Axes/Fixtures/Rejected/*.hs
+                  , test/TensorTest/Ops/Index/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Ops/Index/Fixtures/Rejected/*.hs
 
 license:            MIT
 license-file:       LICENSE
@@ -58,11 +60,13 @@ library
                     , Synapse.Tensor.Ops.Axes
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
+                    , Synapse.Tensor.Ops.Index
                     , Synapse.Tensor.Ops.Shape
                     , Synapse.Tensor.Shapes
                     , Synapse.Tensor.Shapes.Axes
                     , Synapse.Tensor.Shapes.Broadcast
                     , Synapse.Tensor.Shapes.Dimensions
+                    , Synapse.Tensor.Shapes.Index
                     , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Type
 
@@ -80,12 +84,16 @@ test-suite synapse-test
                     , TensorTest.Backend
                     , TensorTest.Construction
                     , TensorTest.Conversion
+                    , TensorTest.Compiler
                     , TensorTest.Ops
                     , TensorTest.Ops.Axes
                     , TensorTest.Ops.Axes.Operations
                     , TensorTest.Ops.Axes.Types
                     , TensorTest.Ops.Elementwise
                     , TensorTest.Ops.Math
+                    , TensorTest.Ops.Index
+                    , TensorTest.Ops.Index.Operations
+                    , TensorTest.Ops.Index.Types
                     , TensorTest.Ops.Shape
                     , TensorTest.Shapes
                     , TensorTest.Shapes.Dimensions

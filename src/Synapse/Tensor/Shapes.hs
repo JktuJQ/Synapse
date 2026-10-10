@@ -18,6 +18,12 @@ module Synapse.Tensor.Shapes
     CanPermuteAxes,
     CanSqueeze,
     Axes (..),
+    Index,
+    Slice,
+    SliceAxis (..),
+    CanIndex,
+    CanSlice,
+    SliceShape,
   )
 where
 
@@ -35,4 +41,5 @@ import Synapse.Tensor.Shapes.Axes
   )
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
+import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, Slice, SliceAxis (..), SliceShape)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)

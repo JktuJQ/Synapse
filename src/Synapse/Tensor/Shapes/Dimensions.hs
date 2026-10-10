@@ -85,7 +85,6 @@ class (A.Shape (ShapeToDIM sh), ShapeRev (Reverse sh)) => Shape (sh :: [Nat]) wh
   shapeSize :: Int
   shapeSize = product (shape @sh)
 
-
   -- | Number of dimensions; a scalar has rank zero.
   shapeRank :: Int
   shapeRank = length (shape @sh)

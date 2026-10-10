@@ -32,8 +32,8 @@ import Synapse.Tensor.Type (FromIntegral, Tensor (..), TensorElement (..), const
 import qualified Synapse.Tensor.Type as E
 
 -- | Create a scalar tensor.
-scalar :: (DType a) => a -> Tensor '[] a
-scalar = full @'[]
+scalar :: (DType a) => TensorElement a -> Tensor '[] a
+scalar = Tensor . A.unit . unTensorElement
 
 -- | Generate elements from row-major linear indices.
 fromGen :: forall sh a. (Shape sh, DType a) => (TensorElement Int -> TensorElement a) -> Tensor sh a

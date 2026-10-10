@@ -20,6 +20,9 @@ module Synapse.Tensor
     Float32,
     Float64,
     Shape,
+    SliceAxis (..),
+    index,
+    slice,
     arange,
     eye,
     fill,
@@ -76,8 +79,10 @@ import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Axes (permuteAxes, squeeze, unsqueeze)
 import Synapse.Tensor.Ops.Elementwise (map, zip, zipWith)
+import Synapse.Tensor.Ops.Index (index, slice)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
+import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, constant, fromIntegral)
 import Prelude hiding (fromIntegral, map, zip, zipWith)

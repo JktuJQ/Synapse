@@ -111,7 +111,7 @@ propSqueezeOneAxis = H.property $ do
 
 propAxisEdges :: H.Property
 propAxisEdges = H.property $ do
-  let scalar = T.scalar (7 :: Int)
+  let scalar = T.scalar (T.constant (7 :: Int))
       empty = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int
   T.toList (T.runCPU (T.squeeze @0 (T.unsqueeze @0 scalar))) H.=== [7]
   T.toList (T.runCPU (T.permuteAxes @'[] scalar)) H.=== [7]

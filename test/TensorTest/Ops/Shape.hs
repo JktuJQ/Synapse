@@ -36,7 +36,7 @@ propReshape = H.property $ do
 
 propBroadcastScalar :: H.Property
 propBroadcastScalar = H.property $ do
-  let tensor = T.scalar (3.0 :: T.Float32)
+  let tensor = T.scalar (T.constant (3.0 :: T.Float32))
       broadcasted = T.broadcast @'[2, 2] tensor
   T.toList (T.runCPU broadcasted) H.=== [3.0, 3.0, 3.0, 3.0]
 
@@ -62,7 +62,7 @@ propReshapeRoundTrip = H.property $ do
 
 propReshapeEdges :: H.Property
 propReshapeEdges = H.property $ do
-  T.toList (T.runCPU (T.reshape @'[1, 1] (T.scalar (7 :: Int)))) H.=== [7]
+  T.toList (T.runCPU (T.reshape @'[1, 1] (T.scalar (T.constant (7 :: Int))))) H.=== [7]
   T.toList (T.runCPU (T.reshape @'[] (T.full @'[1, 1] (7 :: Int)))) H.=== [7]
   T.toList (T.runCPU (T.reshape @'[0] (T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int))) H.=== []
 

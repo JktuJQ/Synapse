@@ -61,8 +61,8 @@ propElementOperationEdges = H.property $ do
   T.toList (T.runCPU mapped) H.=== []
   T.toList (T.runCPU (T.zip empty mapped)) H.=== []
   T.toList (T.runCPU (T.zipWith (\x _ -> x + 1) empty mapped)) H.=== []
-  T.toList (T.runCPU (T.map (+ 1) (T.scalar (2 :: Int)))) H.=== [3]
-  T.toList (T.runCPU (T.zip (T.scalar (2 :: Int)) (T.scalar True))) H.=== [(2, True)]
+  T.toList (T.runCPU (T.map (+ 1) (T.scalar (T.constant (2 :: Int))))) H.=== [3]
+  T.toList (T.runCPU (T.zip (T.scalar (T.constant (2 :: Int))) (T.scalar (T.constant True)))) H.=== [(2, True)]
 
 propMapComposition :: H.Property
 propMapComposition = H.property $ do

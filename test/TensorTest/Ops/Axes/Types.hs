@@ -3,14 +3,12 @@
 
 module TensorTest.Ops.Axes.Types (tests) where
 
-import Data.List (isInfixOf)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (natVal)
 import qualified Hedgehog as H
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Shapes.Axes as Axes
-import System.Exit (ExitCode (..))
-import System.Process (readProcessWithExitCode)
+import qualified TensorTest.Compiler as Compiler
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
@@ -41,35 +39,11 @@ tests =
               ]
         ]
 
-compile :: String -> IO (ExitCode, String, String)
-compile file =
-  readProcessWithExitCode
-    "cabal"
-    [ "exec",
-      "--offline",
-      "--",
-      "ghc",
-      "-fno-code",
-      "-fforce-recomp",
-      "-v0",
-      "-package",
-      "synapse",
-      "test/TensorTest/Ops/Axes/Fixtures/" ++ file ++ ".hs"
-    ]
-    ""
-
 validAxes :: H.Property
-validAxes = H.property $ do
-  (status, stdoutText, stderrText) <- H.evalIO (compile "Accepted/Valid")
-  H.annotate (stdoutText ++ stderrText)
-  status H.=== ExitSuccess
+validAxes = Compiler.accepts "test/TensorTest/Ops/Axes/Fixtures/Accepted/Valid.hs"
 
 rejects :: String -> String -> H.Property
-rejects file diagnostic = H.property $ do
-  (status, stdoutText, stderrText) <- H.evalIO (compile ("Rejected/" ++ file))
-  H.annotate (stdoutText ++ stderrText)
-  H.assert (status /= ExitSuccess)
-  H.assert (diagnostic `isInfixOf` stderrText)
+rejects file = Compiler.rejects ("test/TensorTest/Ops/Axes/Fixtures/Rejected/" ++ file ++ ".hs")
 
 propAxisTypes :: H.Property
 propAxisTypes = H.property $ do
