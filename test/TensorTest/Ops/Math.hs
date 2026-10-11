@@ -12,6 +12,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Synapse.Tensor as T
 import qualified TensorTest.Compiler as Compiler
+import qualified TensorTest.Ops.Math.Linear
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -20,7 +21,8 @@ tests :: TestTree
 tests =
   testGroup
     "math"
-    [ testProperty "integer arithmetic agrees with lists" propIntegerArithmetic,
+    [ TensorTest.Ops.Math.Linear.tests,
+      testProperty "integer arithmetic agrees with lists" propIntegerArithmetic,
       testProperty "Floating methods agree with host calculations" (H.withTests 1 propFloatingMethods),
       testProperty "Num instance is elementwise" (H.withTests 1 propNumInstance),
       testProperty "Fractional instance is elementwise" (H.withTests 1 propFractionalInstance),

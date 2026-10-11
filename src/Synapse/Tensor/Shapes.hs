@@ -26,6 +26,7 @@ module Synapse.Tensor.Shapes
     CanIndex,
     CanSlice,
     SliceShape,
+    MatmulShape,
   )
 where
 
@@ -47,3 +48,4 @@ import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
 import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, Slice, SliceAxis (..), SliceShape)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)
+import Synapse.Tensor.Shapes.Matmul (MatmulShape)

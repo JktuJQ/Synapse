@@ -72,6 +72,7 @@ library
                     , Synapse.Tensor.Shapes.Dimensions
                     , Synapse.Tensor.Shapes.Index
                     , Synapse.Tensor.Shapes.Reshape
+                    , Synapse.Tensor.Shapes.Matmul
                     , Synapse.Tensor.Type
 
     if flag(gpu)
@@ -92,6 +93,7 @@ test-suite synapse-test
                     , TensorTest.Ops
                     , TensorTest.Ops.Elementwise
                     , TensorTest.Ops.Math
+                    , TensorTest.Ops.Math.Linear
                     , TensorTest.Ops.Index
                     , TensorTest.Ops.Index.Operations
                     , TensorTest.Ops.Index.Types

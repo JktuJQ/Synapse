@@ -75,6 +75,8 @@ module Synapse.Tensor
     minimumAxes,
     maximum,
     maximumAxes,
+    dot,
+    matmul,
   )
 where
 
@@ -99,7 +101,7 @@ import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Elementwise (Eq, Ord, map, max, min, zip, zipWith, (/=), (<), (<=), (==), (>), (>=))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
-import Synapse.Tensor.Ops.Math ()
+import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Reduction (maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, reshape, squeeze, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
