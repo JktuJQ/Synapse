@@ -77,6 +77,10 @@ module Synapse.Tensor
     maximumAxes,
     dot,
     matmul,
+    transpose,
+    permuteAxes,
+    concat,
+    stack,
   )
 where
 
@@ -103,8 +107,8 @@ import Synapse.Tensor.Ops.Elementwise (Eq, Ord, map, max, min, zip, zipWith, (/=
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
 import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Reduction (maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, sum, sumAxes)
-import Synapse.Tensor.Ops.Shape (broadcast, reshape, squeeze, unsqueeze)
+import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
-import Prelude hiding (Eq, Ord, fromIntegral, map, max, maximum, min, minimum, sum, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))
+import Prelude hiding (Eq, Ord, concat, fromIntegral, map, max, maximum, min, minimum, sum, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))

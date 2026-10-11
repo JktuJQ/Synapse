@@ -78,8 +78,9 @@ matmul (Tensor left) (Tensor right)
       (0 : _ : _, _ : _ : _) ->
         Tensor (A.fill (A.constant outputShape) (unTensorElement (0 :: TensorElement a)))
       (shared : rows : _, cols : _ : _) ->
-        Tensor $ A.reshape (A.constant outputShape) $
-          matrixProduct (shapeSize @(MatmulShape lhs rhs)) rows shared cols leftVector rightVector
+        Tensor $
+          A.reshape (A.constant outputShape) $
+            matrixProduct (shapeSize @(MatmulShape lhs rhs)) rows shared cols leftVector rightVector
       _ -> error "Synapse.Tensor.matmul: inconsistent input rank"
   where
     outputShape = backendShape (Proxy @(MatmulShape lhs rhs))

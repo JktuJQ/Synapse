@@ -11,21 +11,22 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 tests :: TestTree
-tests = testGroup "types" $
-  [ testProperty "reduced shapes preserve axis order" (H.withTests 1 propShapes),
-    testProperty "valid reductions compile" (H.withTests 1 (Compiler.accepts (root ++ "Accepted/Valid.hs")))
-  ] ++
-  [ testProperty file (H.withTests 1 (Compiler.rejects (root ++ "Rejected/" ++ file ++ ".hs") diagnostic))
-    | (file, diagnostic) <-
-      [ ("DuplicateAxes", "Repeated axis 1"),
-        ("MissingAxis", "Axis 2 is out of bounds"),
-        ("EmptyMinimum", "Cannot reduce empty tensor"),
-        ("EmptyMaximum", "Cannot reduce empty tensor"),
-        ("EmptyMinimumAxis", "Cannot reduce empty axis 1"),
-        ("EmptyMaximumAxis", "Cannot reduce empty axis 0"),
-        ("IntegerMean", "RealFloat Int")
-      ]
-  ]
+tests =
+  testGroup "types" $
+    [ testProperty "reduced shapes preserve axis order" (H.withTests 1 propShapes),
+      testProperty "valid reductions compile" (H.withTests 1 (Compiler.accepts (root ++ "Accepted/Valid.hs")))
+    ]
+      ++ [ testProperty file (H.withTests 1 (Compiler.rejects (root ++ "Rejected/" ++ file ++ ".hs") diagnostic))
+           | (file, diagnostic) <-
+               [ ("DuplicateAxes", "Repeated axis 1"),
+                 ("MissingAxis", "Axis 2 is out of bounds"),
+                 ("EmptyMinimum", "Cannot reduce empty tensor"),
+                 ("EmptyMaximum", "Cannot reduce empty tensor"),
+                 ("EmptyMinimumAxis", "Cannot reduce empty axis 1"),
+                 ("EmptyMaximumAxis", "Cannot reduce empty axis 0"),
+                 ("IntegerMean", "RealFloat Int")
+               ]
+         ]
   where
     root = "test/TensorTest/Ops/Reduction/Fixtures/"
 

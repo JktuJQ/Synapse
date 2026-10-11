@@ -21,33 +21,34 @@ chunks :: Int -> [a] -> [[a]]
 chunks _ [] = []
 chunks size xs = take size xs : chunks size (drop size xs)
 
-reference :: Num a => Int -> Int -> [a] -> [a] -> [a]
+reference :: (Num a) => Int -> Int -> [a] -> [a] -> [a]
 reference shared cols lhs rhs =
   [sum (zipWith (*) row col) | row <- chunks shared lhs, col <- transpose (chunks cols rhs)]
 
 tests :: TestTree
-tests = testGroup "linear algebra" $
-  [ testProperty "dot agrees with vector inner products" propDot,
-    testProperty "matrix products agree with a list reference" propMatmul,
-    testProperty "rectangular products pack complete columns" propRectangular,
-    testProperty "matrix-vector products preserve the contiguous input" propColumn,
-    testProperty "multiple batch dimensions remain independent" propBatched,
-    testProperty "floating products compose with tensor computations" (H.withTests 1 propFloating),
-    testProperty "zero dimensions and empty vectors are supported" (H.withTests 1 propEmpty),
-    testProperty "output shapes preserve batches" (H.withTests 1 propShapes),
-    testProperty "valid linear algebra types compile" (H.withTests 1 (Compiler.accepts (root ++ "Accepted/Linear.hs")))
-  ] ++
-  [ testProperty file (H.withTests 1 (Compiler.rejects (root ++ "Rejected/" ++ file ++ ".hs") diagnostic))
-    | (file, diagnostic) <-
-      [ ("MatmulInner", "Matmul inner dimensions must match"),
-        ("MatmulBatch", "Matmul batch shapes must match"),
-        ("MatmulBatchRank", "Matmul batch shapes must match"),
-        ("MatmulVector", "Matmul requires tensors of rank at least two"),
-        ("MatmulScalar", "Matmul requires tensors of rank at least two"),
-        ("DotLength", "Couldn't match type"),
-        ("DotMatrix", "Couldn't match type")
-      ]
-  ]
+tests =
+  testGroup "linear algebra" $
+    [ testProperty "dot agrees with vector inner products" propDot,
+      testProperty "matrix products agree with a list reference" propMatmul,
+      testProperty "rectangular products pack complete columns" propRectangular,
+      testProperty "matrix-vector products preserve the contiguous input" propColumn,
+      testProperty "multiple batch dimensions remain independent" propBatched,
+      testProperty "floating products compose with tensor computations" (H.withTests 1 propFloating),
+      testProperty "zero dimensions and empty vectors are supported" (H.withTests 1 propEmpty),
+      testProperty "output shapes preserve batches" (H.withTests 1 propShapes),
+      testProperty "valid linear algebra types compile" (H.withTests 1 (Compiler.accepts (root ++ "Accepted/Linear.hs")))
+    ]
+      ++ [ testProperty file (H.withTests 1 (Compiler.rejects (root ++ "Rejected/" ++ file ++ ".hs") diagnostic))
+           | (file, diagnostic) <-
+               [ ("MatmulInner", "Matmul inner dimensions must match"),
+                 ("MatmulBatch", "Matmul batch shapes must match"),
+                 ("MatmulBatchRank", "Matmul batch shapes must match"),
+                 ("MatmulVector", "Matmul requires tensors of rank at least two"),
+                 ("MatmulScalar", "Matmul requires tensors of rank at least two"),
+                 ("DotLength", "Couldn't match type"),
+                 ("DotMatrix", "Couldn't match type")
+               ]
+         ]
   where
     root = "test/TensorTest/Ops/Math/Fixtures/"
 

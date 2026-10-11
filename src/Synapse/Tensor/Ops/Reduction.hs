@@ -58,7 +58,8 @@ reductionMatrix (Tensor input)
     retainedMappings = mappings retained
     reducedMappings = mappings reduced
     sourceIndex ix =
-      A.fromIndex sourceShape
+      A.fromIndex
+        sourceShape
         (sourceOffset (A.indexHead (A.indexTail ix)) retainedMappings + sourceOffset (A.indexHead ix) reducedMappings)
 
 -- | Apply one backend reduction after grouping all selected axes.
@@ -67,7 +68,8 @@ reduceAxesWith ::
   forall xs sh a.
   (Shape sh, Shape (ReduceShape xs sh), Axes xs, DType a) =>
   (A.Acc (A.Array A.DIM2 a) -> A.Acc (A.Array A.DIM1 a)) ->
-  Tensor sh a -> Tensor (ReduceShape xs sh) a
+  Tensor sh a ->
+  Tensor (ReduceShape xs sh) a
 reduceAxesWith reduce input
   | shapeSize @(ReduceShape xs sh) == 0 = Tensor (A.use (A.fromList outputShape []))
   | null (axes @xs) = Tensor (A.reshape (A.constant outputShape) (unTensor input))
@@ -89,7 +91,8 @@ sum (Tensor input) = TensorElement (A.the (A.foldAll (elementOp (+)) (unTensorEl
 sumAxes ::
   forall xs sh a.
   (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, Num (TensorElement a)) =>
-  Tensor sh a -> Tensor (ReduceShape xs sh) a
+  Tensor sh a ->
+  Tensor (ReduceShape xs sh) a
 sumAxes input
   | reductionSize @xs @sh == 0 =
       Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensorElement 0))
@@ -104,7 +107,8 @@ mean input = sum input / constant (fromIntegral (shapeSize @sh) :: a)
 meanAxes ::
   forall xs sh a.
   (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, RealFloat a, Fractional (TensorElement a)) =>
-  Tensor sh a -> Tensor (ReduceShape xs sh) a
+  Tensor sh a ->
+  Tensor (ReduceShape xs sh) a
 meanAxes = map (/ constant (fromIntegral (reductionSize @xs @sh) :: a)) . sumAxes @xs
 
 -- | Minimum of all elements of a statically nonempty tensor.
@@ -118,7 +122,8 @@ minimum (Tensor input) = TensorElement (A.the (A.fold1All (elementOp min) input)
 minimumAxes ::
   forall xs sh a.
   (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh, DType a, Ord (TensorElement a)) =>
-  Tensor sh a -> Tensor (ReduceShape xs sh) a
+  Tensor sh a ->
+  Tensor (ReduceShape xs sh) a
 minimumAxes = reduceAxesWith @xs (A.fold1 (elementOp min))
 
 -- | Maximum of all elements of a statically nonempty tensor.
@@ -132,5 +137,6 @@ maximum (Tensor input) = TensorElement (A.the (A.fold1All (elementOp max) input)
 maximumAxes ::
   forall xs sh a.
   (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh, DType a, Ord (TensorElement a)) =>
-  Tensor sh a -> Tensor (ReduceShape xs sh) a
+  Tensor sh a ->
+  Tensor (ReduceShape xs sh) a
 maximumAxes = reduceAxesWith @xs (A.fold1 (elementOp max))

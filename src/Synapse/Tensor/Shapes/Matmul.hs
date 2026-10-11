@@ -6,7 +6,7 @@
 -- | Output shapes and compatibility checks for batched matrix multiplication.
 module Synapse.Tensor.Shapes.Matmul (MatmulShape) where
 
-import GHC.TypeLits (Nat, TypeError, ErrorMessage (Text, ShowType, (:<>:)))
+import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), Nat, TypeError)
 import Synapse.Tensor.Shapes.Dimensions (Reverse)
 
 type family MatmulBatches (lhs :: [Nat]) (rhs :: [Nat]) (rows :: Nat) (cols :: Nat) :: [Nat] where

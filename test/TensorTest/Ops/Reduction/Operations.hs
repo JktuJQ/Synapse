@@ -14,23 +14,25 @@ import Test.Tasty.Hedgehog (testProperty)
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
 values = T.toList . T.runCPU
 
-element :: T.DType a => T.TensorElement a -> [a]
+element :: (T.DType a) => T.TensorElement a -> [a]
 element = values . T.scalar
 
 tests :: TestTree
-tests = testGroup "operations"
-  [ testProperty "full integer reductions agree with lists" propFull,
-    testProperty "axis reductions agree with row and column reductions" propAxes,
-    testProperty "multiple axes retain the order of remaining axes" propMultipleAxes,
-    testProperty "floating means use the number of reduced elements" (H.withTests 1 propMean),
-    testProperty "empty axis lists preserve values" (H.withTests 1 propNoAxes),
-    testProperty "scalar reductions preserve the scalar" (H.withTests 1 propScalar),
-    testProperty "empty reduction regions yield zero or NaN" (H.withTests 1 propEmptyRegion),
-    testProperty "empty retained dimensions yield empty tensors" (H.withTests 1 propEmptyOutput),
-    testProperty "extrema do not use zero as an initial value" (H.withTests 1 propExtrema),
-    testProperty "floating extrema propagate NaN from any position" (H.withTests 1 propNaN),
-    testProperty "reductions compose with element computations" (H.withTests 1 propComposition)
-  ]
+tests =
+  testGroup
+    "operations"
+    [ testProperty "full integer reductions agree with lists" propFull,
+      testProperty "axis reductions agree with row and column reductions" propAxes,
+      testProperty "multiple axes retain the order of remaining axes" propMultipleAxes,
+      testProperty "floating means use the number of reduced elements" (H.withTests 1 propMean),
+      testProperty "empty axis lists preserve values" (H.withTests 1 propNoAxes),
+      testProperty "scalar reductions preserve the scalar" (H.withTests 1 propScalar),
+      testProperty "empty reduction regions yield zero or NaN" (H.withTests 1 propEmptyRegion),
+      testProperty "empty retained dimensions yield empty tensors" (H.withTests 1 propEmptyOutput),
+      testProperty "extrema do not use zero as an initial value" (H.withTests 1 propExtrema),
+      testProperty "floating extrema propagate NaN from any position" (H.withTests 1 propNaN),
+      testProperty "reductions compose with element computations" (H.withTests 1 propComposition)
+    ]
 
 propFull :: H.Property
 propFull = H.property $ do

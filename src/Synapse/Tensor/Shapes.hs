@@ -27,6 +27,9 @@ module Synapse.Tensor.Shapes
     CanSlice,
     SliceShape,
     MatmulShape,
+    PermuteAxes,
+    TransposeShape,
+    ConcatShape,
   )
 where
 
@@ -37,15 +40,18 @@ import Synapse.Tensor.Shapes.Axes
     CanReduceNonEmpty,
     CanSelectAxes,
     CanSqueeze,
+    ConcatShape,
     InsertAxis,
     NonEmpty,
+    PermuteAxes,
     Rank,
     ReduceShape,
     RemoveAxis,
     SelectAxes,
+    TransposeShape,
   )
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
 import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, Slice, SliceAxis (..), SliceShape)
-import Synapse.Tensor.Shapes.Reshape (CanReshape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
+import Synapse.Tensor.Shapes.Reshape (CanReshape)

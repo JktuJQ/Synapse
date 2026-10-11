@@ -24,6 +24,9 @@ module Synapse.Tensor.Shapes.Axes
     CanReduce,
     CanReduceNonEmpty,
     NonEmpty,
+    PermuteAxes,
+    TransposeShape,
+    ConcatShape,
   )
 where
 
@@ -39,7 +42,7 @@ import GHC.TypeLits
     type (+),
     type (-),
   )
-import Synapse.Tensor.Shapes.Dimensions (ShapeSize)
+import Synapse.Tensor.Shapes.Dimensions (Reverse, ShapeSize)
 
 -- | Reflect an axis list in its declared order.
 -- Bounds and uniqueness are checked by operation-specific constraints.
@@ -96,6 +99,28 @@ type family InsertAxisChecked (order :: Ordering) (axis :: Nat) (dim :: Nat) (sh
 -- | Insert a dimension at a position from zero through the rank, inclusive.
 type InsertAxis axis dim sh = InsertAxisChecked (CmpNat axis (Rank sh)) axis dim sh
 
+type family ConcatShapeAt (axis :: Nat) (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where
+  ConcatShapeAt 0 (left ': rest) (right ': rest) = (left + right) ': rest
+  ConcatShapeAt 0 lhs rhs =
+    TypeError ('Text "Concat dimensions outside the selected axis must match")
+  ConcatShapeAt axis (dim ': left) (dim ': right) = dim ': ConcatShapeAt (axis - 1) left right
+  ConcatShapeAt axis lhs rhs =
+    TypeError ('Text "Concat dimensions outside the selected axis must match")
+
+type family ConcatAxisChecked (order :: Ordering) (axis :: Nat) (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where
+  ConcatAxisChecked 'LT axis lhs rhs = ConcatShapeAt axis lhs rhs
+  ConcatAxisChecked order axis lhs rhs =
+    TypeError ('Text "Concat axis " ':<>: 'ShowType axis ':<>: 'Text " is out of bounds for shape " ':<>: 'ShowType lhs)
+
+type family ConcatRankChecked (order :: Ordering) (axis :: Nat) (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where
+  ConcatRankChecked 'EQ axis lhs rhs = ConcatAxisChecked (CmpNat axis (Rank lhs)) axis lhs rhs
+  ConcatRankChecked order axis lhs rhs =
+    TypeError ('Text "Concat ranks must match: " ':<>: 'ShowType lhs ':<>: 'Text " and " ':<>: 'ShowType rhs)
+
+-- | Sum the selected dimension of equally ranked shapes that agree on all other dimensions.
+-- The selected axis must already exist, so scalar concatenation is rejected.
+type ConcatShape axis lhs rhs = ConcatRankChecked (CmpNat (Rank lhs) (Rank rhs)) axis lhs rhs
+
 type family Contains (axis :: Nat) (xs :: [Nat]) :: Bool where
   Contains axis '[] = 'False
   Contains axis (axis ': rest) = 'True
@@ -126,6 +151,23 @@ type family CanSelectAxes (xs :: [Nat]) (sh :: [Nat]) :: Constraint where
   CanSelectAxes '[] sh = ()
   CanSelectAxes (axis ': rest) sh =
     (CheckAxis (CmpNat axis (Rank sh)) axis sh, CheckDuplicate (Contains axis rest) axis, CanSelectAxes rest sh)
+
+type family PermuteAxesChecked (order :: Ordering) (xs :: [Nat]) (sh :: [Nat]) :: [Nat] where
+  PermuteAxesChecked 'EQ xs sh = SelectAxes xs sh
+  PermuteAxesChecked order xs sh =
+    TypeError ('Text "Axis permutation " ':<>: 'ShowType xs ':<>: 'Text " must contain every axis of shape " ':<>: 'ShowType sh)
+
+-- | Reorder all dimensions using each input axis exactly once.
+-- Missing, repeated, and out-of-bounds axes are rejected while computing the shape.
+type PermuteAxes xs sh = PermuteAxesChecked (CmpNat (Rank xs) (Rank sh)) xs sh
+
+type family TransposeReversed (sh :: [Nat]) :: [Nat] where
+  TransposeReversed (cols ': rows ': batch) = Reverse (rows ': cols ': batch)
+  TransposeReversed sh =
+    TypeError ('Text "Transpose requires tensor rank at least two, got " ':<>: 'ShowType (Reverse sh))
+
+-- | Swap the last two dimensions while preserving all leading batch dimensions.
+type TransposeShape sh = TransposeReversed (Reverse sh)
 
 type family CheckSingleton (axis :: Nat) (sh :: [Nat]) (dim :: Nat) :: Constraint where
   CheckSingleton axis sh 1 = ()

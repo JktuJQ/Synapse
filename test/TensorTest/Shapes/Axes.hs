@@ -33,7 +33,20 @@ tests =
                 ("squeeze rejects missing axes", "SqueezeBounds", "Cannot remove axis 2"),
                 ("unsqueeze rejects missing insertion positions", "UnsqueezeBounds", "Cannot insert axis 3"),
                 ("generator coordinate axis must exist", "CoordinateBounds", "Axis 2 is out of bounds"),
-                ("scalar index has no coordinates", "ScalarCoordinate", "Axis 0 is out of bounds")
+                ("scalar index has no coordinates", "ScalarCoordinate", "Axis 0 is out of bounds"),
+                ("permutation rejects repeated axes", "PermuteDuplicate", "Repeated axis 1"),
+                ("permutation rejects missing axes", "PermuteBounds", "Axis 3 is out of bounds"),
+                ("permutation requires all axes", "PermuteShort", "must contain every axis"),
+                ("permutation rejects excess axes", "PermuteLong", "must contain every axis"),
+                ("transpose rejects scalars", "TransposeScalar", "Transpose requires tensor rank at least two"),
+                ("transpose rejects vectors", "TransposeVector", "Transpose requires tensor rank at least two"),
+                ("concat rejects incompatible suffixes", "ConcatSuffix", "Concat dimensions outside the selected axis must match"),
+                ("concat rejects incompatible prefixes", "ConcatPrefix", "Concat dimensions outside the selected axis must match"),
+                ("concat ranks must match", "ConcatRank", "Concat ranks must match"),
+                ("concat axis must exist", "ConcatAxis", "Concat axis 2 is out of bounds"),
+                ("concat rejects scalars", "ConcatScalar", "Concat axis 0 is out of bounds"),
+                ("stack shapes must match", "StackShape", "Couldn't match type"),
+                ("stack insertion must be in bounds", "StackAxis", "Cannot insert axis 3")
               ]
         ]
 
@@ -66,3 +79,10 @@ propAxisSelection = H.property $ do
   Axes.axes @'[] H.=== []
   T.shape @(Axes.SelectAxes '[2, 0] '[2, 3, 4]) H.=== [4, 2]
   T.shape @(Axes.SelectAxes '[] '[2, 3, 4]) H.=== []
+  T.shape @(Axes.PermuteAxes '[2, 0, 1] '[2, 3, 4]) H.=== [4, 2, 3]
+  T.shape @(Axes.PermuteAxes '[] '[]) H.=== []
+  T.shape @(Axes.TransposeShape '[2, 3]) H.=== [3, 2]
+  T.shape @(Axes.TransposeShape '[2, 8, 3, 4]) H.=== [2, 8, 4, 3]
+  T.shape @(Axes.ConcatShape 0 '[2, 3] '[4, 3]) H.=== [6, 3]
+  T.shape @(Axes.ConcatShape 1 '[2, 3] '[2, 4]) H.=== [2, 7]
+  T.shape @(Axes.ConcatShape 1 '[2, 0, 3] '[2, 1, 3]) H.=== [2, 1, 3]
