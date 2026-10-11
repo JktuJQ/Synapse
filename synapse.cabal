@@ -19,6 +19,8 @@ extra-source-files: test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Reduction/Fixtures/Rejected/*.hs
                   , test/TensorTest/Ops/Math/Fixtures/Accepted/*.hs
                   , test/TensorTest/Ops/Math/Fixtures/Rejected/*.hs
+                  , test/TensorTest/Ops/Elementwise/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Ops/Elementwise/Fixtures/Rejected/*.hs
 
 license:            MIT
 license-file:       LICENSE

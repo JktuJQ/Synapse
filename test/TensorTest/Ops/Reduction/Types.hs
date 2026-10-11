@@ -24,7 +24,12 @@ tests =
                  ("EmptyMaximum", "Cannot reduce empty tensor"),
                  ("EmptyMinimumAxis", "Cannot reduce empty axis 1"),
                  ("EmptyMaximumAxis", "Cannot reduce empty axis 0"),
-                 ("IntegerMean", "RealFloat Int")
+                 ("IntegerMean", "RealFloat Int"),
+                 ("EmptySoftmax", "Cannot reduce empty axis 1"),
+                 ("EmptyLogSoftmax", "Cannot reduce empty axis 0"),
+                 ("SoftmaxAxis", "Axis 2 is out of bounds"),
+                 ("EmptyArgmax", "Cannot reduce empty axis 1"),
+                 ("ArgminAxis", "Axis 2 is out of bounds")
                ]
          ]
   where

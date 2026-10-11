@@ -18,6 +18,32 @@ module Synapse.Tensor
     FromIntegral,
     Eq,
     Ord,
+    Boolean,
+    Integral,
+    RealFloat,
+    quot,
+    rem,
+    isNaN,
+    isInfinite,
+    all,
+    any,
+    allAxes,
+    anyAxes,
+    softmax,
+    logSoftmax,
+    logSumExp,
+    logSumExpAxes,
+    Conditional,
+    not,
+    (&&),
+    (||),
+    select,
+    cond,
+    while,
+    iterate,
+    pair,
+    fst,
+    snd,
     (==),
     (/=),
     (<),
@@ -75,6 +101,8 @@ module Synapse.Tensor
     minimumAxes,
     maximum,
     maximumAxes,
+    argmax,
+    argmin,
     dot,
     matmul,
     transpose,
@@ -103,12 +131,12 @@ import Synapse.Tensor.Construction
   )
 import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
-import Synapse.Tensor.Ops.Elementwise (Eq, Ord, map, max, min, zip, zipWith, (/=), (<), (<=), (==), (>), (>=))
+import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, fst, isInfinite, isNaN, iterate, map, max, min, not, pair, quot, rem, select, snd, while, zip, zipWith, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
 import Synapse.Tensor.Ops.Math (dot, matmul)
-import Synapse.Tensor.Ops.Reduction (maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, sum, sumAxes)
+import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
-import Prelude hiding (Eq, Ord, concat, fromIntegral, map, max, maximum, min, minimum, sum, zip, zipWith, (!!), (/=), (<), (<=), (==), (>), (>=))
+import Prelude hiding (Eq, Integral, Ord, RealFloat, all, any, concat, fromIntegral, fst, isInfinite, isNaN, iterate, map, max, maximum, min, minimum, not, quot, rem, snd, sum, zip, zipWith, (!!), (&&), (/=), (<), (<=), (==), (>), (>=), (||))
