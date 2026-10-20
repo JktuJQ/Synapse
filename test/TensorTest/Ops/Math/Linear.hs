@@ -15,7 +15,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
-values = T.toList . T.runCPU
+values = T.toList . T.run T.CPU
 
 chunks :: Int -> [a] -> [[a]]
 chunks _ [] = []

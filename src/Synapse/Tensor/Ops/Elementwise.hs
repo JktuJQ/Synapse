@@ -13,7 +13,29 @@ module Synapse.Tensor.Ops.Elementwise
     RealFloat (..),
     map,
     zip,
+    zip3,
+    zip4,
+    zip5,
+    zip6,
+    zip7,
+    zip8,
+    zip9,
     zipWith,
+    zipWith3,
+    zipWith4,
+    zipWith5,
+    zipWith6,
+    zipWith7,
+    zipWith8,
+    zipWith9,
+    unzip,
+    unzip3,
+    unzip4,
+    unzip5,
+    unzip6,
+    unzip7,
+    unzip8,
+    unzip9,
     while,
     iterate,
     pair,
@@ -26,7 +48,7 @@ import qualified Data.Array.Accelerate as A
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Tensor (..), TensorElement (..))
-import Prelude hiding (Eq, Integral, Ord, RealFloat, fst, isInfinite, isNaN, iterate, map, max, min, not, quot, rem, snd, zip, zipWith, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
+import Prelude hiding (Eq, Integral, Ord, RealFloat, fst, isInfinite, isNaN, iterate, map, max, min, not, quot, rem, snd, unzip, unzip3, zip, zip3, zipWith, zipWith3, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 
 -- | Transform each element, preserving the shape while allowing a new element type.
 map :: (Shape sh, DType a, DType b) => (TensorElement a -> TensorElement b) -> Tensor sh a -> Tensor sh b
@@ -36,9 +58,274 @@ map f (Tensor x) = Tensor (A.map (unTensorElement . f . TensorElement) x)
 zip :: (Shape sh, DType a, DType b) => Tensor sh a -> Tensor sh b -> Tensor sh (a, b)
 zip (Tensor x) (Tensor y) = Tensor (A.zip x y)
 
+-- | Group corresponding elements of three equally shaped tensors into triples.
+-- The three element types may differ.
+zip3 :: (Shape sh, DType a, DType b, DType c) => Tensor sh a -> Tensor sh b -> Tensor sh c -> Tensor sh (a, b, c)
+zip3 (Tensor x) (Tensor y) (Tensor z) = Tensor (A.zip3 x y z)
+
+-- | Group corresponding elements of 4 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip4 ::
+  (Shape sh, DType a, DType b, DType c, DType d) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh (a, b, c, d)
+zip4 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) = Tensor (A.zip4 x1 x2 x3 x4)
+
+-- | Group corresponding elements of 5 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip5 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh (a, b, c, d, e)
+zip5 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) = Tensor (A.zip5 x1 x2 x3 x4 x5)
+
+-- | Group corresponding elements of 6 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip6 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh (a, b, c, d, e, f)
+zip6 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) = Tensor (A.zip6 x1 x2 x3 x4 x5 x6)
+
+-- | Group corresponding elements of 7 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip7 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh (a, b, c, d, e, f, g)
+zip7 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) = Tensor (A.zip7 x1 x2 x3 x4 x5 x6 x7)
+
+-- | Group corresponding elements of 8 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip8 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh h ->
+  Tensor sh (a, b, c, d, e, f, g, h)
+zip8 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8) = Tensor (A.zip8 x1 x2 x3 x4 x5 x6 x7 x8)
+
+-- | Group corresponding elements of 9 equally shaped tensors into tuples.
+-- Input element types may differ.
+zip9 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i) =>
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh h ->
+  Tensor sh i ->
+  Tensor sh (a, b, c, d, e, f, g, h, i)
+zip9 (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8) (Tensor x9) = Tensor (A.zip9 x1 x2 x3 x4 x5 x6 x7 x8 x9)
+
 -- | Combine corresponding elements of two tensors with the same shape.
 zipWith :: (Shape sh, DType a, DType b, DType c) => (TensorElement a -> TensorElement b -> TensorElement c) -> Tensor sh a -> Tensor sh b -> Tensor sh c
 zipWith f (Tensor x) (Tensor y) = Tensor $ A.zipWith (\a b -> unTensorElement (f (TensorElement a) (TensorElement b))) x y
+
+-- | Combine corresponding elements of three equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith3 :: (Shape sh, DType a, DType b, DType c, DType d) => (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d) -> Tensor sh a -> Tensor sh b -> Tensor sh c -> Tensor sh d
+zipWith3 f (Tensor x) (Tensor y) (Tensor z) =
+  Tensor (A.zipWith3 (\a b c -> unTensorElement (f (TensorElement a) (TensorElement b) (TensorElement c))) x y z)
+
+-- | Combine corresponding elements of 4 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith4 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e
+zipWith4 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) =
+  Tensor (A.zipWith4 (\a1 a2 a3 a4 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4))) x1 x2 x3 x4)
+
+-- | Combine corresponding elements of 5 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith5 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e -> TensorElement f) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f
+zipWith5 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) =
+  Tensor (A.zipWith5 (\a1 a2 a3 a4 a5 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4) (TensorElement a5))) x1 x2 x3 x4 x5)
+
+-- | Combine corresponding elements of 6 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith6 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e -> TensorElement f -> TensorElement g) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g
+zipWith6 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) =
+  Tensor (A.zipWith6 (\a1 a2 a3 a4 a5 a6 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4) (TensorElement a5) (TensorElement a6))) x1 x2 x3 x4 x5 x6)
+
+-- | Combine corresponding elements of 7 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith7 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e -> TensorElement f -> TensorElement g -> TensorElement h) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh h
+zipWith7 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) =
+  Tensor (A.zipWith7 (\a1 a2 a3 a4 a5 a6 a7 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4) (TensorElement a5) (TensorElement a6) (TensorElement a7))) x1 x2 x3 x4 x5 x6 x7)
+
+-- | Combine corresponding elements of 8 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith8 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e -> TensorElement f -> TensorElement g -> TensorElement h -> TensorElement i) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh h ->
+  Tensor sh i
+zipWith8 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8) =
+  Tensor (A.zipWith8 (\a1 a2 a3 a4 a5 a6 a7 a8 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4) (TensorElement a5) (TensorElement a6) (TensorElement a7) (TensorElement a8))) x1 x2 x3 x4 x5 x6 x7 x8)
+
+-- | Combine corresponding elements of 9 equally shaped tensors.
+-- All input element types and the output element type may differ.
+zipWith9 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i, DType j) =>
+  (TensorElement a -> TensorElement b -> TensorElement c -> TensorElement d -> TensorElement e -> TensorElement f -> TensorElement g -> TensorElement h -> TensorElement i -> TensorElement j) ->
+  Tensor sh a ->
+  Tensor sh b ->
+  Tensor sh c ->
+  Tensor sh d ->
+  Tensor sh e ->
+  Tensor sh f ->
+  Tensor sh g ->
+  Tensor sh h ->
+  Tensor sh i ->
+  Tensor sh j
+zipWith9 f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8) (Tensor x9) =
+  Tensor (A.zipWith9 (\a1 a2 a3 a4 a5 a6 a7 a8 a9 -> unTensorElement (f (TensorElement a1) (TensorElement a2) (TensorElement a3) (TensorElement a4) (TensorElement a5) (TensorElement a6) (TensorElement a7) (TensorElement a8) (TensorElement a9))) x1 x2 x3 x4 x5 x6 x7 x8 x9)
+
+-- | Split a tensor of 2-tuples into 2 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip ::
+  (Shape sh, DType a, DType b) =>
+  Tensor sh (a, b) ->
+  (Tensor sh a, Tensor sh b)
+unzip (Tensor input) =
+  case A.unzip input of
+    (x1, x2) -> (Tensor x1, Tensor x2)
+
+-- | Split a tensor of 3-tuples into 3 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip3 ::
+  (Shape sh, DType a, DType b, DType c) =>
+  Tensor sh (a, b, c) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c)
+unzip3 (Tensor input) =
+  case A.unzip3 input of
+    (x1, x2, x3) -> (Tensor x1, Tensor x2, Tensor x3)
+
+-- | Split a tensor of 4-tuples into 4 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip4 ::
+  (Shape sh, DType a, DType b, DType c, DType d) =>
+  Tensor sh (a, b, c, d) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d)
+unzip4 (Tensor input) =
+  case A.unzip4 input of
+    (x1, x2, x3, x4) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4)
+
+-- | Split a tensor of 5-tuples into 5 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip5 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e) =>
+  Tensor sh (a, b, c, d, e) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d, Tensor sh e)
+unzip5 (Tensor input) =
+  case A.unzip5 input of
+    (x1, x2, x3, x4, x5) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4, Tensor x5)
+
+-- | Split a tensor of 6-tuples into 6 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip6 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f) =>
+  Tensor sh (a, b, c, d, e, f) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d, Tensor sh e, Tensor sh f)
+unzip6 (Tensor input) =
+  case A.unzip6 input of
+    (x1, x2, x3, x4, x5, x6) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4, Tensor x5, Tensor x6)
+
+-- | Split a tensor of 7-tuples into 7 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip7 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g) =>
+  Tensor sh (a, b, c, d, e, f, g) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d, Tensor sh e, Tensor sh f, Tensor sh g)
+unzip7 (Tensor input) =
+  case A.unzip7 input of
+    (x1, x2, x3, x4, x5, x6, x7) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4, Tensor x5, Tensor x6, Tensor x7)
+
+-- | Split a tensor of 8-tuples into 8 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip8 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h) =>
+  Tensor sh (a, b, c, d, e, f, g, h) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d, Tensor sh e, Tensor sh f, Tensor sh g, Tensor sh h)
+unzip8 (Tensor input) =
+  case A.unzip8 input of
+    (x1, x2, x3, x4, x5, x6, x7, x8) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4, Tensor x5, Tensor x6, Tensor x7, Tensor x8)
+
+-- | Split a tensor of 9-tuples into 9 tensor expressions with the same shape.
+-- Component element types may differ and no computation is executed on the host.
+unzip9 ::
+  (Shape sh, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i) =>
+  Tensor sh (a, b, c, d, e, f, g, h, i) ->
+  (Tensor sh a, Tensor sh b, Tensor sh c, Tensor sh d, Tensor sh e, Tensor sh f, Tensor sh g, Tensor sh h, Tensor sh i)
+unzip9 (Tensor input) =
+  case A.unzip9 input of
+    (x1, x2, x3, x4, x5, x6, x7, x8, x9) -> (Tensor x1, Tensor x2, Tensor x3, Tensor x4, Tensor x5, Tensor x6, Tensor x7, Tensor x8, Tensor x9)
 
 -- | Boolean operations on element expressions and equally shaped masks.
 class Boolean a where
@@ -85,7 +372,7 @@ instance (DType a) => Conditional (TensorElement a) where
 
 instance (Shape sh, DType a) => Conditional (Tensor sh a) where
   type Condition (Tensor sh a) = Tensor sh Bool
-  select (Tensor mask) (Tensor x) (Tensor y) = Tensor (A.zipWith3 A.cond mask x y)
+  select = zipWith3 select
   cond (TensorElement flag) (Tensor x) (Tensor y) = Tensor (A.acond flag x y)
 
 -- | Combine two element expressions into a pair, including loop states.

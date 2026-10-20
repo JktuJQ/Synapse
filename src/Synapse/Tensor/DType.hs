@@ -38,3 +38,17 @@ instance DType Word64
 instance DType Bool
 
 instance (DType a, DType b) => DType (a, b)
+
+instance (DType a, DType b, DType c) => DType (a, b, c)
+
+instance (DType a, DType b, DType c, DType d) => DType (a, b, c, d)
+
+instance (DType a, DType b, DType c, DType d, DType e) => DType (a, b, c, d, e)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f) => DType (a, b, c, d, e, f)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g) => DType (a, b, c, d, e, f, g)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h) => DType (a, b, c, d, e, f, g, h)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i) => DType (a, b, c, d, e, f, g, h, i)

@@ -19,6 +19,7 @@ module Synapse.Tensor.Shapes.Dimensions
     Reverse,
     backendShape,
     backendCoordinates,
+    backendIndex,
     strides,
   )
 where
@@ -72,15 +73,22 @@ class (A.Shape (ShapeToDIMRev sh)) => ShapeRev (sh :: [Nat]) where
   -- | Prepend coordinate expressions in user-facing order to a suffix, extracting them directly from the recursive index representation.
   coordinatesRev :: A.Exp (ShapeToDIMRev sh) -> [A.Exp Int] -> [A.Exp Int]
 
+  -- | Build an index from coordinates supplied in reversed axis order.
+  indexRev :: [A.Exp Int] -> A.Exp (ShapeToDIMRev sh)
+
 instance ShapeRev '[] where
   backendShapeRev _ = A.Z
   shapeRev _ suffix = suffix
   coordinatesRev _ suffix = suffix
+  indexRev [] = A.index0
+  indexRev _ = error "Synapse.Tensor.backendIndex: inconsistent coordinate rank"
 
 instance (KnownNat dim, ShapeRev rest) => ShapeRev (dim ': rest) where
   backendShapeRev _ = backendShapeRev (Proxy @rest) A.:. dimVal @dim
   shapeRev _ suffix = shapeRev (Proxy @rest) (dimVal @dim : suffix)
   coordinatesRev ix suffix = coordinatesRev @rest (A.indexTail ix) (A.indexHead ix : suffix)
+  indexRev (coord : coords) = A.lift (indexRev @rest coords A.:. coord)
+  indexRev [] = error "Synapse.Tensor.backendIndex: inconsistent coordinate rank"
 
 -- | A shape whose dimensions can be materialized at runtime.
 -- All methods describe the same dimensions in left-to-right order.
@@ -114,6 +122,11 @@ backendShape _ = backendShapeRev (Proxy @(Reverse sh))
 -- The result follows the same left-to-right axis order as 'shape'.
 backendCoordinates :: forall sh. (Shape sh) => A.Exp (ShapeToDIM sh) -> [A.Exp Int]
 backendCoordinates ix = coordinatesRev @(Reverse sh) ix []
+
+-- | Internal construction of an index from one coordinate per axis, in left-to-right order.
+-- Callers must supply exactly the shape rank and establish coordinate bounds.
+backendIndex :: forall sh. (Shape sh) => [A.Exp Int] -> A.Exp (ShapeToDIM sh)
+backendIndex = indexRev @(Reverse sh) . reverse
 
 -- | Row-major strides.
 -- The rightmost axis has stride one; a scalar has none.

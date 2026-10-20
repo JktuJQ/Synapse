@@ -36,7 +36,7 @@
             pkgs.pkg-config
           ];
 
-          ACCELERATE_LLVM_CLANG_PATH = "${pkgs.clang}/bin/clang";
+          ACCELERATE_LLVM_CLANG_PATH = "${pkgs.llvmPackages.clang-unwrapped}/bin/clang";
 
           shellHook = ''
             echo "Synapse dev shell: GHC ${haskellPackages.ghc.version}"

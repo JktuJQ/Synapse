@@ -12,12 +12,11 @@
 module Synapse.Tensor.Ops.Index (Indexable (..), coordinate, index, slice) where
 
 import qualified Data.Array.Accelerate as A
-import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
-import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM, backendCoordinates, backendShape, shape, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM, backendCoordinates, backendIndex, backendShape, shape)
 import Synapse.Tensor.Shapes.Index
   ( CanIndex,
     CanSlice,
@@ -52,14 +51,7 @@ index ::
   (Shape sh, Index ix, CanIndex ix sh, DType a) =>
   Tensor sh a ->
   TensorElement a
-index (Tensor acc) = TensorElement $ acc A.! A.fromIndex sourceShape (A.constant linear)
-  where
-    sourceShape = A.constant (backendShape (Proxy @sh))
-    linear =
-      foldl'
-        (\offset (dim, coord) -> offset * dim + coord)
-        0
-        (zip (shape @sh) (coordinates @ix))
+index (Tensor acc) = TensorElement (acc A.! backendIndex @sh (map A.constant (coordinates @ix)))
 
 -- | Read a coordinate or tensor element using a shape-checked index.
 -- Use @ix !! Proxy \@0@ for a coordinate and @tensor !! Proxy \@'[1, 2]@ for a static element.
@@ -79,43 +71,20 @@ instance (Shape sh, Index ix, CanIndex ix sh, DType a) => Indexable (Tensor sh a
 instance (Shape sh, DType a) => Indexable (Tensor sh a) (TensorIndex sh) (TensorElement a) where
   Tensor acc !! TensorIndex ix = TensorElement (acc A.! ix)
 
--- | One source-axis mapping.
--- Fixed axes consume no output coordinate; retained axes transform an output coordinate by an offset and a signed step.
-data SliceMapping = SliceMapping
-  { sourceDimension :: Int,
-    sourceStart :: Int,
-    sourceStep :: Int,
-    outputAxis :: Maybe (Int, Int)
-  }
-
--- | Prepare the coordinate mapping once from validated slice descriptors.
--- Output axes contain their dimension and row-major stride.
-planSlice :: [SliceAxis Int] -> [Int] -> [(Int, Int)] -> [SliceMapping]
-planSlice [] [] [] = []
-planSlice (At coord : rest) (dim : dims) output =
-  SliceMapping dim coord 0 Nothing : planSlice rest dims output
-planSlice (selection : rest) (dim : dims) (axis : output) =
-  let (start, step) = case selection of
-        All -> (0, 1)
-        Range begin _ stride -> (begin, stride)
-        RangeReverse begin _ stride ->
-          (begin + max 0 (fst axis - 1) * stride, negate stride)
-   in SliceMapping dim start step (Just axis) : planSlice rest dims output
-planSlice _ _ _ = error "Synapse.Tensor.slice: inconsistent selection rank"
-
--- | Convert an output linear index to a source linear index using the prepared mapping.
--- The fold follows source axis order, including axes removed by At.
-applySlicePlan :: A.Exp Int -> [SliceMapping] -> A.Exp Int
-applySlicePlan linear = foldl' addAxis 0
+-- | Map retained coordinates directly to source coordinates, inserting fixed coordinates for removed axes.
+-- Retained dimensions determine the starting coordinate of reversed ranges.
+sliceCoordinates :: [SliceAxis Int] -> [Int] -> [A.Exp Int] -> [A.Exp Int]
+sliceCoordinates [] [] [] = []
+sliceCoordinates (At coord : rest) dims coords =
+  A.constant coord : sliceCoordinates rest dims coords
+sliceCoordinates (selection : rest) (dim : dims) (coord : coords) =
+  sourceCoordinate : sliceCoordinates rest dims coords
   where
-    addAxis offset mapping =
-      let coord = case outputAxis mapping of
-            Nothing -> A.constant (sourceStart mapping)
-            Just (dim, stride) ->
-              A.constant (sourceStart mapping)
-                + A.constant (sourceStep mapping)
-                  * ((linear `quot` A.constant stride) `rem` A.constant dim)
-       in offset * A.constant (sourceDimension mapping) + coord
+    sourceCoordinate = case selection of
+      All -> coord
+      Range begin _ step -> A.constant begin + A.constant step * coord
+      RangeReverse begin _ step -> A.constant (begin + max 0 (dim - 1) * step) - A.constant step * coord
+sliceCoordinates _ _ _ = error "Synapse.Tensor.slice: inconsistent selection rank"
 
 -- | Select a region using one descriptor per axis.
 -- At removes an axis; ranges preserve it.
@@ -129,11 +98,8 @@ slice ::
   Tensor (SliceShape spec sh) a
 slice (Tensor acc) = Tensor $ A.backpermute targetShape sourceIndex acc
   where
-    sourceShape = A.constant (backendShape (Proxy @sh))
     targetShape = A.constant (backendShape (Proxy @(SliceShape spec sh)))
     targetDims = shape @(SliceShape spec sh)
-    targetAxes = zip targetDims (strides targetDims)
-    mappings = planSlice (sliceAxes @spec) (shape @sh) targetAxes
 
     sourceIndex :: A.Exp (ShapeToDIM (SliceShape spec sh)) -> A.Exp (ShapeToDIM sh)
-    sourceIndex ix = A.fromIndex sourceShape $ applySlicePlan (A.toIndex targetShape ix) mappings
+    sourceIndex ix = backendIndex @sh (sliceCoordinates (sliceAxes @spec) targetDims (backendCoordinates @(SliceShape spec sh) ix))

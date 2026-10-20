@@ -13,7 +13,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
-values = T.toList . T.runCPU
+values = T.toList . T.run T.CPU
 
 element :: (T.DType a) => T.TensorElement a -> [a]
 element = values . T.scalar

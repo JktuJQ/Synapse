@@ -86,7 +86,8 @@ arange start step =
   fromGen @'[n] $ \ix -> constant start + E.fromIntegral (coordinate @0 ix) * constant step
 
 -- | Create a vector with @n@ evenly spaced values from @start@ to @end@.
--- For @n >= 2@ both endpoints are included, with the last value taken directly from @end@ to avoid accumulated rounding.
+-- For @n >= 2@ both endpoints are taken directly from the supplied values.
+-- Interior points use weighted endpoints to avoid overflowing their difference.
 -- Zero elements produce an empty vector; one element produces @start@.
 -- Descending endpoints are supported.
 linspace :: forall n a. (Shape '[n], DType a, Fractional a, Fractional (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a)) => a -> a -> Tensor '[n] a
@@ -95,12 +96,14 @@ linspace start end =
     0 -> full @'[n] start
     1 -> full @'[n] start
     count ->
-      let step :: TensorElement a
-          step = (constant end - constant start) / constant (fromIntegral (count - 1))
-       in fromGen @'[n] $ \ix ->
-            let i = unTensorElement (coordinate @0 ix)
-                value = constant start + E.fromIntegral (coordinate @0 ix) * step
-             in TensorElement (A.cond (i A.== A.constant (count - 1)) (A.constant end) (unTensorElement value))
+      fromGen @'[n] $ \ix ->
+        let i = unTensorElement (coordinate @0 ix)
+            weight :: TensorElement a
+            weight = E.fromIntegral (coordinate @0 ix) / constant (fromIntegral (count - 1))
+            value = (1 - weight) * constant start + weight * constant end
+         in TensorElement $
+              A.cond (i A.== 0) (A.constant start) $
+                A.cond (i A.== A.constant (count - 1)) (A.constant end) (unTensorElement value)
 
 -- | Exponentiate 'linspace' using the supplied base.
 -- Parameters are start exponent, end exponent, then base.

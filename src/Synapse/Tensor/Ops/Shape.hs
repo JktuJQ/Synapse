@@ -29,6 +29,7 @@ import Synapse.Tensor.Shapes.Dimensions
   ( Shape,
     ShapeToDIM,
     backendCoordinates,
+    backendIndex,
     backendShape,
     shape,
     shapeRank,
@@ -184,29 +185,10 @@ broadcast (Tensor acc) =
       acc
   where
     sourceIndex :: A.Exp (ShapeToDIM to) -> A.Exp (ShapeToDIM from)
-    sourceIndex ix =
-      A.fromIndex
-        (A.constant (backendShape (Proxy @from)))
-        (sourceLinearIndex ix)
-
-    -- \| Map target indices to source elements; singleton source axes always contribute coordinate zero, and leading target axes do not contribute.
-    sourceLinearIndex :: A.Exp (ShapeToDIM to) -> A.Exp Int
-    sourceLinearIndex ix =
-      foldr addAxis 0 axisMappings
+    sourceIndex ix = backendIndex @from (zipWith sourceCoordinate fromDims sourceCoordinates)
       where
-        targetLinear = A.toIndex (A.constant (backendShape (Proxy @to))) ix
-
-        addAxis :: (Int, Int, (Int, Int)) -> A.Exp Int -> A.Exp Int
-        addAxis (fromDim, toDim, (fromStride, toStride)) linearAcc
-          | fromDim == 1 = linearAcc
-          | otherwise =
-              let coord = (targetLinear `quot` A.constant toStride) `rem` A.constant toDim
-               in coord * A.constant fromStride + linearAcc
+        sourceCoordinates = drop leadingAxes (backendCoordinates @to ix)
+        sourceCoordinate dim coord = if dim == 1 then 0 else coord
 
     fromDims = shape @from
-    toDims = shape @to
-    alignedToDims = drop (length toDims - length fromDims) toDims
-    fromStrides = strides fromDims
-    toStrides = strides toDims
-    alignedToStrides = drop (length toStrides - length fromDims) toStrides
-    axisMappings = zip3 fromDims alignedToDims (zip fromStrides alignedToStrides)
+    leadingAxes = shapeRank @to - shapeRank @from
