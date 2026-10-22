@@ -109,6 +109,16 @@ executable tensor-example
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
 
+executable autograd-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: Haskell2010
+    hs-source-dirs:   examples
+    main-is:          Autograd.hs
+
+    build-depends:    base >= 4.19 && < 4.22
+                    , synapse
+
 test-suite synapse-test
     import:           warnings
     ghc-options:      -threaded
