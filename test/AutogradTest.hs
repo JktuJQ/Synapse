@@ -5,6 +5,8 @@
 
 module AutogradTest (tests) where
 
+import qualified AutogradTest.Differentiable
+import qualified AutogradTest.Execution
 import qualified AutogradTest.Tensor
 import Control.Monad (forM_)
 import qualified Hedgehog as H
@@ -15,7 +17,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 differentiate :: (forall s. (AG.Context s) => AG.Var s Double -> AG.Var s Double) -> Double -> (Double, Double)
-differentiate f = BP.backprop (BP.ZF AG.zero) (BP.OF AG.one) (AG.unVar . f . AG.Var)
+differentiate = AG.backprop
 
 close :: Double -> Double -> H.PropertyT IO ()
 close actual expected = do
@@ -27,6 +29,8 @@ tests =
   testGroup
     "autograd"
     [ AutogradTest.Tensor.tests,
+      AutogradTest.Execution.tests,
+      AutogradTest.Differentiable.tests,
       testProperty "shared variables accumulate gradient contributions" $ H.withTests 1 $ H.property $ do
         let (value, gradient) = differentiate (\x -> x * x + x) 3
         value H.=== 12

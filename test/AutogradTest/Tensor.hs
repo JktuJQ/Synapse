@@ -18,7 +18,7 @@ constant :: T.Tensor sh a -> AG.Tensor s sh a
 constant = AG.Tensor . AG.Var . BP.auto
 
 differentiate :: (T.Shape from, T.Shape to) => (forall s. (AG.Context s) => AG.Tensor s from Double -> AG.Tensor s to Double) -> T.Tensor from Double -> (T.Tensor to Double, T.Tensor from Double)
-differentiate f = BP.backprop (BP.ZF AG.zero) (BP.OF AG.one) (AG.unVar . AG.unTensor . f . AG.Tensor . AG.Var)
+differentiate = AG.backprop
 
 values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU

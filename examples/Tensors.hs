@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
+import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
 
 showTensor :: (T.Shape sh, T.DType a, Show a) => String -> T.Tensor sh a -> IO ()
@@ -28,6 +30,7 @@ main = do
   controlFlow
   preparedFunctions
   classification
+  differentiation
 
 construction :: IO ()
 construction = do
@@ -194,3 +197,20 @@ classification = do
   showData "logits = matmul inputs weights + broadcast bias" logits
   showData "probabilities" probabilities
   showData "predicted classes" predictions
+
+differentiation :: IO ()
+differentiation = do
+  putStrLn "\nDifferentiation"
+  let input = T.fromList @'[3] [1, 2, 3 :: Double]
+      squareSum :: (AG.Context s) => AG.Tensor s '[3] Double -> AG.Tensor s '[] Double
+      squareSum x = T.sum (x * x)
+      (value, derivative) = AG.backprop squareSum input
+      (_, backward) = AG.pullback (\x -> x * x) input
+  showTensor "sum of squares" value
+  showTensor "gradient" derivative
+  showTensor "pullback with seed [1, 2, 3]" (backward input)
+  showTensor "stopGrad: gradient of sum (x * stopGrad x)" (AG.gradient (\x -> T.sum (x * AG.stopGrad x)) input)
+  let execute = T.run1 T.CPU (AG.backprop squareSum)
+      (computedValue, computedGradient) = execute (T.run T.CPU input)
+  showData "prepared value" computedValue
+  showData "prepared gradient" computedGradient

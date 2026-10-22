@@ -1,3 +1,4 @@
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -9,6 +10,7 @@ module Synapse.Autograd.Type
   ( Backpropagatable (..),
     Context,
     Var (..),
+    stopVariable,
     liftUnary,
     liftBinary,
   )
@@ -16,22 +18,30 @@ where
 
 import qualified Numeric.Backprop as BP
 import qualified Numeric.Backprop.Explicit as BPE
+import qualified Numeric.Backprop.Internal as BPI
 
--- | Numeric values whose gradient contributions can be initialized and combined.
--- The defaults use numeric literals, which must preserve the shape of the value.
+-- | Values whose gradient contributions can be initialized and combined.
+-- A 'Num' instance is optional; numeric instances can use the default implementations.
+-- Other instances must supply all three operations.
+-- The default numeric literals must preserve the shape of the value.
 -- Containers whose shape is determined at runtime should override 'zero' and 'one' using the supplied reference value.
-class (Num a) => Backpropagatable a where
+class Backpropagatable a where
   -- | Construct a zero gradient with the structure of the reference value.
   zero :: a -> a
+  default zero :: (Num a) => a -> a
   zero _ = 0
 
-  -- | Construct an initial gradient of ones with the structure of the reference value.
-  -- For nonscalar results, this seed corresponds to differentiating the sum of their components.
+  -- | Construct the default output gradient with the structure of the reference value.
+  -- Numeric and tensor instances use ones, corresponding to differentiation of the sum of the output elements.
+  -- Custom instances determine their own default seed.
   one :: a -> a
+  default one :: (Num a) => a -> a
   one _ = 1
 
-  -- | Add two gradient contributions for the same value.
+  -- | Add two gradient contributions for the same value, preserving its structure and shape.
+  -- The result of 'zero' must be an additive identity for this operation.
   add :: a -> a -> a
+  default add :: (Num a) => a -> a -> a
   add = (+)
 
 instance Backpropagatable Int
@@ -52,8 +62,13 @@ instance (BP.Reifies s BP.W) => Context s
 -- | A value participating in a differentiation scope.
 -- The constructor and 'unVar' are escape hatches for custom operations using the underlying <https://hackage.haskell.org/package/backprop backprop> library.
 newtype Var s a = Var
-  { unVar :: BP.BVar s a
+  { -- | Access the underlying <https://hackage.haskell.org/package/backprop backprop> variable without discarding its history.
+    unVar :: BP.BVar s a
   }
+
+-- | Preserve a variable's value while discarding its tape edges.
+stopVariable :: Var s a -> Var s a
+stopVariable = Var . BPE.auto . BPI._bvVal . unVar
 
 -- | Lift a value computation together with its vector-Jacobian product.
 -- The accumulation function combines contributions to the input variable.
@@ -65,7 +80,7 @@ liftBinary :: (Context s) => (a -> a -> a) -> (b -> b -> b) -> (a -> b -> (c, c 
 liftBinary accumulateX accumulateY rule (Var x) (Var y) =
   Var (BPE.liftOp2 (BPE.AF accumulateX) (BPE.AF accumulateY) (BPE.op2 rule) x y)
 
-instance (Context s, Backpropagatable a) => Num (Var s a) where
+instance (Context s, Backpropagatable a, Num a) => Num (Var s a) where
   (+) = liftBinary add add (\x y -> (x + y, \dy -> (dy, dy)))
   (-) = liftBinary add add (\x y -> (x - y, \dy -> (dy, negate dy)))
   (*) = liftBinary add add (\x y -> (x * y, \dy -> (dy * y, dy * x)))
