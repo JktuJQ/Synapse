@@ -56,7 +56,8 @@ propFromGen = H.property $ do
 propElementExpressions :: H.Property
 propElementExpressions = H.property $ do
   let tensor = T.fromGen @'[2, 3] $ \ix ->
-        let i = T.coordinate @0 ix * 3 + T.coordinate @1 ix
+        let i :: T.TensorElement Int
+            i = T.coordinate @0 ix * 3 + T.coordinate @1 ix
          in sqrt (T.fromIntegral i + T.constant (4 :: T.Float32)) / 2
   approxList (T.toList (T.run T.CPU tensor)) (map (\i -> sqrt (i + 4) / 2) [0 .. 5])
 

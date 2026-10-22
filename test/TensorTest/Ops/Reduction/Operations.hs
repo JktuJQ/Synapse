@@ -15,9 +15,6 @@ import Test.Tasty.Hedgehog (testProperty)
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
 values = T.toList . T.run T.CPU
 
-element :: (T.DType a) => T.TensorElement a -> [a]
-element = values . T.scalar
-
 tests :: TestTree
 tests =
   testGroup
@@ -32,7 +29,7 @@ tests =
       testProperty "empty retained dimensions yield empty tensors" (H.withTests 1 propEmptyOutput),
       testProperty "extrema do not use zero as an initial value" (H.withTests 1 propExtrema),
       testProperty "floating extrema propagate NaN from any position" (H.withTests 1 propNaN),
-      testProperty "reductions compose with element computations" (H.withTests 1 propComposition),
+      testProperty "reductions compose with values computations" (H.withTests 1 propComposition),
       testProperty "boolean reductions agree with lists" propBoolean,
       testProperty "empty boolean regions use their identities" (H.withTests 1 propBooleanEmpty),
       testProperty "normalization is stable for large finite logits" (H.withTests 1 propNormalization),
@@ -50,9 +47,9 @@ propFull :: H.Property
 propFull = H.property $ do
   xs <- H.forAll $ Gen.list (Range.singleton 24) (Gen.int (Range.linear (-100) 100))
   let input = T.fromList @'[2, 3, 4] xs
-  element (T.sum input) H.=== [sum xs]
-  element (T.minimum input) H.=== [minimum xs]
-  element (T.maximum input) H.=== [maximum xs]
+  values (T.sum input) H.=== [sum xs]
+  values (T.minimum input) H.=== [minimum xs]
+  values (T.maximum input) H.=== [maximum xs]
 
 propAxes :: H.Property
 propAxes = H.property $ do
@@ -80,7 +77,7 @@ propMean :: H.Property
 propMean = H.property $ do
   let input = T.fromList @'[2, 3] [1 .. 6 :: Double]
       higher = T.fromList @'[2, 3, 4] [0 .. 23 :: Float]
-  approxList (element (T.mean input)) [3.5]
+  approxList (values (T.mean input)) [3.5]
   approxList (values (T.meanAxes @'[1] input)) [2, 5]
   approxList (values (T.meanAxes @'[0] input)) [2.5, 3.5, 4.5]
   approxList (values (T.meanAxes @'[2, 0] higher)) [7.5, 11.5, 15.5]
@@ -99,19 +96,19 @@ propNoAxes = H.property $ do
 propScalar :: H.Property
 propScalar = H.property $ do
   let input = T.scalar (T.constant (7 :: Double))
-  element (T.sum input) H.=== [7]
-  element (T.mean input) H.=== [7]
-  element (T.minimum input) H.=== [7]
-  element (T.maximum input) H.=== [7]
+  values (T.sum input) H.=== [7]
+  values (T.mean input) H.=== [7]
+  values (T.minimum input) H.=== [7]
+  values (T.maximum input) H.=== [7]
   values (T.maximumAxes @'[] input) H.=== [7]
 
 propEmptyRegion :: H.Property
 propEmptyRegion = H.property $ do
   let input = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Double
-  element (T.sum input) H.=== [0]
+  values (T.sum input) H.=== [0]
   values (T.sumAxes @'[1] input) H.=== replicate 6 0
   values (T.sumAxes @'[2, 1] input) H.=== [0, 0]
-  H.assert (all isNaN (element (T.mean input)))
+  H.assert (all isNaN (values (T.mean input)))
   let result = values (T.meanAxes @'[1] input)
   length result H.=== 6
   H.assert (all isNaN result)
@@ -127,29 +124,29 @@ propEmptyOutput = H.property $ do
 
 propExtrema :: H.Property
 propExtrema = H.property $ do
-  element (T.maximum (T.fromList @'[2] [-5, -2 :: Int])) H.=== [-2]
-  element (T.minimum (T.fromList @'[2] [5, 2 :: Int])) H.=== [2]
-  element (T.minimum (T.fromList @'[2] [False, True])) H.=== [False]
-  element (T.maximum (T.fromList @'[2] [False, True])) H.=== [True]
-  element (T.minimum (T.full @'[2] (1 / 0 :: Double))) H.=== [1 / 0]
-  element (T.maximum (T.full @'[2] (-(1 / 0) :: Float))) H.=== [-(1 / 0)]
+  values (T.maximum (T.fromList @'[2] [-5, -2 :: Int])) H.=== [-2]
+  values (T.minimum (T.fromList @'[2] [5, 2 :: Int])) H.=== [2]
+  values (T.minimum (T.fromList @'[2] [False, True])) H.=== [False]
+  values (T.maximum (T.fromList @'[2] [False, True])) H.=== [True]
+  values (T.minimum (T.full @'[2] (1 / 0 :: Double))) H.=== [1 / 0]
+  values (T.maximum (T.full @'[2] (-(1 / 0) :: Float))) H.=== [-(1 / 0)]
 
 propNaN :: H.Property
 propNaN = H.property $ do
   let input = T.fromList @'[2, 3] [0 / 0, 2, 3, 4, 5, 0 / 0 :: Double]
       single = T.fromList @'[2] [1, 0 / 0 :: Float]
-  H.assert (all isNaN (element (T.minimum input)))
-  H.assert (all isNaN (element (T.maximum input)))
+  H.assert (all isNaN (values (T.minimum input)))
+  H.assert (all isNaN (values (T.maximum input)))
   H.assert (all isNaN (values (T.minimumAxes @'[1] input)))
   H.assert (all isNaN (values (T.maximumAxes @'[1] input)))
-  H.assert (all isNaN (element (T.minimum single)))
-  H.assert (all isNaN (element (T.maximum single)))
+  H.assert (all isNaN (values (T.minimum single)))
+  H.assert (all isNaN (values (T.maximum single)))
 
 propComposition :: H.Property
 propComposition = H.property $ do
   let input = T.fromList @'[2, 3] [1 .. 6 :: Int]
       total = T.sum (input * 2)
-  values (T.fromGen @'[3] (\ix -> total + T.coordinate @0 ix)) H.=== [42, 43, 44]
+  values (T.fromGen @'[3] (\ix -> T.index @'[] total + T.coordinate @0 ix)) H.=== [42, 43, 44]
   values (T.sumAxes @'[1] (input + 1) * 2) H.=== [18, 36]
 
 propBoolean :: H.Property
@@ -158,8 +155,8 @@ propBoolean = H.property $ do
   let input = T.fromList @'[2, 3] xs
       rows = [take 3 xs, drop 3 xs]
       cols = [[xs !! j, xs !! (3 + j)] | j <- [0 .. 2]]
-  element (T.all input) H.=== [and xs]
-  element (T.any input) H.=== [or xs]
+  values (T.all input) H.=== [and xs]
+  values (T.any input) H.=== [or xs]
   values (T.allAxes @'[1] input) H.=== map and rows
   values (T.anyAxes @'[0] input) H.=== map or cols
   values (T.allAxes @'[1, 0] input) H.=== [and xs]
@@ -168,12 +165,12 @@ propBoolean = H.property $ do
 propBooleanEmpty :: H.Property
 propBooleanEmpty = H.property $ do
   let input = T.full @'[2, 0, 3] False
-  element (T.all input) H.=== [True]
-  element (T.any input) H.=== [False]
+  values (T.all input) H.=== [True]
+  values (T.any input) H.=== [False]
   values (T.allAxes @'[1] input) H.=== replicate 6 True
   values (T.anyAxes @'[1] input) H.=== replicate 6 False
   values (T.allAxes @'[2] input) H.=== []
-  element (T.any (T.scalar (T.constant True))) H.=== [True]
+  values (T.any (T.scalar (T.constant True))) H.=== [True]
 
 propNormalization :: H.Property
 propNormalization = H.property $ do
@@ -184,7 +181,7 @@ propNormalization = H.property $ do
   approxList (values (T.softmax @1 input)) (probabilities ++ probabilities)
   approxList (values (T.logSoftmax @1 input)) (logs ++ logs)
   approxList (values (T.logSumExpAxes @'[1] input)) [1002 + log (sum weights), -1000 + log (sum weights)]
-  approxList (element (T.logSumExp input)) [1002 + log (sum weights)]
+  approxList (values (T.logSumExp input)) [1002 + log (sum weights)]
   approxList (values (T.logSoftmax @0 (T.fromList @'[2] [0, -1000 :: Float]))) [0, -1000]
 
 propNormalizationAxes :: H.Property
@@ -205,13 +202,13 @@ propLogSumExpAxes = H.property $ do
       expected = [log (sum [exp (xs !! ((i * 3 + j) * 2 + k)) | i <- [0, 1], k <- [0, 1]]) | j <- [0 .. 2]]
   approxList (values (T.logSumExpAxes @'[2, 0] input)) expected
   values (T.logSumExpAxes @'[] input) H.=== xs
-  approxList (element (T.logSumExp (T.scalar (T.constant (3 :: Double))))) [3]
+  approxList (values (T.logSumExp (T.scalar (T.constant (3 :: Double))))) [3]
 
 propLogSumExpEdges :: H.Property
 propLogSumExpEdges = H.property $ do
   let empty = T.zeros @'[2, 0] :: T.Tensor '[2, 0] Double
       input = T.fromList @'[4, 2] [1 / 0, 3, -(1 / 0), -(1 / 0), 0 / 0, 2, 0 / 0, 1 / 0 :: Double]
-  element (T.logSumExp empty) H.=== [-(1 / 0)]
+  values (T.logSumExp empty) H.=== [-(1 / 0)]
   values (T.logSumExpAxes @'[1] empty) H.=== replicate 2 (-(1 / 0))
   values (T.logSumExpAxes @'[1] (T.zeros @'[0, 2] :: T.Tensor '[0, 2] Float)) H.=== []
   case values (T.logSumExpAxes @'[1] input) of
@@ -220,8 +217,8 @@ propLogSumExpEdges = H.property $ do
       negative H.=== -(1 / 0)
       H.assert (isNaN nan && isNaN mixed)
     _ -> H.failure
-  element (T.logSumExp (T.full @'[2] (1 / 0 :: Float))) H.=== [1 / 0]
-  element (T.logSumExp (T.full @'[2] (-(1 / 0) :: Float))) H.=== [-(1 / 0)]
+  values (T.logSumExp (T.full @'[2] (1 / 0 :: Float))) H.=== [1 / 0]
+  values (T.logSumExp (T.full @'[2] (-(1 / 0) :: Float))) H.=== [-(1 / 0)]
 
 propNormalizationEdges :: H.Property
 propNormalizationEdges = H.property $ do

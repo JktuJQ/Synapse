@@ -92,7 +92,7 @@ propCPUDispatch :: H.Property
 propCPUDispatch = H.property $ do
   let tensor = T.arange @4 (1 :: Int) 2
   T.toList (T.run T.CPU tensor) H.=== [1, 3, 5, 7]
-  T.toList (T.run T.CPU (T.scalar (T.sum tensor))) H.=== [16]
+  T.toList (T.run T.CPU (T.sum tensor)) H.=== [16]
 
 propAccelerateAccess :: H.Property
 propAccelerateAccess = H.property $ do
@@ -124,7 +124,7 @@ propRun1Types = H.property $ do
   let execute = T.run1 T.CPU (T.transpose . T.map T.fromIntegral) :: T.TensorData '[2, 3] Int -> T.TensorData '[3, 2] Double
       first = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Int])
       second = T.run T.CPU (T.fromList @'[2, 3] [7 .. 12 :: Int])
-      total = T.run1 T.CPU (T.scalar . T.sum) :: T.TensorData '[2, 3] Int -> T.TensorData '[] Int
+      total = T.run1 T.CPU T.sum :: T.TensorData '[2, 3] Int -> T.TensorData '[] Int
   T.toList (execute first) H.=== [1, 4, 2, 5, 3, 6]
   T.toList (execute second) H.=== [7, 10, 8, 11, 9, 12]
   T.toList (total first) H.=== [21]
@@ -300,7 +300,7 @@ propNestedComputation :: H.Property
 propNestedComputation = H.property $ do
   let vector = T.fromList @'[3] [1, 2, 3 :: Int]
       matrix = T.fromList @'[2, 2] [1 .. 4 :: Double]
-      result = (T.scalar (T.sum vector), (T.transpose matrix, vector T.> 1))
+      result = (T.sum vector, (T.transpose matrix, vector T.> 1))
       (total, (transposed, mask)) = T.run T.CPU result
   T.toList total H.=== [6]
   T.toList transposed H.=== [1, 3, 2, 4]
@@ -309,7 +309,7 @@ propNestedComputation = H.property $ do
 propRun1Outputs :: H.Property
 propRun1Outputs = H.property $ do
   let execute :: T.TensorData '[2, 3] Int -> (T.TensorData '[] Int, T.TensorData '[3] Bool)
-      execute = T.run1 T.CPU (\x -> (T.scalar (T.sum x), T.anyAxes @'[0] (x T.> 2)))
+      execute = T.run1 T.CPU (\x -> (T.sum x, T.anyAxes @'[0] (x T.> 2)))
       first = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Int])
       second = T.run T.CPU (T.fromList @'[2, 3] [0, 5, 0, 0, 0, 0 :: Int])
       (firstTotal, firstMask) = execute first
@@ -322,7 +322,7 @@ propRun1Outputs = H.property $ do
 propRun2Outputs :: H.Property
 propRun2Outputs = H.property $ do
   let execute :: T.TensorData '[2, 3] Int -> T.TensorData '[3, 2] Int -> (T.TensorData '[2, 2] Int, T.TensorData '[] Int)
-      execute = T.run2 T.CPU (\x w -> let productTensor = T.matmul x w in (productTensor, T.scalar (T.sum productTensor)))
+      execute = T.run2 T.CPU (\x w -> let productTensor = T.matmul x w in (productTensor, T.sum productTensor))
       inputs = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Int])
       weights = T.run T.CPU (T.fromList @'[3, 2] [1 .. 6 :: Int])
       (matrix, total) = execute inputs weights
@@ -348,7 +348,7 @@ propComputationEdges :: H.Property
 propComputationEdges = H.property $ do
   let (empty, scalar) = T.run T.CPU (T.zeros @'[2, 0, 3] @Int, T.scalar (T.constant True))
       execute :: T.TensorData '[0] Int -> (T.TensorData '[0] Bool, T.TensorData '[] Int)
-      execute = T.run1 T.CPU (\x -> (x T.> 0, T.scalar (T.sum x)))
+      execute = T.run1 T.CPU (\x -> (x T.> 0, T.sum x))
       (emptyMask, total) = execute (T.run T.CPU (T.zeros @'[0] @Int))
   T.toList empty H.=== []
   T.toList scalar H.=== [True]

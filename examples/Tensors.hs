@@ -99,7 +99,7 @@ linearAlgebra = do
   let vector = T.fromList @'[3] [1, 2, 3 :: Double]
       lhs = T.fromList @'[2, 3] [1 .. 6 :: Double]
       rhs = T.fromList @'[3, 2] [1 .. 6 :: Double]
-  showElement "dot" (T.dot vector vector)
+  showTensor "dot" (T.dot vector vector)
   showTensor "matmul" (T.matmul lhs rhs)
   showTensor "batched matmul" (T.matmul (T.stack @0 lhs lhs) (T.stack @0 rhs rhs))
 
@@ -108,19 +108,19 @@ reductions = do
   putStrLn "\nReductions and normalization"
   let matrix = T.fromList @'[2, 3] [1000, 1001, 1002, -1002, -1001, -1000 :: Double]
       mask = matrix T.> 0
-  showElement "sum" (T.sum matrix)
-  showElement "mean" (T.mean matrix)
-  showElement "minimum" (T.minimum matrix)
-  showElement "maximum" (T.maximum matrix)
+  showTensor "sum" (T.sum matrix)
+  showTensor "mean" (T.mean matrix)
+  showTensor "minimum" (T.minimum matrix)
+  showTensor "maximum" (T.maximum matrix)
   showTensor "sumAxes: row sums" (T.sumAxes @'[1] matrix)
   showTensor "meanAxes: column means" (T.meanAxes @'[0] matrix)
   showTensor "argmax: position within each row" (T.argmax @1 matrix)
   showTensor "argmin: position within each row" (T.argmin @1 matrix)
-  showElement "all positive" (T.all mask)
+  showTensor "all positive" (T.all mask)
   showTensor "any positive per row" (T.anyAxes @'[1] mask)
   showTensor "softmax per row" (T.softmax @1 matrix)
   showTensor "logSoftmax per row" (T.logSoftmax @1 matrix)
-  showElement "logSumExp" (T.logSumExp matrix)
+  showTensor "logSumExp" (T.logSumExp matrix)
   showTensor "logSumExpAxes per row" (T.logSumExpAxes @'[1] matrix)
 
 controlFlow :: IO ()
@@ -152,7 +152,7 @@ preparedFunctions = do
       linear :: T.TensorData '[2, 3] Double -> T.TensorData '[3, 2] Double -> T.TensorData '[2] Double -> T.TensorData '[2, 2] Double
       linear = T.run3 T.CPU (\x w b -> T.matmul x w + T.broadcast b)
       summarize :: T.TensorData '[3] Double -> (T.TensorData '[3] Double, (T.TensorData '[] Double, T.TensorData '[3] Bool))
-      summarize = T.run1 T.CPU (\x -> (x * 2 + 1, (T.scalar (T.mean x), x T.> 2)))
+      summarize = T.run1 T.CPU (\x -> (x * 2 + 1, (T.mean x, x T.> 2)))
       maskedLinear :: T.TensorData '[2, 3] Double -> T.TensorData '[3, 2] Double -> T.TensorData '[2] Double -> T.TensorData '[2, 2] Bool -> T.TensorData '[2, 2] Double
       maskedLinear = T.run4 T.CPU (\x w b mask -> T.select mask (T.matmul x w + T.broadcast b) 0)
   putStrLn "run1: reuse with two inputs"

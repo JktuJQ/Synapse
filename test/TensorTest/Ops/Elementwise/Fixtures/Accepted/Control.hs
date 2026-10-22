@@ -12,7 +12,7 @@ selected :: T.Tensor '[2] Int
 selected = T.select mask (T.ones @'[2]) (T.zeros @'[2])
 
 branched :: T.Tensor '[2] Bool
-branched = T.cond (T.constant True) mask (T.not mask)
+branched = T.cond (T.scalar (T.constant True)) mask (T.not mask)
 
 loop :: T.TensorElement Int
 loop = T.while (T.< 5) (+ 1) 0

@@ -132,7 +132,7 @@ propElementComparisons = H.property $ do
   T.toList (T.run T.CPU (T.map (T.> 0) input)) H.=== [False, False, True]
   T.toList (T.run T.CPU (T.map (T.== 0) input)) H.=== [False, True, False]
   T.toList (T.run T.CPU (T.map (`T.max` 0) input)) H.=== [0, 0, 1]
-  T.toList (T.run T.CPU (T.scalar (T.sum input T.== 0))) H.=== [True]
+  T.toList (T.run T.CPU (T.sum input T.== 0)) H.=== [True]
 
 propFloatingComparisons :: H.Property
 propFloatingComparisons = H.property $ do

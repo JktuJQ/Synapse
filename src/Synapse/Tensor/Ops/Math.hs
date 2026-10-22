@@ -1,5 +1,9 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -7,7 +11,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Tensor math operations.
-module Synapse.Tensor.Ops.Math (dot, matmul) where
+module Synapse.Tensor.Ops.Math (LinearAlgebra (..), dot, matmul) where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
@@ -20,9 +24,73 @@ import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Synapse.Tensor.Type (Tensor (..), TensorElement (..))
 import Prelude hiding (map, zip, zipWith)
 
+-- | Vector and matrix products with statically checked shapes.
+class (DType a) => LinearAlgebra t a where
+  -- | Inner product of equally sized vectors, returning zero for empty vectors.
+  dotOp ::
+    forall n.
+    (Shape '[n]) =>
+    t '[n] a ->
+    t '[n] a ->
+    t '[] a
+
+  -- | Multiply the last two dimensions of tensors with identical leading batch shapes.
+  -- Broadcasting is explicit and both inputs must have rank at least two.
+  -- A zero inner dimension produces zeros and an empty output shape produces an empty tensor.
+  -- Columns of the right input are packed contiguously and products are consumed by an array reduction.
+  -- Floating point accumulation order is determined by the backend reduction.
+  matmulOp ::
+    forall lhs rhs.
+    (Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs)) =>
+    t lhs a ->
+    t rhs a ->
+    t (MatmulShape lhs rhs) a
+
+instance (DType a, Num (TensorElement a)) => LinearAlgebra Tensor a where
+  dotOp lhs rhs = R.sum (zipWith (*) lhs rhs)
+
+  matmulOp ::
+    forall lhs rhs.
+    (Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs)) =>
+    Tensor lhs a ->
+    Tensor rhs a ->
+    Tensor (MatmulShape lhs rhs) a
+  matmulOp (Tensor left) (Tensor right)
+    | shapeSize @(MatmulShape lhs rhs) == 0 = Tensor (A.use (A.fromList outputShape []))
+    | otherwise = case (reverse (shape @lhs), reverse (shape @rhs)) of
+        (0 : _ : _, _ : _ : _) ->
+          Tensor (A.fill (A.constant outputShape) (unTensorElement (0 :: TensorElement a)))
+        (shared : rows : _, cols : _ : _) ->
+          Tensor $
+            A.reshape (A.constant outputShape) $
+              matrixProduct (shapeSize @(MatmulShape lhs rhs)) rows shared cols leftVector rightVector
+        _ -> error "Synapse.Tensor.matmul: inconsistent input rank"
+    where
+      outputShape = backendShape (Proxy @(MatmulShape lhs rhs))
+      leftVector = A.flatten left
+      rightVector = A.flatten right
+
 -- | Inner product of equally sized vectors, returning zero for empty vectors.
-dot :: (Shape '[n], DType a, Num (TensorElement a)) => Tensor '[n] a -> Tensor '[n] a -> TensorElement a
-dot lhs rhs = R.sum (zipWith (*) lhs rhs)
+dot ::
+  forall {t} n a.
+  (LinearAlgebra t a, Shape '[n]) =>
+  t '[n] a ->
+  t '[n] a ->
+  t '[] a
+dot = dotOp @t @a @n
+
+-- | Multiply the last two dimensions of tensors with identical leading batch shapes.
+-- Broadcasting is explicit and both inputs must have rank at least two.
+-- A zero inner dimension produces zeros and an empty output shape produces an empty tensor.
+-- Columns of the right input are packed contiguously and products are consumed by an array reduction.
+-- Floating point accumulation order is determined by the backend reduction.
+matmul ::
+  forall {t} lhs rhs a.
+  (LinearAlgebra t a, Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs)) =>
+  t lhs a ->
+  t rhs a ->
+  t (MatmulShape lhs rhs) a
+matmul = matmulOp @t @a @lhs @rhs
 
 -- | Store each column contiguously so an inner product reads both inputs sequentially.
 -- The compute boundary materializes only the rearranged right-hand input.
@@ -60,32 +128,6 @@ matrixProduct count rows shared cols left right = A.fold add zero products
           x = TensorElement (left A.! A.index1 (leftOffset + inner))
           y = TensorElement (packedRight A.! A.index1 (rightOffset + inner))
        in unTensorElement (x * y)
-
--- | Multiply the last two dimensions of tensors with identical leading batch shapes.
--- Broadcasting is explicit and both inputs must have rank at least two.
--- A zero inner dimension produces zeros and an empty output shape produces an empty tensor.
--- Columns of the right input are packed contiguously and products are consumed by an array reduction.
--- Floating point accumulation order is determined by the backend reduction.
-matmul ::
-  forall lhs rhs a.
-  (Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs), DType a, Num (TensorElement a)) =>
-  Tensor lhs a ->
-  Tensor rhs a ->
-  Tensor (MatmulShape lhs rhs) a
-matmul (Tensor left) (Tensor right)
-  | shapeSize @(MatmulShape lhs rhs) == 0 = Tensor (A.use (A.fromList outputShape []))
-  | otherwise = case (reverse (shape @lhs), reverse (shape @rhs)) of
-      (0 : _ : _, _ : _ : _) ->
-        Tensor (A.fill (A.constant outputShape) (unTensorElement (0 :: TensorElement a)))
-      (shared : rows : _, cols : _ : _) ->
-        Tensor $
-          A.reshape (A.constant outputShape) $
-            matrixProduct (shapeSize @(MatmulShape lhs rhs)) rows shared cols leftVector rightVector
-      _ -> error "Synapse.Tensor.matmul: inconsistent input rank"
-  where
-    outputShape = backendShape (Proxy @(MatmulShape lhs rhs))
-    leftVector = A.flatten left
-    rightVector = A.flatten right
 
 instance (Shape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) where
   (+) = zipWith (+)

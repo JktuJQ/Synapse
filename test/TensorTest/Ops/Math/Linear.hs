@@ -56,7 +56,7 @@ propDot :: H.Property
 propDot = H.property $ do
   xs <- H.forAll $ Gen.list (Range.singleton 4) (Gen.int (Range.linear (-20) 20))
   ys <- H.forAll $ Gen.list (Range.singleton 4) (Gen.int (Range.linear (-20) 20))
-  values (T.scalar (T.dot (T.fromList @'[4] xs) (T.fromList @'[4] ys))) H.=== [sum (zipWith (*) xs ys)]
+  values (T.dot (T.fromList @'[4] xs) (T.fromList @'[4] ys)) H.=== [sum (zipWith (*) xs ys)]
 
 propMatmul :: H.Property
 propMatmul = H.property $ do
@@ -94,14 +94,14 @@ propFloating = H.property $ do
       bias = T.broadcast @'[2, 2] (T.fromList @'[2] [1, 2 :: Double])
   approxList (values (T.matmul lhs rhs + bias)) [23, 30, 50, 66]
   approxList (values (T.matmul (lhs * 2) rhs)) [44, 56, 98, 128]
-  approxList (values (T.scalar (T.dot (T.fromList @'[3] [1, 2, 3 :: Float]) (T.fromList @'[3] [4, 5, 6])))) [32]
-  values (T.scalar (T.sum (T.matmul lhs rhs))) H.=== [163]
-  values (T.fromGen @'[2] (\ix -> T.dot (T.ones @'[3] @Int) (T.ones @'[3]) + T.coordinate @0 ix)) H.=== [3, 4]
+  approxList (values (T.dot (T.fromList @'[3] [1, 2, 3 :: Float]) (T.fromList @'[3] [4, 5, 6]))) [32]
+  values (T.sum (T.matmul lhs rhs)) H.=== [163]
+  values (T.fromGen @'[2] (\ix -> T.index @'[] (T.dot (T.ones @'[3] @Int) (T.ones @'[3])) + T.coordinate @0 ix)) H.=== [3, 4]
   values (T.matmul (T.ones @'[1, 1] @Float) (T.ones @'[1, 1])) H.=== [1]
 
 propEmpty :: H.Property
 propEmpty = H.property $ do
-  values (T.scalar (T.dot (T.zeros @'[0] @Int) (T.zeros @'[0]))) H.=== [0]
+  values (T.dot (T.zeros @'[0] @Int) (T.zeros @'[0])) H.=== [0]
   values (T.matmul (T.zeros @'[2, 0] @Int) (T.zeros @'[0, 3])) H.=== replicate 6 0
   values (T.matmul (T.zeros @'[2, 3, 0] @Double) (T.zeros @'[2, 0, 4])) H.=== replicate 24 0
   values (T.matmul (T.zeros @'[0, 2, 3] @Int) (T.zeros @'[0, 3, 4])) H.=== []

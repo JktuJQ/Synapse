@@ -5,4 +5,4 @@ module CondShape where
 
 import qualified Synapse.Tensor as T
 
-bad = T.cond (T.constant True) (T.zeros @'[2] @Int) (T.ones @'[3])
+bad = T.cond (T.scalar (T.constant True)) (T.zeros @'[2] @Int) (T.ones @'[3])

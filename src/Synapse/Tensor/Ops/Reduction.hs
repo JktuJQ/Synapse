@@ -1,13 +1,23 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Full and axis-wise reductions that remain inside the tensor computation.
 module Synapse.Tensor.Ops.Reduction
-  ( sum,
+  ( Reductions (..),
+    MeanReductions (..),
+    OrderedReductions (..),
+    BooleanReductions (..),
+    Normalization (..),
+    LogReductions (..),
+    sum,
     sumAxes,
     mean,
     meanAxes,
@@ -39,6 +49,469 @@ import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape
 import Synapse.Tensor.Type (Tensor (..), TensorElement (..), constant)
 import Prelude hiding (Ord, all, any, map, max, maximum, min, minimum, sum, zipWith, (&&), (||))
 import qualified Prelude as P
+
+-- | Summation of full tensors and selected axes.
+class (DType a) => Reductions t a where
+  -- | Sum all elements, returning zero for an empty tensor.
+  sumOp ::
+    forall sh.
+    (Shape sh) =>
+    t sh a ->
+    t '[] a
+
+  -- | Sum over selected axes and remove them from the output shape.
+  -- Axis order does not affect the result and an empty axis list preserves the input.
+  -- Empty reduction regions produce zero.
+  sumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    t sh a ->
+    t (ReduceShape xs sh) a
+
+instance (DType a, Num (TensorElement a)) => Reductions Tensor a where
+  sumOp (Tensor input) = Tensor (A.foldAll (elementOp (+)) (unTensorElement 0) input)
+
+  sumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    Tensor sh a ->
+    Tensor (ReduceShape xs sh) a
+  sumAxesOp _ input
+    | reductionSize @xs @sh == 0 =
+        Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensorElement 0))
+    | otherwise = reduceAxesWith @xs (A.fold (elementOp (+)) (unTensorElement 0)) input
+
+-- | Arithmetic means of full tensors and selected axes.
+class (DType a) => MeanReductions t a where
+  -- | Mean of all floating point elements, returning NaN for an empty tensor.
+  meanOp ::
+    forall sh.
+    (Shape sh) =>
+    t sh a ->
+    t '[] a
+
+  -- | Mean over selected axes, removing them from the output shape.
+  -- Empty reduction regions produce NaN and an empty axis list preserves the input.
+  meanAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    t sh a ->
+    t (ReduceShape xs sh) a
+
+instance (DType a, RealFloat a, Fractional (TensorElement a)) => MeanReductions Tensor a where
+  meanOp ::
+    forall sh.
+    (Shape sh) =>
+    Tensor sh a ->
+    Tensor '[] a
+  meanOp input = map (/ constant (fromIntegral (shapeSize @sh) :: a)) (sum input)
+
+  meanAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    Tensor sh a ->
+    Tensor (ReduceShape xs sh) a
+  meanAxesOp _ = map (/ constant (fromIntegral (reductionSize @xs @sh) :: a)) . sumAxes @xs
+
+-- | Extrema and their positions in tensors.
+class (DType a) => OrderedReductions t a where
+  -- | Minimum of all elements of a statically nonempty tensor.
+  -- Floating point NaN values propagate to the result.
+  minimumOp ::
+    forall sh.
+    (Shape sh, NonEmpty sh) =>
+    t sh a ->
+    t '[] a
+
+  -- | Minimum over selected axes, removing them from the output shape.
+  -- Selected dimensions must be nonzero, while unselected dimensions may be empty.
+  -- Floating point NaN values propagate to the result.
+  minimumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+    Proxy xs ->
+    t sh a ->
+    t (ReduceShape xs sh) a
+
+  -- | Maximum of all elements of a statically nonempty tensor.
+  -- Floating point NaN values propagate to the result.
+  maximumOp ::
+    forall sh.
+    (Shape sh, NonEmpty sh) =>
+    t sh a ->
+    t '[] a
+
+  -- | Maximum over selected axes, removing them from the output shape.
+  -- Selected dimensions must be nonzero, while unselected dimensions may be empty.
+  -- Floating point NaN values propagate to the result.
+  maximumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+    Proxy xs ->
+    t sh a ->
+    t (ReduceShape xs sh) a
+
+  -- | Position of the maximum along one nonempty axis, removing that axis.
+  -- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
+  argmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    t sh a ->
+    t (ReduceShape '[axis] sh) Int
+
+  -- | Position of the minimum along one nonempty axis, removing that axis.
+  -- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
+  argminOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    t sh a ->
+    t (ReduceShape '[axis] sh) Int
+
+instance (DType a, Ord (TensorElement a)) => OrderedReductions Tensor a where
+  minimumOp (Tensor input) = Tensor (A.fold1All (elementOp min) input)
+
+  minimumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+    Proxy xs ->
+    Tensor sh a ->
+    Tensor (ReduceShape xs sh) a
+  minimumAxesOp _ = reduceAxesWith @xs (A.fold1 (elementOp min))
+
+  maximumOp (Tensor input) = Tensor (A.fold1All (elementOp max) input)
+
+  maximumAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+    Proxy xs ->
+    Tensor sh a ->
+    Tensor (ReduceShape xs sh) a
+  maximumAxesOp _ = reduceAxesWith @xs (A.fold1 (elementOp max))
+
+  argmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    Tensor sh a ->
+    Tensor (ReduceShape '[axis] sh) Int
+  argmaxOp _ = argReduce @axis (E.>)
+
+  argminOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    Tensor sh a ->
+    Tensor (ReduceShape '[axis] sh) Int
+  argminOp _ = argReduce @axis (E.<)
+
+-- | Boolean conjunction and disjunction over tensor elements.
+class BooleanReductions t where
+  -- | Test whether every element is true, returning True for an empty tensor.
+  allOp ::
+    forall sh.
+    (Shape sh) =>
+    t sh Bool ->
+    t '[] Bool
+
+  -- | Test whether any element is true, returning False for an empty tensor.
+  anyOp ::
+    forall sh.
+    (Shape sh) =>
+    t sh Bool ->
+    t '[] Bool
+
+  -- | Test conjunction along selected axes, removing them from the result.
+  -- Empty reduction regions produce True.
+  allAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    t sh Bool ->
+    t (ReduceShape xs sh) Bool
+
+  -- | Test disjunction along selected axes, removing them from the result.
+  -- Empty reduction regions produce False.
+  anyAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    t sh Bool ->
+    t (ReduceShape xs sh) Bool
+
+instance BooleanReductions Tensor where
+  allOp (Tensor input) = Tensor (A.foldAll (elementOp (&&)) (A.constant True) input)
+
+  anyOp (Tensor input) = Tensor (A.foldAll (elementOp (||)) (A.constant False) input)
+
+  allAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    Tensor sh Bool ->
+    Tensor (ReduceShape xs sh) Bool
+  allAxesOp _ = booleanAxes @xs True (&&)
+
+  anyAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    Tensor sh Bool ->
+    Tensor (ReduceShape xs sh) Bool
+  anyAxesOp _ = booleanAxes @xs False (||)
+
+-- | Stable normalization along a tensor axis.
+class (DType a) => Normalization t a where
+  -- | Normalize exponentials along one axis without overflowing on large finite inputs.
+  -- The axis must be nonempty; NaN and infinite logits follow floating point arithmetic.
+  softmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    t sh a ->
+    t sh a
+
+  -- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
+  logSoftmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    t sh a ->
+    t sh a
+
+instance (DType a, Floating (TensorElement a), Ord (TensorElement a)) => Normalization Tensor a where
+  softmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    Tensor sh a ->
+    Tensor sh a
+  softmaxOp _ input = zipWith (/) exponentials (expandReduced @'[axis] @sh (sumAxes @'[axis] exponentials))
+    where
+      shifted = zipWith (-) input (expandReduced @'[axis] @sh (maximumAxes @'[axis] input))
+      exponentials = map exp shifted
+
+  logSoftmaxOp ::
+    forall axis sh.
+    (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+    Proxy axis ->
+    Tensor sh a ->
+    Tensor sh a
+  logSoftmaxOp _ input = zipWith (-) shifted (expandReduced @'[axis] @sh (map log (sumAxes @'[axis] (map exp shifted))))
+    where
+      shifted = zipWith (-) input (expandReduced @'[axis] @sh (maximumAxes @'[axis] input))
+
+-- | Stable logarithms of sums of exponentials.
+class (DType a) => LogReductions t a where
+  -- | Logarithm of the sum of exponentials, using maximum subtraction for finite inputs.
+  -- Empty tensors produce negative infinity and NaN values propagate.
+  logSumExpOp ::
+    forall sh.
+    (Shape sh) =>
+    t sh a ->
+    t '[] a
+
+  -- | Logarithm of summed exponentials over selected axes, removing those axes.
+  -- Empty regions produce negative infinity; infinite extrema are preserved and NaN values propagate.
+  logSumExpAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    t sh a ->
+    t (ReduceShape xs sh) a
+
+instance (DType a, RealFloat a, Floating (TensorElement a), Ord (TensorElement a), E.RealFloat (TensorElement a)) => LogReductions Tensor a where
+  logSumExpOp ::
+    forall sh.
+    (Shape sh) =>
+    Tensor sh a ->
+    Tensor '[] a
+  logSumExpOp (Tensor input)
+    | shapeSize @sh == 0 = Tensor (A.unit (A.constant (negate (1 / 0) :: a)))
+    | otherwise = Tensor (A.unit (unTensorElement (select (E.isInfinite peak) peak (peak + log total))))
+    where
+      peak = TensorElement (A.the (A.fold1All (elementOp max) input))
+      total = TensorElement (A.the (unTensor (sum (map (\x -> exp (x - peak)) (Tensor input :: Tensor sh a)))))
+
+  logSumExpAxesOp ::
+    forall xs sh.
+    (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+    Proxy xs ->
+    Tensor sh a ->
+    Tensor (ReduceShape xs sh) a
+  logSumExpAxesOp _ input
+    | reductionSize @xs @sh == 0 = Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (A.constant (negate (1 / 0) :: a)))
+    | null (axes @xs) = Tensor (A.reshape (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensor input))
+    | otherwise = select (E.isInfinite peak) peak (zipWith (+) peak (map log total))
+    where
+      peak = reduceAxesWith @xs (A.fold1 (elementOp max)) input
+      shifted = zipWith (-) input (expandReduced @xs @sh peak)
+      total = sumAxes @xs (map exp shifted)
+
+-- | Sum all elements, returning zero for an empty tensor.
+sum ::
+  forall {t} sh a.
+  (Reductions t a, Shape sh) =>
+  t sh a ->
+  t '[] a
+sum = sumOp @t @a @sh
+
+-- | Sum over selected axes and remove them from the output shape.
+-- Axis order does not affect the result and an empty axis list preserves the input.
+-- Empty reduction regions produce zero.
+sumAxes ::
+  forall {t} xs sh a.
+  (Reductions t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+  t sh a ->
+  t (ReduceShape xs sh) a
+sumAxes = sumAxesOp @t @a @xs @sh Proxy
+
+-- | Mean of all floating point elements, returning NaN for an empty tensor.
+mean ::
+  forall {t} sh a.
+  (MeanReductions t a, Shape sh) =>
+  t sh a ->
+  t '[] a
+mean = meanOp @t @a @sh
+
+-- | Mean over selected axes, removing them from the output shape.
+-- Empty reduction regions produce NaN and an empty axis list preserves the input.
+meanAxes ::
+  forall {t} xs sh a.
+  (MeanReductions t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+  t sh a ->
+  t (ReduceShape xs sh) a
+meanAxes = meanAxesOp @t @a @xs @sh Proxy
+
+-- | Minimum of all elements of a statically nonempty tensor.
+-- Floating point NaN values propagate to the result.
+minimum ::
+  forall {t} sh a.
+  (OrderedReductions t a, Shape sh, NonEmpty sh) =>
+  t sh a ->
+  t '[] a
+minimum = minimumOp @t @a @sh
+
+-- | Minimum over selected axes, removing them from the output shape.
+-- Selected dimensions must be nonzero, while unselected dimensions may be empty.
+-- Floating point NaN values propagate to the result.
+minimumAxes ::
+  forall {t} xs sh a.
+  (OrderedReductions t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+  t sh a ->
+  t (ReduceShape xs sh) a
+minimumAxes = minimumAxesOp @t @a @xs @sh Proxy
+
+-- | Maximum of all elements of a statically nonempty tensor.
+-- Floating point NaN values propagate to the result.
+maximum ::
+  forall {t} sh a.
+  (OrderedReductions t a, Shape sh, NonEmpty sh) =>
+  t sh a ->
+  t '[] a
+maximum = maximumOp @t @a @sh
+
+-- | Maximum over selected axes, removing them from the output shape.
+-- Selected dimensions must be nonzero, while unselected dimensions may be empty.
+-- Floating point NaN values propagate to the result.
+maximumAxes ::
+  forall {t} xs sh a.
+  (OrderedReductions t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
+  t sh a ->
+  t (ReduceShape xs sh) a
+maximumAxes = maximumAxesOp @t @a @xs @sh Proxy
+
+-- | Test whether every element is true, returning True for an empty tensor.
+all ::
+  forall {t} sh.
+  (BooleanReductions t, Shape sh) =>
+  t sh Bool ->
+  t '[] Bool
+all = allOp @t @sh
+
+-- | Test whether any element is true, returning False for an empty tensor.
+any ::
+  forall {t} sh.
+  (BooleanReductions t, Shape sh) =>
+  t sh Bool ->
+  t '[] Bool
+any = anyOp @t @sh
+
+-- | Test conjunction along selected axes, removing them from the result.
+-- Empty reduction regions produce True.
+allAxes ::
+  forall {t} xs sh.
+  (BooleanReductions t, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+  t sh Bool ->
+  t (ReduceShape xs sh) Bool
+allAxes = allAxesOp @t @xs @sh Proxy
+
+-- | Test disjunction along selected axes, removing them from the result.
+-- Empty reduction regions produce False.
+anyAxes ::
+  forall {t} xs sh.
+  (BooleanReductions t, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+  t sh Bool ->
+  t (ReduceShape xs sh) Bool
+anyAxes = anyAxesOp @t @xs @sh Proxy
+
+-- | Normalize exponentials along one axis without overflowing on large finite inputs.
+-- The axis must be nonempty; NaN and infinite logits follow floating point arithmetic.
+softmax ::
+  forall {t} axis sh a.
+  (Normalization t a, Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+  t sh a ->
+  t sh a
+softmax = softmaxOp @t @a @axis @sh Proxy
+
+-- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
+logSoftmax ::
+  forall {t} axis sh a.
+  (Normalization t a, Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+  t sh a ->
+  t sh a
+logSoftmax = logSoftmaxOp @t @a @axis @sh Proxy
+
+-- | Logarithm of the sum of exponentials, using maximum subtraction for finite inputs.
+-- Empty tensors produce negative infinity and NaN values propagate.
+logSumExp ::
+  forall {t} sh a.
+  (LogReductions t a, Shape sh) =>
+  t sh a ->
+  t '[] a
+logSumExp = logSumExpOp @t @a @sh
+
+-- | Logarithm of summed exponentials over selected axes, removing those axes.
+-- Empty regions produce negative infinity; infinite extrema are preserved and NaN values propagate.
+logSumExpAxes ::
+  forall {t} xs sh a.
+  (LogReductions t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
+  t sh a ->
+  t (ReduceShape xs sh) a
+logSumExpAxes = logSumExpAxesOp @t @a @xs @sh Proxy
+
+-- | Position of the maximum along one nonempty axis, removing that axis.
+-- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
+argmax ::
+  forall {t} axis sh a.
+  (OrderedReductions t a, Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+  t sh a ->
+  t (ReduceShape '[axis] sh) Int
+argmax = argmaxOp @t @a @axis @sh Proxy
+
+-- | Position of the minimum along one nonempty axis, removing that axis.
+-- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
+argmin ::
+  forall {t} axis sh a.
+  (OrderedReductions t a, Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
+  t sh a ->
+  t (ReduceShape '[axis] sh) Int
+argmin = argminOp @t @a @axis @sh Proxy
 
 -- | Adapt an element operation to the backend fold representation.
 elementOp :: (TensorElement a -> TensorElement a -> TensorElement a) -> A.Exp a -> A.Exp a -> A.Exp a
@@ -100,78 +573,6 @@ reductionSize ::
   Int
 reductionSize = product [dim | (axis, dim) <- zip [0 ..] (shape @sh), axis `elem` axes @xs]
 
--- | Sum all elements, returning zero for an empty tensor.
-sum :: (Shape sh, DType a, Num (TensorElement a)) => Tensor sh a -> TensorElement a
-sum (Tensor input) = TensorElement (A.the (A.foldAll (elementOp (+)) (unTensorElement 0) input))
-
--- | Sum over selected axes and remove them from the output shape.
--- Axis order does not affect the result and an empty axis list preserves the input.
--- Empty reduction regions produce zero.
-sumAxes ::
-  forall xs sh a.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, Num (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor (ReduceShape xs sh) a
-sumAxes input
-  | reductionSize @xs @sh == 0 =
-      Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensorElement 0))
-  | otherwise = reduceAxesWith @xs (A.fold (elementOp (+)) (unTensorElement 0)) input
-
--- | Mean of all floating point elements, returning NaN for an empty tensor.
-mean ::
-  forall sh a.
-  (Shape sh, DType a, RealFloat a, Fractional (TensorElement a)) =>
-  Tensor sh a ->
-  TensorElement a
-mean input = sum input / constant (fromIntegral (shapeSize @sh) :: a)
-
--- | Mean over selected axes, removing them from the output shape.
--- Empty reduction regions produce NaN and an empty axis list preserves the input.
-meanAxes ::
-  forall xs sh a.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, RealFloat a, Fractional (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor (ReduceShape xs sh) a
-meanAxes = map (/ constant (fromIntegral (reductionSize @xs @sh) :: a)) . sumAxes @xs
-
--- | Minimum of all elements of a statically nonempty tensor.
--- Floating point NaN values propagate to the result.
-minimum :: (Shape sh, NonEmpty sh, DType a, Ord (TensorElement a)) => Tensor sh a -> TensorElement a
-minimum (Tensor input) = TensorElement (A.the (A.fold1All (elementOp min) input))
-
--- | Minimum over selected axes, removing them from the output shape.
--- Selected dimensions must be nonzero, while unselected dimensions may be empty.
--- Floating point NaN values propagate to the result.
-minimumAxes ::
-  forall xs sh a.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh, DType a, Ord (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor (ReduceShape xs sh) a
-minimumAxes = reduceAxesWith @xs (A.fold1 (elementOp min))
-
--- | Maximum of all elements of a statically nonempty tensor.
--- Floating point NaN values propagate to the result.
-maximum :: (Shape sh, NonEmpty sh, DType a, Ord (TensorElement a)) => Tensor sh a -> TensorElement a
-maximum (Tensor input) = TensorElement (A.the (A.fold1All (elementOp max) input))
-
--- | Maximum over selected axes, removing them from the output shape.
--- Selected dimensions must be nonzero, while unselected dimensions may be empty.
--- Floating point NaN values propagate to the result.
-maximumAxes ::
-  forall xs sh a.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh, DType a, Ord (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor (ReduceShape xs sh) a
-maximumAxes = reduceAxesWith @xs (A.fold1 (elementOp max))
-
--- | Test whether every element is true, returning True for an empty tensor.
-all :: (Shape sh) => Tensor sh Bool -> TensorElement Bool
-all (Tensor input) = TensorElement (A.the (A.foldAll (elementOp (&&)) (A.constant True) input))
-
--- | Test whether any element is true, returning False for an empty tensor.
-any :: (Shape sh) => Tensor sh Bool -> TensorElement Bool
-any (Tensor input) = TensorElement (A.the (A.foldAll (elementOp (||)) (A.constant False) input))
-
 -- | Reduce boolean regions using the identity for empty regions.
 booleanAxes ::
   forall xs sh.
@@ -183,24 +584,6 @@ booleanAxes ::
 booleanAxes identity combine input
   | reductionSize @xs @sh == 0 = Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (A.constant identity))
   | otherwise = reduceAxesWith @xs (A.fold (elementOp combine) (A.constant identity)) input
-
--- | Test conjunction along selected axes, removing them from the result.
--- Empty reduction regions produce True.
-allAxes ::
-  forall xs sh.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
-  Tensor sh Bool ->
-  Tensor (ReduceShape xs sh) Bool
-allAxes = booleanAxes @xs True (&&)
-
--- | Test disjunction along selected axes, removing them from the result.
--- Empty reduction regions produce False.
-anyAxes ::
-  forall xs sh.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
-  Tensor sh Bool ->
-  Tensor (ReduceShape xs sh) Bool
-anyAxes = booleanAxes @xs False (||)
 
 -- | Repeat a reduced value over its original reduction region.
 expandReduced ::
@@ -214,58 +597,6 @@ expandReduced (Tensor input) = Tensor (A.backpermute (A.constant (backendShape (
     outputStrides = strides [shape @sh !! axis | axis <- retained]
     offset ix = A.index1 (foldl' (+) 0 (P.zipWith (\coordinate stride -> coordinate * A.constant stride) (coordinates ix) outputStrides))
     coordinates ix = [coordinate | (axis, coordinate) <- zip [0 ..] (backendCoordinates @sh ix), axis `notElem` axes @xs]
-
--- | Normalize exponentials along one axis without overflowing on large finite inputs.
--- The axis must be nonempty; NaN and infinite logits follow floating point arithmetic.
-softmax ::
-  forall axis sh a.
-  (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh, DType a, Floating (TensorElement a), Ord (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor sh a
-softmax input = zipWith (/) exponentials (expandReduced @'[axis] @sh (sumAxes @'[axis] exponentials))
-  where
-    shifted = zipWith (-) input (expandReduced @'[axis] @sh (maximumAxes @'[axis] input))
-    exponentials = map exp shifted
-
--- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
-logSoftmax ::
-  forall axis sh a.
-  (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh, DType a, Floating (TensorElement a), Ord (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor sh a
-logSoftmax input = zipWith (-) shifted (expandReduced @'[axis] @sh (map log (sumAxes @'[axis] (map exp shifted))))
-  where
-    shifted = zipWith (-) input (expandReduced @'[axis] @sh (maximumAxes @'[axis] input))
-
--- | Logarithm of the sum of exponentials, using maximum subtraction for finite inputs.
--- Empty tensors produce negative infinity and NaN values propagate.
-logSumExp ::
-  forall sh a.
-  (Shape sh, DType a, RealFloat a, Floating (TensorElement a), Ord (TensorElement a), E.RealFloat (TensorElement a)) =>
-  Tensor sh a ->
-  TensorElement a
-logSumExp (Tensor input)
-  | shapeSize @sh == 0 = constant (negate (1 / 0) :: a)
-  | otherwise = select (E.isInfinite peak) peak (peak + log total)
-  where
-    peak = TensorElement (A.the (A.fold1All (elementOp max) input))
-    total = sum (map (\x -> exp (x - peak)) (Tensor input :: Tensor sh a))
-
--- | Logarithm of summed exponentials over selected axes, removing those axes.
--- Empty regions produce negative infinity; infinite extrema are preserved and NaN values propagate.
-logSumExpAxes ::
-  forall xs sh a.
-  (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, RealFloat a, Floating (TensorElement a), Ord (TensorElement a), E.RealFloat (TensorElement a)) =>
-  Tensor sh a ->
-  Tensor (ReduceShape xs sh) a
-logSumExpAxes input
-  | reductionSize @xs @sh == 0 = Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (A.constant (negate (1 / 0) :: a)))
-  | null (axes @xs) = Tensor (A.reshape (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensor input))
-  | otherwise = select (E.isInfinite peak) peak (zipWith (+) peak (map log total))
-  where
-    peak = reduceAxesWith @xs (A.fold1 (elementOp max)) input
-    shifted = zipWith (-) input (expandReduced @xs @sh peak)
-    total = sumAxes @xs (map exp shifted)
 
 -- | Choose an extremum together with its earliest position, including the first NaN.
 -- Explicit position tie-breaking makes the result independent of the fold tree.
@@ -289,13 +620,3 @@ argReduce better input
   where
     outputShape = backendShape (Proxy @(ReduceShape '[axis] sh))
     positioned = A.imap (\ix value -> A.lift (A.indexHead ix, value)) (reductionMatrix @'[axis] input)
-
--- | Position of the maximum along one nonempty axis, removing that axis.
--- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
-argmax :: forall axis sh a. (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh, DType a, Ord (TensorElement a)) => Tensor sh a -> Tensor (ReduceShape '[axis] sh) Int
-argmax = argReduce @axis (E.>)
-
--- | Position of the minimum along one nonempty axis, removing that axis.
--- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.
-argmin :: forall axis sh a. (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh, DType a, Ord (TensorElement a)) => Tensor sh a -> Tensor (ReduceShape '[axis] sh) Int
-argmin = argReduce @axis (E.<)

@@ -154,7 +154,7 @@ propCond = H.property $ do
   let lhs = T.fromList @'[3] [1, 2, 3 :: Int]
       rhs = T.fromList @'[3] [4, 5, 6 :: Int]
   T.toList (T.run T.CPU (T.cond (T.sum lhs T.> 0) (lhs + 1) rhs)) H.=== [2, 3, 4]
-  T.toList (T.run T.CPU (T.cond (T.constant False) lhs rhs)) H.=== [4, 5, 6]
+  T.toList (T.run T.CPU (T.cond (T.scalar (T.constant False)) lhs rhs)) H.=== [4, 5, 6]
 
 propSelectEdges :: H.Property
 propSelectEdges = H.property $ do

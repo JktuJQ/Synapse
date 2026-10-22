@@ -5,13 +5,13 @@ module Valid where
 
 import qualified Synapse.Tensor as T
 
-total :: T.TensorElement Int
+total :: T.Tensor '[] Int
 total = T.sum (T.zeros @'[2, 3])
 
-average :: T.TensorElement Double
+average :: T.Tensor '[] Double
 average = T.mean (T.zeros @'[0])
 
-scalarMinimum :: T.TensorElement Int
+scalarMinimum :: T.Tensor '[] Int
 scalarMinimum = T.minimum (T.scalar 5)
 
 columns :: T.Tensor '[3] Int
