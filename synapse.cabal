@@ -82,6 +82,12 @@ library
 
     other-modules:    Synapse.Autograd.Type
                     , Synapse.Autograd.Differentiable
+                    , Synapse.Autograd.Tensor.Type
+                    , Synapse.Autograd.Tensor.Ops.Math
+                    , Synapse.Autograd.Tensor.Ops.Shape
+                    , Synapse.Autograd.Tensor.Ops.Reduction
+                    , Synapse.Autograd.Tensor.Ops.Index
+                    , Synapse.Autograd.Tensor.Helpers
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
@@ -104,7 +110,9 @@ test-suite synapse-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
-    other-modules:    TensorTest
+    other-modules:    AutogradTest
+                    , AutogradTest.Tensor
+                    , TensorTest
                     , TensorTest.Backend
                     , TensorTest.Construction
                     , TensorTest.Conversion
@@ -128,6 +136,7 @@ test-suite synapse-test
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
                     , accelerate >= 1.3 && < 1.5
+                    , backprop >= 0.2.7.2 && < 0.3
                     , hedgehog >= 1.5 && < 1.8
                     , tasty >= 1.5 && < 1.6
                     , tasty-hedgehog >= 1.4 && < 1.5

@@ -5,7 +5,6 @@
 -- @
 -- import qualified Synapse.Autograd as AG
 -- @
---
 module Synapse.Autograd
   ( Backpropagatable (..),
     Context,

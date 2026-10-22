@@ -6,7 +6,7 @@ module Main (main) where
 
 import qualified Synapse.Tensor as T
 
-showTensor :: forall sh a. (T.Shape sh, T.DType a, Show a) => String -> T.Tensor sh a -> IO ()
+showTensor :: (T.Shape sh, T.DType a, Show a) => String -> T.Tensor sh a -> IO ()
 showTensor label = showData label . T.run T.CPU
 
 showData :: forall sh a. (T.Shape sh, T.DType a, Show a) => String -> T.TensorData sh a -> IO ()
@@ -72,9 +72,9 @@ shapes :: IO ()
 shapes = do
   putStrLn "\nShapes and axes"
   let matrix = T.fromList @'[2, 3] [1 .. 6 :: Double]
-      row = T.fromList @'[3] [10, 20, 30 :: Double]
+      row = T.fromList @'[3] [10, 20, 30]
       cube = T.reshape @'[1, 2, 3] matrix
-  showTensor "broadcast row and add" (matrix + T.broadcast @'[2, 3] row)
+  showTensor "broadcast row and add" (matrix + T.broadcast row)
   showTensor "reshape" (T.reshape @'[3, 2] matrix)
   showTensor "unsqueeze" (T.unsqueeze @0 matrix)
   showTensor "squeeze" (T.squeeze @0 cube)
@@ -98,7 +98,7 @@ linearAlgebra = do
   putStrLn "\nLinear algebra"
   let vector = T.fromList @'[3] [1, 2, 3 :: Double]
       lhs = T.fromList @'[2, 3] [1 .. 6 :: Double]
-      rhs = T.fromList @'[3, 2] [1 .. 6 :: Double]
+      rhs = T.fromList @'[3, 2] [1 .. 6]
   showTensor "dot" (T.dot vector vector)
   showTensor "matmul" (T.matmul lhs rhs)
   showTensor "batched matmul" (T.matmul (T.stack @0 lhs lhs) (T.stack @0 rhs rhs))
@@ -142,18 +142,15 @@ controlFlow = do
 preparedFunctions :: IO ()
 preparedFunctions = do
   putStrLn "\nPrepared tensor functions"
-  let affine = T.run1 T.CPU (\x -> x * 2 + 1) :: T.TensorData '[3] Double -> T.TensorData '[3] Double
+  let affine = T.run1 T.CPU (\x -> x * 2 + 1)
       first = T.run T.CPU (T.fromList @'[3] [1, 2, 3 :: Double])
-      second = T.run T.CPU (T.fromList @'[3] [4, 5, 6 :: Double])
-      multiply = T.run2 T.CPU T.matmul :: T.TensorData '[2, 3] Double -> T.TensorData '[3, 2] Double -> T.TensorData '[2, 2] Double
+      second = T.run T.CPU (T.fromList @'[3] [4, 5, 6])
+      multiply = T.run2 T.CPU T.matmul
       lhs = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Double])
-      rhs = T.run T.CPU (T.fromList @'[3, 2] [1 .. 6 :: Double])
-      other = T.run T.CPU (T.ones @'[3, 2] @Double)
-      linear :: T.TensorData '[2, 3] Double -> T.TensorData '[3, 2] Double -> T.TensorData '[2] Double -> T.TensorData '[2, 2] Double
+      rhs = T.run T.CPU (T.fromList @'[3, 2] [1 .. 6])
+      other = T.run T.CPU (T.ones @'[3, 2])
       linear = T.run3 T.CPU (\x w b -> T.matmul x w + T.broadcast b)
-      summarize :: T.TensorData '[3] Double -> (T.TensorData '[3] Double, (T.TensorData '[] Double, T.TensorData '[3] Bool))
       summarize = T.run1 T.CPU (\x -> (x * 2 + 1, (T.mean x, x T.> 2)))
-      maskedLinear :: T.TensorData '[2, 3] Double -> T.TensorData '[3, 2] Double -> T.TensorData '[2] Double -> T.TensorData '[2, 2] Bool -> T.TensorData '[2, 2] Double
       maskedLinear = T.run4 T.CPU (\x w b mask -> T.select mask (T.matmul x w + T.broadcast b) 0)
   putStrLn "run1: reuse with two inputs"
   print (T.toList (affine first))
@@ -162,8 +159,8 @@ preparedFunctions = do
   print (T.toList (multiply lhs rhs))
   print (T.toList (multiply lhs other))
   putStrLn "run3: inputs, weights, and bias"
-  print (T.toList (linear lhs rhs (T.run T.CPU (T.fromList @'[2] [1, 2 :: Double]))))
-  print (T.toList (linear lhs other (T.run T.CPU (T.zeros @'[2] @Double))))
+  print (T.toList (linear lhs rhs (T.run T.CPU (T.fromList @'[2] [1, 2]))))
+  print (T.toList (linear lhs other (T.run T.CPU (T.zeros @'[2]))))
   putStrLn "run1: nested results with different shapes and element types"
   let showSummary input = do
         let (values, (average, mask)) = summarize input
@@ -177,17 +174,16 @@ preparedFunctions = do
   showData "values" values
   showData "flags" flags
   putStrLn "run4: partially apply inputs, weights, and bias; vary the mask"
-  let applyMask = maskedLinear lhs rhs (T.run T.CPU (T.fromList @'[2] [1, 2 :: Double]))
+  let applyMask = maskedLinear lhs rhs (T.run T.CPU (T.fromList @'[2] [1, 2]))
   showData "diagonal mask" (applyMask (T.run T.CPU (T.fromList @'[2, 2] [True, False, False, True])))
   showData "all values" (applyMask (T.run T.CPU (T.full @'[2, 2] True)))
 
 classification :: IO ()
 classification = do
   putStrLn "\nLinear classifier"
-  let inputs = T.fromList @'[3, 2] [2, 0, 0, 2, 1, 1 :: Double]
-      weights = T.fromList @'[2, 3] [1, -1, 0, -1, 1, 0 :: Double]
+  let inputs = T.fromList @'[3, 2] [2, 0, 0, 2, 1, 1]
+      weights = T.fromList @'[2, 3] [1, -1, 0, -1, 1, 0]
       bias = T.fromList @'[3] [0, 0, 0.5 :: Double]
-      evaluate :: T.TensorData '[3, 2] Double -> T.TensorData '[2, 3] Double -> T.TensorData '[3] Double -> (T.TensorData '[3, 3] Double, T.TensorData '[3, 3] Double, T.TensorData '[3] Int)
       evaluate = T.run3 T.CPU $ \x w b ->
         let scores = T.matmul x w + T.broadcast b
          in (scores, T.softmax @1 scores, T.argmax @1 scores)

@@ -1,5 +1,6 @@
 module Main (main) where
 
+import qualified AutogradTest
 import qualified TensorTest
 import Test.Tasty (defaultMain, testGroup)
 
@@ -8,5 +9,6 @@ main =
   defaultMain $
     testGroup
       "synapse"
-      [ TensorTest.tests
+      [ TensorTest.tests,
+        AutogradTest.tests
       ]

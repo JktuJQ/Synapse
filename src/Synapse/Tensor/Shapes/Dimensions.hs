@@ -47,14 +47,14 @@ type family ShapeSize (sh :: [Nat]) :: Nat where
   ShapeSize '[] = 1
   ShapeSize (dim ': rest) = dim * ShapeSize rest
 
--- | Recursive builder for Accelerate shape types from a reversed Synapse shape.
+-- | Recursive builder for <https://hackage.haskell.org/package/accelerate Accelerate> shape types from a reversed Synapse shape.
 type family ShapeToDIMRev (sh :: [Nat]) :: Type where
   ShapeToDIMRev '[] = A.Z
   ShapeToDIMRev (dim ': rest) = ShapeToDIMRev rest A.:. Int
 
--- | Convert a Synapse shape to Accelerate's recursive shape type.
+-- | Convert a Synapse shape to <https://hackage.haskell.org/package/accelerate Accelerate>'s recursive shape type.
 --
--- The Synapse shape @'[d1, d2, d3]@ maps to Accelerate's @Z :. Int :. Int :. Int@, preserving the same left-to-right axis order at the value level.
+-- The Synapse shape @'[d1, d2, d3]@ maps to <https://hackage.haskell.org/package/accelerate Accelerate>'s @Z :. Int :. Int :. Int@, preserving the same left-to-right axis order at the value level.
 type ShapeToDIM (sh :: [Nat]) = ShapeToDIMRev (Reverse sh)
 
 -- | Convert a type-level natural number to an 'Int'.
@@ -63,7 +63,7 @@ dimVal = fromInteger . toInteger $ natVal (Proxy @n)
 
 -- | Runtime witness builder for reversed Synapse shapes.
 class (A.Shape (ShapeToDIMRev sh)) => ShapeRev (sh :: [Nat]) where
-  -- | Build the Accelerate shape value for a reversed Synapse shape.
+  -- | Build the <https://hackage.haskell.org/package/accelerate Accelerate> shape value for a reversed Synapse shape.
   backendShapeRev :: proxy sh -> ShapeToDIMRev sh
 
   -- | Prepend dimensions in user-facing order to a suffix.
