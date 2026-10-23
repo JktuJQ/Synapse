@@ -40,6 +40,19 @@ uniform lower upper generator
   | lower == upper = full @sh lower
   | otherwise = unsafeFromList @sh $ take (shapeSize @sh) $ uniformRs (lower, upper) generator
 
+-- | Generate standard normal pairs using the Marsaglia polar method.
+-- Rejected pairs exclude the origin and the boundary of the unit disk.
+normalSamples :: (RandomGen g) => g -> [Double]
+normalSamples generator =
+  let (u, next) = uniformR (-1, 1) generator
+      (v, rest) = uniformR (-1, 1) next
+      radius = u * u + v * v
+   in if radius <= 0 || radius >= 1
+        then normalSamples rest
+        else
+          let scale = sqrt (((-2) * log radius) / radius)
+           in u * scale : v * scale : normalSamples rest
+
 -- | Initialize elements from a normal distribution with the supplied mean and standard deviation.
 -- Both parameters must be finite and the standard deviation must be nonnegative.
 -- A zero standard deviation produces a constant tensor; invalid parameters raise an error.
@@ -121,16 +134,3 @@ kaimingNormal ::
   g ->
   Tensor sh a
 kaimingNormal fan slope = normal @sh 0 (kaimingScale fan slope)
-
--- | Generate standard normal pairs using the Marsaglia polar method.
--- Rejected pairs exclude the origin and the boundary of the unit disk.
-normalSamples :: (RandomGen g) => g -> [Double]
-normalSamples generator =
-  let (u, next) = uniformR (-1, 1) generator
-      (v, rest) = uniformR (-1, 1) next
-      radius = u * u + v * v
-   in if radius <= 0 || radius >= 1
-        then normalSamples rest
-        else
-          let scale = sqrt (((-2) * log radius) / radius)
-           in u * scale : v * scale : normalSamples rest

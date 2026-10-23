@@ -67,6 +67,7 @@ library
                     , Synapse.NN.Loss
                     , Synapse.NN.Activation
                     , Synapse.NN.Initialization
+                    , Synapse.NN.Metrics
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
                     , Synapse.Autograd.Execution
@@ -137,6 +138,7 @@ test-suite synapse-test
     other-modules:    NNTest
                     , NNTest.Activation
                     , NNTest.Initialization
+                    , NNTest.Metrics
                     , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise
