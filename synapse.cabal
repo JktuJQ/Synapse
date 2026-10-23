@@ -64,6 +64,7 @@ library
     exposed-modules:  Synapse
                     , Synapse.NN
                     , Synapse.NN.Loss
+                    , Synapse.NN.Activation
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
                     , Synapse.Autograd.Execution
@@ -132,6 +133,7 @@ test-suite synapse-test
     hs-source-dirs:   test
     main-is:          Main.hs
     other-modules:    NNTest
+                    , NNTest.Activation
                     , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise

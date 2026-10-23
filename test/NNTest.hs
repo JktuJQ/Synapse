@@ -5,6 +5,7 @@ module NNTest (tests) where
 
 import Control.Exception (ErrorCall, evaluate, try)
 import qualified Hedgehog as H
+import qualified NNTest.Activation as Activation
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
@@ -17,7 +18,10 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests =
+tests = testGroup "nn" [lossTests, Activation.tests]
+
+lossTests :: TestTree
+lossTests =
   testGroup
     "nn loss"
     [ testProperty "mse supports partially applied mean, sum, and identity reductions" $ H.withTests 1 $ H.property $ do
