@@ -22,6 +22,7 @@ module Synapse.Tensor
     Slicing,
     Element,
     Tensor,
+    TensorLike,
     TensorData,
     TensorElement,
     TensorIndex,
@@ -152,5 +153,5 @@ import Synapse.Tensor.Ops.Reduction (BooleanReductions, LogReductions, MeanReduc
 import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
-import Synapse.Tensor.Type (Element, ElementConstant, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
+import Synapse.Tensor.Type (Element, ElementConstant, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, TensorLike, constant, fromIntegral)
 import Prelude hiding (Eq, Integral, Ord, RealFloat, all, any, concat, fromIntegral, isInfinite, isNaN, max, maximum, min, minimum, not, quot, rem, sum, (!!), (&&), (/=), (<), (<=), (==), (>), (>=), (||))

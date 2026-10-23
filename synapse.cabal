@@ -12,6 +12,7 @@ extra-doc-files:    README.md
                   , SynapseLogo.png
 
 extra-source-files: test/AutogradTest/Differentiable/Fixtures/Rejected/*.hs
+                  , test/NNTest/Fixtures/Rejected/*.hs
                   , test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
                   , test/TensorTest/Shapes/Axes/Fixtures/Rejected/*.hs
                   , test/TensorTest/Ops/Index/Fixtures/Accepted/*.hs
@@ -61,6 +62,8 @@ library
 
     hs-source-dirs:   src
     exposed-modules:  Synapse
+                    , Synapse.NN
+                    , Synapse.NN.Loss
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
                     , Synapse.Autograd.Execution
@@ -128,7 +131,8 @@ test-suite synapse-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
-    other-modules:    AutogradTest
+    other-modules:    NNTest
+                    , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise
                     , AutogradTest.Execution

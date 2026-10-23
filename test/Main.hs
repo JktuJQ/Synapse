@@ -1,6 +1,7 @@
 module Main (main) where
 
 import qualified AutogradTest
+import qualified NNTest
 import qualified TensorTest
 import Test.Tasty (defaultMain, testGroup)
 
@@ -10,5 +11,6 @@ main =
     testGroup
       "synapse"
       [ TensorTest.tests,
-        AutogradTest.tests
+        AutogradTest.tests,
+        NNTest.tests
       ]

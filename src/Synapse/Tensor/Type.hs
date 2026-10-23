@@ -15,6 +15,7 @@
 module Synapse.Tensor.Type
   ( ElementConstant (..),
     Tensor (..),
+    TensorLike,
     Element,
     TensorElement (..),
     TensorIndex (..),
@@ -59,9 +60,13 @@ newtype Tensor (sh :: [Nat]) a
 newtype TensorElement a
   = TensorElement {unTensorElement :: A.Exp a}
 
+-- | Kind of tensor representations indexed by a static shape and an element type.
+-- This synonym describes the type parameters without requiring any tensor operations.
+type TensorLike = [Nat] -> Type -> Type
+
 -- | Element expressions associated with a tensor representation.
 -- Each element representation identifies its corresponding tensor representation.
-type family Element (t :: [Nat] -> Type -> Type) = (e :: Type -> Type) | e -> t
+type family Element (t :: TensorLike) = (e :: Type -> Type) | e -> t
 
 type instance Element Tensor = TensorElement
 
