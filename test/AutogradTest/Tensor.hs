@@ -6,11 +6,11 @@
 
 module AutogradTest.Tensor (tests) where
 
+import qualified AutogradTest.Tensor.Elementwise
 import qualified Hedgehog as H
 import qualified Numeric.Backprop.Explicit as BP
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
-import qualified AutogradTest.Tensor.Elementwise
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)

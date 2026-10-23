@@ -67,8 +67,7 @@ lossTests =
         values loss H.=== [0]
         values gradient H.=== [0, 0, 0],
       testProperty "prepared mse gradients accept changing predictions and targets" $ H.withTests 1 $ H.property $ do
-        let execute = T.run2 T.CPU $ \predictions targets ->
-              AG.backprop (uncurry (NN.mse T.sum)) (predictions, targets)
+        let execute = T.run2 T.CPU $ curry (AG.backprop (uncurry (NN.mse T.sum)))
             first = T.run T.CPU (T.fromList @'[2] [1, 3 :: Double])
             second = T.run T.CPU (T.fromList @'[2] [0, 1 :: Double])
             (firstLoss, (firstDP, firstDT)) = execute first second
@@ -141,8 +140,9 @@ lossTests =
               case result of
                 Left _ -> pure ()
                 Right _ -> H.failure
-        mapM_ (rejects (NN.huber T.sum)) [0, -1, 0 / 0, 1 / 0, -1 / 0]
-        mapM_ (rejects (NN.smoothL1 T.sum)) [-1, 0 / 0, 1 / 0, -1 / 0],
-      testProperty "mse rejects mismatched prediction and target shapes" $ H.withTests 1 $
-        Compiler.rejects "test/NNTest/Fixtures/Rejected/MSEShape.hs" "Couldn't match type"
+        mapM_ (rejects (NN.huber T.sum)) [0, -1, 0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (rejects (NN.smoothL1 T.sum)) [-1, 0 / 0, 1 / 0, -(1 / 0)],
+      testProperty "mse rejects mismatched prediction and target shapes" $
+        H.withTests 1 $
+          Compiler.rejects "test/NNTest/Fixtures/Rejected/MSEShape.hs" "Couldn't match type"
     ]

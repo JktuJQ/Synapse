@@ -78,7 +78,7 @@ tests =
             H.assert (abs (dy / expected - 1) < 1e-12)
           _ -> H.failure,
       testProperty "activations propagate NaN and handle infinite inputs" $ H.withTests 1 $ H.property $ do
-        let input = T.fromList @'[3] [-1 / 0, 1 / 0, 0 / 0 :: Double]
+        let input = T.fromList @'[3] [-(1 / 0), 1 / 0, 0 / 0 :: Double]
             check :: T.Tensor '[3] Double -> [Double] -> H.PropertyT IO ()
             check actual expected = case values actual of
               [negative, positive, nan] -> do
@@ -86,7 +86,7 @@ tests =
                 H.assert (isNaN nan)
               _ -> H.failure
         check (NN.relu input) [0, 1 / 0]
-        check (NN.leakyRelu 0.1 input) [-1 / 0, 1 / 0]
+        check (NN.leakyRelu 0.1 input) [-(1 / 0), 1 / 0]
         check (NN.sigmoid input) [0, 1]
         check (NN.tanh input) [-1, 1]
         check (NN.softplus input) [0, 1 / 0],

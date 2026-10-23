@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -38,7 +37,9 @@ extremumVariable ::
   (Context s, Backpropagatable a, Fractional a, E.Ord a, E.Conditional a, E.Comparison a ~ E.Condition a) =>
   (a -> a -> a) ->
   (a -> a -> E.Comparison a) ->
-  Var s a -> Var s a -> Var s a
+  Var s a ->
+  Var s a ->
+  Var s a
 extremumVariable operation loses = liftBinary add add $ \x y ->
   ( operation x y,
     \gradient ->
@@ -94,4 +95,3 @@ instance (E.RealFloat (T.TensorElement a)) => E.RealFloat (TensorElement s a) wh
 
 instance (Context s, DType a, Num (T.TensorElement a)) => Scalar (Tensor s) a where
   scalarOp (TensorElement x) = Tensor (liftUnary add (\value -> (C.scalar value, I.index @'[])) x)
-

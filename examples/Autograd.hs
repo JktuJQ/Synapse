@@ -1,13 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Main (main) where
 
+import Control.Monad (when)
 import GHC.Generics (Generic)
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
@@ -90,7 +90,7 @@ maskedValues = do
   showTensor "ReLU" value
   showTensor "ReLU gradient: zero at the boundary" gradient
   showTensor "gradient through index, element arithmetic, and scalar" (AG.gradient selectedSquare input)
-  showTensor "max x 0 gradient: ties split equally" (AG.gradient (\x -> T.max x 0) input)
+  showTensor "max x 0 gradient: ties split equally" (AG.gradient (`T.max` 0) input)
 
 linearRegression :: IO ()
 linearRegression = do
@@ -108,9 +108,8 @@ linearRegression = do
       train :: Int -> T.TensorData '[2, 1] Double -> T.TensorData '[1] Double -> IO (T.TensorData '[2, 1] Double, T.TensorData '[1] Double)
       train iteration w b = do
         let (loss, (nextW, nextB)) = step batchData w b
-        if iteration `mod` 10 == 0
-          then showData ("step " ++ show iteration ++ ", mean squared error") loss
-          else pure ()
+        when (iteration `mod` 10 == 0) $
+          showData ("step " ++ show iteration ++ ", mean squared error") loss
         if iteration == 40
           then pure (w, b)
           else train (iteration + 1) nextW nextB
@@ -124,5 +123,5 @@ linearRegression = do
   showTensor "targets" target
   showTensor "gradient with respect to input features" $
     AG.gradient
-      (\features -> T.sum (predict (AG.constant (Parameters (T.fromData trainedWeights) (T.fromData trainedBias))) features))
+      (T.sum . predict (AG.constant (Parameters (T.fromData trainedWeights) (T.fromData trainedBias))))
       input

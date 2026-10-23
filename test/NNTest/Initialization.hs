@@ -112,17 +112,17 @@ tests =
         H.assert (any (/= 0) tinySamples),
       testProperty "invalid distribution parameters are rejected" $ H.withTests 1 $ H.property $ do
         rejects (NN.uniform @'[1] 2 1 seed)
-        mapM_ (\x -> rejects (NN.uniform @'[1] x 1 seed)) [0 / 0, 1 / 0, -1 / 0]
-        mapM_ (\x -> rejects (NN.uniform @'[1] 0 x seed)) [0 / 0, 1 / 0, -1 / 0]
-        mapM_ (\x -> rejects (NN.normal @'[1] x 1 seed)) [0 / 0, 1 / 0, -1 / 0]
-        mapM_ (\x -> rejects (NN.normal @'[1] 0 x seed)) [-1, 0 / 0, 1 / 0, -1 / 0],
+        mapM_ (\x -> rejects (NN.uniform @'[1] x 1 seed)) [0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (\x -> rejects (NN.uniform @'[1] 0 x seed)) [0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (\x -> rejects (NN.normal @'[1] x 1 seed)) [0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (\x -> rejects (NN.normal @'[1] 0 x seed)) [-1, 0 / 0, 1 / 0, -(1 / 0)],
       testProperty "invalid fans, gains, and slopes are rejected" $ H.withTests 1 $ H.property $ do
         mapM_ (\fan -> rejects (NN.xavierUniform @'[1] fan 2 1 seed)) [0, -1]
         mapM_ (\fan -> rejects (NN.xavierNormal @'[1] 2 fan 1 seed)) [0, -1]
-        mapM_ (\gain -> rejects (NN.xavierUniform @'[1] 2 3 gain seed)) [-1, 0 / 0, 1 / 0, -1 / 0]
-        mapM_ (\gain -> rejects (NN.xavierNormal @'[1] 2 3 gain seed)) [-1, 0 / 0, 1 / 0, -1 / 0]
+        mapM_ (\gain -> rejects (NN.xavierUniform @'[1] 2 3 gain seed)) [-1, 0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (\gain -> rejects (NN.xavierNormal @'[1] 2 3 gain seed)) [-1, 0 / 0, 1 / 0, -(1 / 0)]
         mapM_ (\fan -> rejects (NN.kaimingUniform @'[1] fan 0 seed)) [0, -1]
         mapM_ (\fan -> rejects (NN.kaimingNormal @'[1] fan 0 seed)) [0, -1]
-        mapM_ (\slope -> rejects (NN.kaimingUniform @'[1] 2 slope seed)) [0 / 0, 1 / 0, -1 / 0]
-        mapM_ (\slope -> rejects (NN.kaimingNormal @'[1] 2 slope seed)) [0 / 0, 1 / 0, -1 / 0]
+        mapM_ (\slope -> rejects (NN.kaimingUniform @'[1] 2 slope seed)) [0 / 0, 1 / 0, -(1 / 0)]
+        mapM_ (\slope -> rejects (NN.kaimingNormal @'[1] 2 slope seed)) [0 / 0, 1 / 0, -(1 / 0)]
     ]

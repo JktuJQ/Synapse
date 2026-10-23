@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module AutogradTest.Tensor.Elementwise (tests) where
 
@@ -34,7 +34,7 @@ tests =
         let x = T.fromList @'[3] [1, 2, 3 :: Double]
             y = T.fromList @'[3] [4, 5, 6 :: Double]
             mask = T.fromList @'[3] [True, False, True]
-            (value, backward) = AG.pullback (\(a, b) -> T.select mask a b) (x, y)
+            (value, backward) = AG.pullback (uncurry (T.select mask)) (x, y)
             (dx, dy) = backward (T.fromList @'[3] [2, 3, 5])
         values value H.=== [1, 5, 3]
         values dx H.=== [2, 0, 5]
@@ -57,7 +57,7 @@ tests =
       testProperty "inactive selection gradients stay zero with infinite seeds" $ H.withTests 1 $ H.property $ do
         let input = T.fromList @'[2] [1, 2 :: Double]
             mask = T.fromList @'[2] [True, False]
-            (_, backward) = AG.pullback (\(x, y) -> T.select mask x y) (input, input)
+            (_, backward) = AG.pullback (uncurry (T.select mask)) (input, input)
             (dx, dy) = backward (T.full @'[2] (1 / 0))
         values dx H.=== [1 / 0, 0]
         values dy H.=== [0, 1 / 0],
@@ -68,8 +68,8 @@ tests =
       testProperty "element extrema divide gradients at ties" $ H.withTests 1 $ H.property $ do
         let x = T.fromList @'[3] [1, 2, 4 :: Double]
             y = T.fromList @'[3] [3, 2, 0 :: Double]
-            (largest, (maxX, maxY)) = AG.backprop (\(a, b) -> T.max a b) (x, y)
-            (smallest, (minX, minY)) = AG.backprop (\(a, b) -> T.min a b) (x, y)
+            (largest, (maxX, maxY)) = AG.backprop (uncurry T.max) (x, y)
+            (smallest, (minX, minY)) = AG.backprop (uncurry T.min) (x, y)
         values largest H.=== [3, 2, 4]
         values smallest H.=== [1, 2, 0]
         values maxX H.=== [0, 0.5, 1]
