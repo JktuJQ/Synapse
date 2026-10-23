@@ -8,6 +8,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Core tensor type.
@@ -27,7 +28,7 @@ import qualified Data.Array.Accelerate as A
 import Data.Kind (Type)
 import GHC.TypeLits (Nat)
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shapes.Dimensions (ShapeToDIM)
+import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
 import Prelude hiding (fromIntegral)
 
 -- | Embedding host values into element expressions.
@@ -89,3 +90,6 @@ class FromIntegral a b where
 
 instance (A.Integral a, A.FromIntegral a b) => FromIntegral (TensorElement a) (TensorElement b) where
   fromIntegral (TensorElement x) = TensorElement (A.fromIntegral x)
+
+instance (out ~ sh, Shape sh, DType a, DType b, A.Integral a, A.FromIntegral a b) => FromIntegral (Tensor sh a) (Tensor out b) where
+  fromIntegral (Tensor x) = Tensor (A.map A.fromIntegral x)

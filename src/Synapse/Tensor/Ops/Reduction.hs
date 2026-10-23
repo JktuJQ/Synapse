@@ -42,7 +42,8 @@ import qualified Data.Array.Accelerate as A
 import Data.List (foldl', partition)
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Ops.Elementwise (Ord (..), map, select, zipWith, (&&), (||))
+import Synapse.Tensor.Ops.Elementwise (Ord (..), select, (&&), (||))
+import Synapse.Tensor.Ops.Elementwise.Helpers (map, zipWith)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Shapes.Axes (Axes (..), CanReduce, CanReduceNonEmpty, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape, shape, shapeSize, strides)
@@ -605,12 +606,12 @@ choosePosition better left right = unTensorElement (select rightWins y x)
   where
     x = TensorElement left
     y = TensorElement right
-    lx = E.snd x
-    ry = E.snd y
+    lx = TensorElement (A.snd left)
+    ry = TensorElement (A.snd right)
     leftNaN = lx E./= lx
     rightNaN = ry E./= ry
     tied = (leftNaN && rightNaN) || (lx E.== ry)
-    rightWins = (E.not leftNaN && (rightNaN || better ry lx)) || (tied && (E.fst y E.< E.fst x))
+    rightWins = (E.not leftNaN && (rightNaN || better ry lx)) || (tied && (TensorElement (A.fst right) E.< TensorElement (A.fst left)))
 
 -- | Reduce one axis while retaining the position rather than the extremum value.
 argReduce :: forall axis sh a. (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], DType a, Ord (TensorElement a)) => (TensorElement a -> TensorElement a -> TensorElement Bool) -> Tensor sh a -> Tensor (ReduceShape '[axis] sh) Int

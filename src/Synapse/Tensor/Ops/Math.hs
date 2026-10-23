@@ -17,7 +17,7 @@ import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.Construction (full)
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Ops.Elementwise (map, zipWith)
+import Synapse.Tensor.Ops.Elementwise.Helpers (map, zipWith)
 import qualified Synapse.Tensor.Ops.Reduction as R
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shape, shapeSize)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)

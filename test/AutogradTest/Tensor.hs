@@ -10,6 +10,7 @@ import qualified Hedgehog as H
 import qualified Numeric.Backprop.Explicit as BP
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
+import qualified AutogradTest.Tensor.Elementwise
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -40,7 +41,8 @@ tests :: TestTree
 tests =
   testGroup
     "tensor operations"
-    [ testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
+    [ AutogradTest.Tensor.Elementwise.tests,
+      testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             (value, gradient) = differentiate forward input
         values value H.=== values (forward input)

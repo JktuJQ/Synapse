@@ -48,7 +48,7 @@ tests =
 propRun4Types :: H.Property
 propRun4Types = H.property $ do
   let execute :: T.TensorData '[2, 3] Int -> T.TensorData '[3, 2] Int -> T.TensorData '[2] Double -> T.TensorData '[2, 2] Bool -> T.TensorData '[2, 2] Double
-      execute = T.run4 T.CPU (\x w b m -> T.select m (T.map T.fromIntegral (T.matmul x w) + T.broadcast @'[2, 2] b) 0)
+      execute = T.run4 T.CPU (\x w b m -> T.select m (T.fromIntegral (T.matmul x w) + T.broadcast @'[2, 2] b) 0)
       lhs = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Int])
       rhs = T.run T.CPU (T.fromList @'[3, 2] [1 .. 6 :: Int])
       bias = T.run T.CPU (T.fromList @'[2] [0.5, 1.5 :: Double])
@@ -121,7 +121,7 @@ propRun1 = H.property $ do
 
 propRun1Types :: H.Property
 propRun1Types = H.property $ do
-  let execute = T.run1 T.CPU (T.transpose . T.map T.fromIntegral) :: T.TensorData '[2, 3] Int -> T.TensorData '[3, 2] Double
+  let execute = T.run1 T.CPU (T.transpose . T.fromIntegral) :: T.TensorData '[2, 3] Int -> T.TensorData '[3, 2] Double
       first = T.run T.CPU (T.fromList @'[2, 3] [1 .. 6 :: Int])
       second = T.run T.CPU (T.fromList @'[2, 3] [7 .. 12 :: Int])
       total = T.run1 T.CPU T.sum :: T.TensorData '[2, 3] Int -> T.TensorData '[] Int
@@ -170,7 +170,7 @@ propRun3 = H.property $ do
 propRun3Types :: H.Property
 propRun3Types = H.property $ do
   let execute :: T.TensorData '[2] Bool -> T.TensorData '[2] Int -> T.TensorData '[2] Double -> T.TensorData '[2] Double
-      execute = T.run3 T.CPU (\m a b -> T.select m (T.map T.fromIntegral a + b) 0)
+      execute = T.run3 T.CPU (\m a b -> T.select m (T.fromIntegral a + b) 0)
       mask = T.run T.CPU (T.fromList @'[2] [True, False])
       x = T.run T.CPU (T.fromList @'[2] [1, 2 :: Int])
       y = T.run T.CPU (T.fromList @'[2] [3, 4 :: Double])
@@ -285,11 +285,9 @@ propRun9 = H.property $ do
       x7 = T.run T.CPU (T.fromList @'[2] [7, -7 :: Int])
       x8 = T.run T.CPU (T.fromList @'[2] [8, -8 :: Int])
       x9 = T.run T.CPU (T.fromList @'[2] [9, -9 :: Int])
-      zipInputs = T.run9 T.CPU T.zip9
   T.toList (execute x1 x2 x3 x4 x5 x6 x7 x8 x9) H.=== [285, -285]
   T.toList (execute x9 x8 x7 x6 x5 x4 x3 x2 x1) H.=== [165, -165]
   T.toList (execute x1 x2 x3 x4 x5 x6 x7 x8 x9) H.=== [285, -285]
-  T.toList (zipInputs x1 x2 x3 x4 x5 x6 x7 x8 x9) H.=== [(1, 2, 3, 4, 5, 6, 7, 8, 9), (-1, -2, -3, -4, -5, -6, -7, -8, -9)]
 
   let executeOutputs = T.run9 T.CPU (\firstTensor _ _ _ _ _ _ _ lastTensor -> (firstTensor, T.scalar (T.index @'[0] lastTensor)))
       (firstOutput, lastOutput) = executeOutputs x1 x2 x3 x4 x5 x6 x7 x8 x9

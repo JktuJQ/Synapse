@@ -3,13 +3,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Tensor construction and initialisation.
 module Synapse.Tensor.Construction
-  ( Construction (..),
+  ( Scalar (..),
+    Construction (..),
     arange,
     eye,
     fill,
@@ -30,23 +32,23 @@ where
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Ops.Elementwise (map)
+import Synapse.Tensor.Ops.Elementwise.Helpers (map)
 import Synapse.Tensor.Ops.Index (coordinate)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
 import Synapse.Tensor.Type (Element, FromIntegral, Tensor (..), TensorElement (..), TensorIndex (..), constant)
 import qualified Synapse.Tensor.Type as E
 import Prelude hiding (map)
 
+-- | Embedding an element expression in a scalar tensor.
+class (DType a) => Scalar t a where
+  -- | Preserve an element expression as a rank-zero tensor.
+  scalarOp :: Element t a -> t '[] a
+
+instance (DType a) => Scalar Tensor a where
+  scalarOp (TensorElement x) = Tensor (A.unit x)
+
 -- | Construction of tensor expressions from values and element generators.
 class Construction t where
-  -- | Turn an element expression into a rank-zero tensor for execution.
-  -- Numeric literals work directly; use 'constant' for existing host values.
-  scalarOp ::
-    forall a.
-    (DType a) =>
-    Element t a ->
-    t '[] a
-
   -- | Generate each element from its complete multidimensional index.
   -- The callback builds element expressions.
   -- Use @coordinate \@axis@ to read an axis coordinate.
@@ -153,8 +155,6 @@ class Construction t where
     t '[n, n] a
 
 instance Construction Tensor where
-  scalarOp = Tensor . A.unit . unTensorElement
-
   fromGenOp ::
     forall sh a.
     (Shape sh, DType a) =>
@@ -270,9 +270,10 @@ instance Construction Tensor where
 
 -- | Turn an element expression into a rank-zero tensor for execution.
 -- Numeric literals work directly; use 'constant' for existing host values.
+-- Differentiable element expressions retain their gradient history.
 scalar ::
   forall {t} a.
-  (Construction t, DType a) =>
+  (Scalar t a) =>
   Element t a ->
   t '[] a
 scalar = scalarOp @t @a

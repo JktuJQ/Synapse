@@ -11,6 +11,7 @@ module Synapse.Autograd.Type
     Context,
     Var (..),
     stopVariable,
+    variableValue,
     liftUnary,
     liftBinary,
   )
@@ -66,9 +67,13 @@ newtype Var s a = Var
     unVar :: BP.BVar s a
   }
 
+-- | Read the staged value used to construct nondifferentiable predicates.
+variableValue :: Var s a -> a
+variableValue = BPI._bvVal . unVar
+
 -- | Preserve a variable's value while discarding its tape edges.
 stopVariable :: Var s a -> Var s a
-stopVariable = Var . BPE.auto . BPI._bvVal . unVar
+stopVariable = Var . BPE.auto . variableValue
 
 -- | Lift a value computation together with its vector-Jacobian product.
 -- The accumulation function combines contributions to the input variable.

@@ -6,10 +6,9 @@
 -- import qualified Synapse.Tensor as T
 -- @
 module Synapse.Tensor
-  ( Construction,
+  ( Scalar,
+    Construction,
     ElementConstant,
-    Elementwise,
-    ElementControl,
     ShapeOps,
     LinearAlgebra,
     Reductions,
@@ -53,11 +52,6 @@ module Synapse.Tensor
     (||),
     select,
     cond,
-    while,
-    iterate,
-    pair,
-    fst,
-    snd,
     (==),
     (/=),
     (<),
@@ -87,31 +81,6 @@ module Synapse.Tensor
     identity,
     linspace,
     logspace,
-    map,
-    zip,
-    zip3,
-    zip4,
-    zip5,
-    zip6,
-    zip7,
-    zip8,
-    zip9,
-    zipWith,
-    zipWith3,
-    zipWith4,
-    zipWith5,
-    zipWith6,
-    zipWith7,
-    zipWith8,
-    zipWith9,
-    unzip,
-    unzip3,
-    unzip4,
-    unzip5,
-    unzip6,
-    unzip7,
-    unzip8,
-    unzip9,
     ones,
     onesLike,
     run,
@@ -157,7 +126,8 @@ where
 
 import Synapse.Tensor.Backend (Backend (..), run, run1, run2, run3, run4, run5, run6, run7, run8, run9)
 import Synapse.Tensor.Construction
-  ( Construction,
+  ( Scalar,
+    Construction,
     arange,
     eye,
     fill,
@@ -175,7 +145,7 @@ import Synapse.Tensor.Construction
   )
 import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
 import Synapse.Tensor.DType (DType, Float32, Float64)
-import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, ElementControl, Elementwise, Eq, Integral, Ord, RealFloat, cond, fst, isInfinite, isNaN, iterate, map, max, min, not, pair, quot, rem, select, snd, unzip, unzip3, unzip4, unzip5, unzip6, unzip7, unzip8, unzip9, while, zip, zip3, zip4, zip5, zip6, zip7, zip8, zip9, zipWith, zipWith3, zipWith4, zipWith5, zipWith6, zipWith7, zipWith8, zipWith9, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
+import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, isInfinite, isNaN, max, min, not, quot, rem, select, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 import Synapse.Tensor.Ops.Index (Coordinates, Indexable, Indexing, Slicing, coordinate, index, slice, (!!))
 import Synapse.Tensor.Ops.Math (LinearAlgebra, dot, matmul)
 import Synapse.Tensor.Ops.Reduction (BooleanReductions, LogReductions, MeanReductions, Normalization, OrderedReductions, Reductions, all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
@@ -183,4 +153,4 @@ import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast, concat, permuteAxes, resha
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (Element, ElementConstant, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, constant, fromIntegral)
-import Prelude hiding (Eq, Integral, Ord, RealFloat, all, any, concat, fromIntegral, fst, isInfinite, isNaN, iterate, map, max, maximum, min, minimum, not, quot, rem, snd, sum, unzip, unzip3, zip, zip3, zipWith, zipWith3, (!!), (&&), (/=), (<), (<=), (==), (>), (>=), (||))
+import Prelude hiding (Eq, Integral, Ord, RealFloat, all, any, concat, fromIntegral, isInfinite, isNaN, max, maximum, min, minimum, not, quot, rem, sum, (!!), (&&), (/=), (<), (<=), (==), (>), (>=), (||))

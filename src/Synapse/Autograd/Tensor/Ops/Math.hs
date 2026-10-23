@@ -17,7 +17,7 @@ import Synapse.Autograd.Tensor.Helpers (shapeOf, tensorBinary)
 import Synapse.Autograd.Tensor.Type (Tensor (..), TensorElement (..))
 import Synapse.Autograd.Type (Context)
 import Synapse.Tensor.DType (DType)
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Elementwise.Helpers as H
 import Synapse.Tensor.Ops.Math (LinearAlgebra (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import qualified Synapse.Tensor.Type as T
@@ -39,7 +39,7 @@ instance (Context s, DType a, Num a, Num (T.TensorElement a)) => LinearAlgebra (
     ( dotOp x y,
       \(T.Tensor gradient) ->
         let scale = T.TensorElement (A.the gradient)
-         in (E.map (* scale) y, E.map (* scale) x)
+         in (H.map (* scale) y, H.map (* scale) x)
     )
   matmulOp = tensorBinary $ \x y -> (matmulOp x y, matmulPullback x y)
 

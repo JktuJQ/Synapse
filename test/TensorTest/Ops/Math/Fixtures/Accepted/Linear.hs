@@ -31,8 +31,8 @@ squaredTotal input = T.sum (input * input)
 reshapeMatrix :: (T.ShapeOps t Double) => t '[2, 3] Double -> t '[3, 2] Double
 reshapeMatrix = T.reshape @'[3, 2]
 
-convertElements :: (T.Elementwise t, T.FromIntegral (T.Element t Int) (T.Element t Double)) => t '[3] Int -> t '[3] Double
-convertElements = T.map T.fromIntegral
+convertElements :: (T.FromIntegral (t '[3] Int) (t '[3] Double)) => t '[3] Int -> t '[3] Double
+convertElements = T.fromIntegral
 
 generateCoordinates :: (T.Construction t, T.Coordinates (T.Element t), Num (T.Element t Int)) => t '[2, 3] Int
 generateCoordinates = T.fromGen @'[2, 3] (\ix -> T.coordinate @0 ix * 10 + T.coordinate @1 ix)
@@ -43,8 +43,5 @@ readElement = T.index @'[1, 2]
 selectRow :: (T.Slicing t Double) => t '[2, 3] Double -> t '[3] Double
 selectRow = T.slice @'[ 'T.At 1, 'T.All]
 
-makeScalar :: (T.Construction t) => T.Element t Double -> t '[] Double
+makeScalar :: (T.Scalar t Double) => T.Element t Double -> t '[] Double
 makeScalar = T.scalar
-
-swapPair :: (T.ElementControl element) => element (Double, Bool) -> element (Bool, Double)
-swapPair input = T.pair (T.snd input) (T.fst input)

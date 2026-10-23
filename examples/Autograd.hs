@@ -40,6 +40,7 @@ main = do
   scalarDerivatives
   vectorPullbacks
   gradientPaths
+  maskedValues
   linearRegression
 
 scalarDerivatives :: IO ()
@@ -77,6 +78,19 @@ gradientPaths = do
   showTensor "gradient with respect to stopped y" dy
   showTensor "gradient of index [1]" (AG.gradient (T.index @'[1]) input)
   showTensor "gradient of sum of slice [1:3]" (AG.gradient (T.sum . T.slice @'[ 'T.Range 1 3 1]) input)
+
+maskedValues :: IO ()
+maskedValues = do
+  putStrLn "\nDifferentiable masks and element expressions"
+  let input = T.fromList @'[4] [-2, 0, 1, 3 :: Double]
+      relu x = T.select (x T.> 0) x 0
+      (value, gradient) = AG.backprop relu input
+      selectedSquare :: (AG.Context s) => AG.Tensor s '[4] Double -> AG.Tensor s '[] Double
+      selectedSquare x = let element = T.index @'[3] x in T.scalar (element * element)
+  showTensor "ReLU" value
+  showTensor "ReLU gradient: zero at the boundary" gradient
+  showTensor "gradient through index, element arithmetic, and scalar" (AG.gradient selectedSquare input)
+  showTensor "max x 0 gradient: ties split equally" (AG.gradient (\x -> T.max x 0) input)
 
 linearRegression :: IO ()
 linearRegression = do

@@ -14,6 +14,7 @@ import Synapse.Autograd.Type (Context)
 import qualified Synapse.Tensor.Construction as C
 import Synapse.Tensor.DType (DType)
 import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Elementwise.Helpers as H
 import Synapse.Tensor.Ops.Reduction (LogReductions (..), MeanReductions (..), Normalization (..), OrderedReductions (..), Reductions (..))
 import qualified Synapse.Tensor.Type as T
 
@@ -24,36 +25,36 @@ instance (Context s, DType a, Num a, Num (T.TensorElement a)) => Reductions (Ten
 instance (Context s, DType a, RealFloat a, Fractional (T.TensorElement a)) => MeanReductions (Tensor s) a where
   meanOp = tensorUnary $ \x ->
     let count = T.constant (fromIntegral (product (shapeOf x)))
-     in (meanOp x, E.map (/ count) . expandReduced [0 .. length (shapeOf x) - 1] x)
+     in (meanOp x, H.map (/ count) . expandReduced [0 .. length (shapeOf x) - 1] x)
   meanAxesOp selected = tensorUnary $ \x ->
     let axes = axesOf selected
         count = T.constant (fromIntegral (product [dim | (axis, dim) <- zip [0 ..] (shapeOf x), axis `elem` axes]))
-     in (meanAxesOp selected x, E.map (/ count) . expandReduced axes x)
+     in (meanAxesOp selected x, H.map (/ count) . expandReduced axes x)
 
 -- | Equal extrema share the gradient uniformly, including reductions over several axes.
 instance (Context s, DType a, Fractional a, Fractional (T.TensorElement a), E.Ord (T.TensorElement a)) => OrderedReductions (Tensor s) a where
   minimumOp = tensorUnary $ \x ->
     let y = minimumOp x
         axes = [0 .. length (shapeOf x) - 1]
-        weights = E.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
+        weights = H.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
         counts = sumOp weights
      in (y, \gradient -> weights * expandReduced axes x (gradient / counts))
   maximumOp = tensorUnary $ \x ->
     let y = maximumOp x
         axes = [0 .. length (shapeOf x) - 1]
-        weights = E.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
+        weights = H.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
         counts = sumOp weights
      in (y, \gradient -> weights * expandReduced axes x (gradient / counts))
   minimumAxesOp selected = tensorUnary $ \x ->
     let y = minimumAxesOp selected x
         axes = axesOf selected
-        weights = E.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
+        weights = H.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
         counts = sumAxesOp selected weights
      in (y, \gradient -> weights * expandReduced axes x (gradient / counts))
   maximumAxesOp selected = tensorUnary $ \x ->
     let y = maximumAxesOp selected x
         axes = axesOf selected
-        weights = E.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
+        weights = H.zipWith (\a b -> E.select (a E.== b) 1 0) x (expandReduced axes x y)
         counts = sumAxesOp selected weights
      in (y, \gradient -> weights * expandReduced axes x (gradient / counts))
   argmaxOp selected = tensorUnary $ \x -> (argmaxOp selected x, const (C.zerosLike x))

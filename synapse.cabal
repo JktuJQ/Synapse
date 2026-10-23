@@ -84,11 +84,13 @@ library
                     , Synapse.Tensor.Shapes.Matmul
                     , Synapse.Tensor.Type
 
-    other-modules:    Synapse.Autograd.Type
+    other-modules:    Synapse.Tensor.Ops.Elementwise.Helpers
+                    , Synapse.Autograd.Type
                     , Synapse.Autograd.Differentiable.Structure
                     , Synapse.Autograd.Execution.Reverse
                     , Synapse.Autograd.Execution.Traversal
                     , Synapse.Autograd.Tensor.Type
+                    , Synapse.Autograd.Tensor.Ops.Elementwise
                     , Synapse.Autograd.Tensor.Ops.Math
                     , Synapse.Autograd.Tensor.Ops.Shape
                     , Synapse.Autograd.Tensor.Ops.Reduction
@@ -128,6 +130,7 @@ test-suite synapse-test
     main-is:          Main.hs
     other-modules:    AutogradTest
                     , AutogradTest.Tensor
+                    , AutogradTest.Tensor.Elementwise
                     , AutogradTest.Execution
                     , AutogradTest.Execution.Public
                     , AutogradTest.Differentiable

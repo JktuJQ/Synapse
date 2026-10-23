@@ -54,18 +54,11 @@ elementwise = do
   let x = T.fromList @'[2, 3] [-2, -1, 0, 1, 2, 3 :: Double]
       mask = (x T.> 0) T.&& (x T.< 3)
       integers = T.fromList @'[4] [-7, -2, 2, 7 :: Int]
-      (unzippedValues, unzippedMask) = T.unzip (T.zip x mask)
-      (_, _, unzippedThird) = T.unzip3 (T.zip3 x mask (x + 1))
   showTensor "x * 2 + 1" (x * 2 + 1)
-  showTensor "map: square" (T.map (\value -> value * value) x)
-  showTensor "map: Int to Double" (T.map T.fromIntegral integers :: T.Tensor '[4] Double)
-  showTensor "zip" (T.zip x mask)
-  showTensor "zip3" (T.zip3 x mask (x + 1))
-  showTensor "unzip: values" unzippedValues
-  showTensor "unzip: mask" unzippedMask
-  showTensor "unzip3: third component" unzippedThird
-  showTensor "zipWith: squared difference" (T.zipWith (\a b -> (a - b) * (a - b)) x (x + 1))
-  showTensor "zipWith3: masked sum" (T.zipWith3 (\a b flag -> T.select flag (a + b) 0) x (x + 1) mask)
+  showTensor "square" (x * x)
+  showTensor "fromIntegral: Int to Double" (T.fromIntegral integers :: T.Tensor '[4] Double)
+  showTensor "squared difference" ((x - (x + 1)) * (x - (x + 1)))
+  showTensor "masked sum" (T.select mask (x + x + 1) 0)
   showTensor "0 < x < 3" mask
   showTensor "select: keep matching values" (T.select mask x 0)
   showTensor "quot: truncate toward zero" (T.quot integers 3)
@@ -128,19 +121,10 @@ reductions = do
 
 controlFlow :: IO ()
 controlFlow = do
-  putStrLn "\nElement expressions and control flow"
+  putStrLn "\nElement expressions and conditional selection"
   let integers = T.fromList @'[4] [-2, 0, 3, 5 :: Int]
-      factorial :: T.TensorElement Int -> T.TensorElement Int
-      factorial limit =
-        T.snd $
-          T.while
-            (\state -> T.fst state T.<= limit)
-            (\state -> T.pair (T.fst state + 1) (T.snd state * T.fst state))
-            (T.pair 1 1)
-  showTensor "select within map: absolute value" (T.map (\x -> T.select (x T.< 0) (negate x) x) integers)
+  showTensor "select: absolute value" (T.select (integers T.< 0) (negate integers) integers)
   showTensor "cond: choose a whole tensor" (T.cond (T.any (integers T.< 0)) (negate integers) integers)
-  showTensor "while with a pair state: factorials" (T.fromGen @'[6] (factorial . T.coordinate @0))
-  showTensor "iterate: powers of two" (T.fromGen @'[5] (\ix -> T.iterate (T.coordinate @0 ix) (* 2) (1 :: T.TensorElement Int)))
 
 preparedFunctions :: IO ()
 preparedFunctions = do
@@ -172,8 +156,8 @@ preparedFunctions = do
         showData "input > 2" mask
   showSummary first
   showSummary second
-  putStrLn "run: unzip into several materialized tensors"
-  let (values, flags) = T.run T.CPU (T.unzip (T.zip (T.fromData first) (T.fromData first T.> 2)))
+  putStrLn "run: return several materialized tensors"
+  let (values, flags) = T.run T.CPU (T.fromData first, T.fromData first T.> 2)
   showData "values" values
   showData "flags" flags
   putStrLn "run4: partially apply inputs, weights, and bias; vary the mask"

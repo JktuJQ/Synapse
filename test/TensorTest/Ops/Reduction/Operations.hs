@@ -193,7 +193,7 @@ propNormalizationAxes = H.property $ do
   approxList (values (T.softmax @0 input)) (replicate 3 lo ++ replicate 3 hi)
   approxList (values (T.softmax @1 middle)) [realToFrac lo, realToFrac lo, realToFrac hi, realToFrac hi, realToFrac lo, realToFrac lo, realToFrac hi, realToFrac hi]
   approxList (values (T.sumAxes @'[1] (T.softmax @1 middle))) (replicate 4 1)
-  approxList (values (T.map exp (T.logSoftmax @0 input))) (values (T.softmax @0 input))
+  approxList (values (exp (T.logSoftmax @0 input))) (values (T.softmax @0 input))
 
 propLogSumExpAxes :: H.Property
 propLogSumExpAxes = H.property $ do
