@@ -6,7 +6,9 @@
 -- import qualified Synapse.NN as NN
 -- @
 module Synapse.NN
-  ( mse,
+  ( Model (..),
+    Dense (..),
+    mse,
     mae,
     huber,
     smoothL1,
@@ -38,7 +40,9 @@ module Synapse.NN
 where
 
 import Synapse.NN.Activation (leakyRelu, relu, sigmoid, softplus, tanh)
+import Synapse.NN.Dense (Dense (..))
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Loss (huber, mae, mse, smoothL1)
 import Synapse.NN.Metrics (explainedVariance, mape, maxError, meanError, msle, pearson, r2, rae, rmse, rmsle, rse, smape, wmape)
+import Synapse.NN.Model (Model (..))
 import Prelude hiding (tanh)

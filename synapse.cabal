@@ -68,6 +68,8 @@ library
                     , Synapse.NN.Activation
                     , Synapse.NN.Initialization
                     , Synapse.NN.Metrics
+                    , Synapse.NN.Model
+                    , Synapse.NN.Dense
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
                     , Synapse.Autograd.Execution
@@ -92,6 +94,7 @@ library
                     , Synapse.Tensor.Type
 
     other-modules:    Synapse.Tensor.Ops.Elementwise.Helpers
+                    , Synapse.Tensor.Ops.Math.Helpers
                     , Synapse.Autograd.Type
                     , Synapse.Autograd.Differentiable.Structure
                     , Synapse.Autograd.Execution.Reverse
@@ -139,6 +142,7 @@ test-suite synapse-test
                     , NNTest.Activation
                     , NNTest.Initialization
                     , NNTest.Metrics
+                    , NNTest.Dense
                     , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise

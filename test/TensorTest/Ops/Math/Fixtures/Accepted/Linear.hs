@@ -25,6 +25,15 @@ expanded = T.matmul (T.broadcast @'[8, 2, 3] (T.ones @'[2, 3])) (T.ones @'[8, 3,
 project :: (T.LinearAlgebra t Double) => t '[2, 3] Double -> t '[3, 4] Double -> t '[2, 4] Double
 project = T.matmul
 
+vectorInner :: T.Tensor '[] Double
+vectorInner = T.matmul (T.ones @'[3]) (T.ones @'[3])
+
+sharedWeights :: T.Tensor '[2, 5, 4] Float
+sharedWeights = T.matmul (T.ones @'[2, 5, 3]) (T.ones @'[3, 4])
+
+crossBatches :: T.Tensor '[2, 5, 3, 6] Float
+crossBatches = T.matmul (T.ones @'[2, 1, 3, 4]) (T.ones @'[5, 4, 6])
+
 squaredTotal :: (T.Reductions t Double, Num (t '[2, 3] Double)) => t '[2, 3] Double -> t '[] Double
 squaredTotal input = T.sum (input * input)
 

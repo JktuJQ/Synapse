@@ -117,6 +117,73 @@ tests =
         finiteDifferences (T.matmul (constant left)) right
         finiteDifferences (\x -> T.matmul x (constant batchRight)) batchLeft
         finiteDifferences (T.matmul (constant batchLeft)) batchRight,
+      testProperty "vector matmul pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
+        let vector = T.fromList @'[3] [0.2, 0.4, 0.6 :: Double]
+            other = T.fromList @'[3] [0.3, 0.5, 0.7 :: Double]
+            matrix = T.fromList @'[2, 3] [0.1, 0.2 .. 0.6 :: Double]
+            right = T.fromList @'[3, 2] [0.2, 0.3 .. 0.7 :: Double]
+            batches = T.fromList @'[2, 3, 2] [0.1, 0.2 .. 1.2 :: Double]
+        finiteDifferences (\x -> T.matmul x (constant other)) vector
+        finiteDifferences (T.matmul (constant vector)) other
+        finiteDifferences (\x -> T.matmul x (constant right)) vector
+        finiteDifferences (T.matmul (constant vector)) right
+        finiteDifferences (\x -> T.matmul x (constant vector)) matrix
+        finiteDifferences (T.matmul (constant matrix)) vector
+        finiteDifferences (\x -> T.matmul x (constant batches)) vector
+        finiteDifferences (T.matmul (constant vector)) batches,
+      testProperty "broadcast matmul pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
+        let left = T.fromList @'[2, 1, 1, 2] [0.1, 0.2, 0.3, 0.4 :: Double]
+            right = T.fromList @'[3, 2, 1] [0.2, 0.3 .. 0.7 :: Double]
+        finiteDifferences (\x -> T.matmul x (constant right)) left
+        finiteDifferences (T.matmul (constant left)) right,
+      testProperty "broadcast matmul pullbacks respect nonuniform output seeds" $ H.withTests 1 $ H.property $ do
+        let left = T.fromList @'[2, 1, 1, 2] [1, 2, 3, 4 :: Double]
+            right = T.fromList @'[3, 2, 1] [5, 6, 7, 8, 9, 10 :: Double]
+            (_, backward) = AG.pullback (uncurry T.matmul) (left, right)
+            (dl, dr) = backward (T.fromList @'[2, 3, 1, 1] [1, 2, 3, 4, 5, 6])
+        values dl H.=== [46, 52, 109, 124]
+        values dr H.=== [13, 18, 17, 24, 21, 30],
+      testProperty "shared matrix gradients sum over multiple broadcast axes" $ H.withTests 1 $ H.property $ do
+        let left = T.ones @'[2, 3, 1, 2] @Double
+            right = T.ones @'[2, 1] @Double
+            (_, (dl, dr)) = AG.backprop (uncurry T.matmul) (left, right)
+        values dl H.=== replicate 12 1
+        values dr H.=== [6, 6],
+      testProperty "vector matmul accumulates both paths through a shared input" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[3] [1, 2, 3 :: Double]
+            (value, gradient) = differentiate (\x -> T.matmul x x) input
+        values value H.=== [14]
+        values gradient H.=== [2, 4, 6],
+      testProperty "empty broadcast batches return zeros for nonempty shared operands" $ H.withTests 1 $ H.property $ do
+        let left = T.ones @'[2, 3] @Double
+            right = T.zeros @'[0, 3, 4] @Double
+            (_, (dl, dr)) = AG.backprop (uncurry T.matmul) (left, right)
+            emptyLeft = T.zeros @'[0, 2, 3] @Double
+            sharedRight = T.ones @'[1, 3, 4] @Double
+            (_, (emptyDL, sharedDR)) = AG.backprop (uncurry T.matmul) (emptyLeft, sharedRight)
+        values dl H.=== replicate 6 0
+        values dr H.=== []
+        values emptyDL H.=== []
+        values sharedDR H.=== replicate 12 0,
+      testProperty "empty vector matmul produces a zero scalar and empty gradients" $ H.withTests 1 $ H.property $ do
+        let input = T.zeros @'[0] @Double
+            (value, gradient) = differentiate (\x -> T.matmul x x) input
+        values value H.=== [0]
+        values gradient H.=== [],
+      testProperty "prepared broadcast matmul gradients accept changing vectors" $ H.withTests 1 $ H.property $ do
+        let execute = T.run2 T.CPU $ \lhs rhs ->
+              let (output, (dl, dr)) = AG.backprop (uncurry T.matmul) (lhs, rhs)
+               in (output, dl, dr)
+            vector = T.fromList @'[3] [1, 2, 3 :: Double]
+            right = T.run T.CPU (T.ones @'[2, 3, 2] @Double)
+            (first, firstDL, firstDR) = execute (T.run T.CPU vector) right
+            (second, secondDL, secondDR) = execute (T.run T.CPU (2 * vector)) right
+        T.toList first H.=== replicate 4 6
+        T.toList firstDL H.=== [4, 4, 4]
+        T.toList firstDR H.=== [1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3]
+        T.toList second H.=== replicate 4 12
+        T.toList secondDL H.=== [4, 4, 4]
+        T.toList secondDR H.=== [2, 2, 4, 4, 6, 6, 2, 2, 4, 4, 6, 6],
       testProperty "zero-size matrix contractions return zero gradients" $ H.withTests 1 $ H.property $ do
         let left = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             right = T.unsafeFromList [] :: T.Tensor '[3, 0] Double

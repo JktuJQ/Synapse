@@ -3,28 +3,33 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Output shapes and compatibility checks for batched matrix multiplication.
+-- | Output shapes for vector, matrix, and broadcast batched matrix products.
 module Synapse.Tensor.Shapes.Matmul (MatmulShape) where
 
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), Nat, TypeError)
+import Synapse.Tensor.Shapes.Broadcast (BroadcastShape)
 import Synapse.Tensor.Shapes.Dimensions (Reverse)
 
-type family MatmulBatches (lhs :: [Nat]) (rhs :: [Nat]) (rows :: Nat) (cols :: Nat) :: [Nat] where
-  MatmulBatches batch batch rows cols = Reverse (cols ': rows ': batch)
-  MatmulBatches lhs rhs rows cols =
-    TypeError ('Text "Matmul batch shapes must match: " ':<>: 'ShowType (Reverse lhs) ':<>: 'Text " and " ':<>: 'ShowType (Reverse rhs))
+-- | Append the matrix result axes to the common batch shape.
+type family Append (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where
+  Append '[] rhs = rhs
+  Append (dim ': rest) rhs = dim ': Append rest rhs
 
-type family MatmulDimensions (lhs :: Nat) (rhs :: Nat) (rows :: Nat) (cols :: Nat) (leftBatch :: [Nat]) (rightBatch :: [Nat]) :: [Nat] where
-  MatmulDimensions shared shared rows cols leftBatch rightBatch = MatmulBatches leftBatch rightBatch rows cols
-  MatmulDimensions lhs rhs rows cols leftBatch rightBatch =
+-- | Validate the contracted dimensions before broadcasting the reversed batch shapes.
+type family MatmulDimensions (lhs :: Nat) (rhs :: Nat) (leftBatch :: [Nat]) (rightBatch :: [Nat]) (result :: [Nat]) :: [Nat] where
+  MatmulDimensions shared shared leftBatch rightBatch result = Append (BroadcastShape (Reverse leftBatch) (Reverse rightBatch)) result
+  MatmulDimensions lhs rhs leftBatch rightBatch result =
     TypeError ('Text "Matmul inner dimensions must match: " ':<>: 'ShowType lhs ':<>: 'Text " and " ':<>: 'ShowType rhs)
 
+-- | Promote vectors for contraction and omit their inserted result axes.
 type family MatmulReversed (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where
-  MatmulReversed (shared ': rows ': leftBatch) (cols ': sharedRight ': rightBatch) =
-    MatmulDimensions shared sharedRight rows cols leftBatch rightBatch
-  MatmulReversed lhs rhs =
-    TypeError ('Text "Matmul requires tensors of rank at least two, got " ':<>: 'ShowType (Reverse lhs) ':<>: 'Text " and " ':<>: 'ShowType (Reverse rhs))
+  MatmulReversed '[] rhs = TypeError ('Text "Matmul requires tensors of rank at least one")
+  MatmulReversed lhs '[] = TypeError ('Text "Matmul requires tensors of rank at least one")
+  MatmulReversed '[lhs] '[rhs] = MatmulDimensions lhs rhs '[] '[] '[]
+  MatmulReversed '[lhs] (cols ': rhs ': batch) = MatmulDimensions lhs rhs '[] batch '[cols]
+  MatmulReversed (lhs ': rows ': batch) '[rhs] = MatmulDimensions lhs rhs batch '[] '[rows]
+  MatmulReversed (lhs ': rows ': leftBatch) (cols ': rhs ': rightBatch) = MatmulDimensions lhs rhs leftBatch rightBatch '[rows, cols]
 
--- | Multiply the last two dimensions and preserve exactly matching leading batch dimensions.
--- Rank and compatibility errors are reported while computing the output shape.
+-- | Matrix product shape with vector promotion and broadcasting of leading batch axes.
+-- Two vectors return a scalar; scalar operands and incompatible dimensions are rejected.
 type MatmulShape lhs rhs = MatmulReversed (Reverse lhs) (Reverse rhs)
