@@ -8,6 +8,9 @@
 module Synapse.NN
   ( Dense (..),
     dense,
+    Optimizer (..),
+    SGD (..),
+    updateParameters,
     mse,
     mae,
     huber,
@@ -44,4 +47,5 @@ import Synapse.NN.Dense (Dense (..), dense)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Loss (huber, mae, mse, smoothL1)
 import Synapse.NN.Metrics (explainedVariance, mape, maxError, meanError, msle, pearson, r2, rae, rmse, rmsle, rse, smape, wmape)
+import Synapse.NN.Optimizer (Optimizer (..), SGD (..), updateParameters)
 import Prelude hiding (tanh)

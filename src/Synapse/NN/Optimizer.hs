@@ -1,0 +1,87 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+-- | Pure parameter updates with explicit optimizer state.
+-- Updates build tensor expressions without executing them.
+-- Parameters and gradients must have corresponding fields and tensor shapes.
+module Synapse.NN.Optimizer
+  ( Optimizer (..),
+    SGD (..),
+    updateParameters,
+  )
+where
+
+import Synapse.Autograd.Differentiable (Differentiable (..))
+import Synapse.Autograd.Differentiable.Structure (Field (..), Structure (..), rebuild)
+import Synapse.Autograd.Tensor ()
+
+-- | Optimizers for a parameter structure.
+-- The initial state is constructed before the first step.
+-- Updated parameters and state can be passed directly to the next step.
+class Optimizer optimizer parameters where
+  -- | Accumulated values carried between updates.
+  type OptimizerState optimizer parameters
+
+  -- | Initialize optimizer state for the supplied parameters.
+  initialState :: optimizer -> parameters -> OptimizerState optimizer parameters
+
+  -- | Update parameters using their gradients and the previous optimizer state.
+  -- Returns the new parameters followed by the new state.
+  optimizerStep ::
+    optimizer ->
+    parameters ->
+    parameters ->
+    OptimizerState optimizer parameters ->
+    (parameters, OptimizerState optimizer parameters)
+
+-- | Compute new parameters by applying an update formula to each parameter and its corresponding gradient.
+-- The formula receives the current parameter component first and its gradient second, and returns the updated component.
+-- The parameter and gradient structures must correspond, including the shapes of their tensor components.
+-- Select the required component operations with a type application such as @\@Num@, @\@Fractional@, or @\@Floating@.
+-- The containing records need no numeric instances.
+--
+-- @
+-- updateParameters \@Fractional (\parameter gradient -> parameter - 0.01 * gradient)
+--   parameters gradients
+-- @
+updateParameters ::
+  forall c parameters.
+  (Differentiable parameters, ParametersConstraints c parameters) =>
+  -- | Update formula taking the current parameter component first and its gradient second.
+  (forall a. (c a) => a -> a -> a) ->
+  -- | Current parameters.
+  parameters ->
+  -- | Corresponding gradients.
+  parameters ->
+  -- | Updated parameters with the same structure and tensor shapes.
+  parameters
+updateParameters formula =
+  let applyUpdate :: Structure c p -> p -> p -> p
+      applyUpdate (Leaf _ _) = formula
+      applyUpdate (Record fields constructor _) = \parameters gradients ->
+        rebuild (\(Field child getter _) -> applyUpdate child (getter parameters) (getter gradients)) fields constructor
+   in applyUpdate (structureWith @parameters @c)
+
+-- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
+-- The caller supplies a finite, nonnegative learning rate.
+-- Hyperparameters are used without runtime validation.
+newtype SGD = SGD
+  { -- | Step size applied to each gradient.
+    sgdLearningRate :: Double
+  }
+  deriving (Eq, Show)
+
+instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer SGD p where
+  type OptimizerState SGD p = ()
+  initialState _ _ = ()
+  optimizerStep (SGD lr) parameters gradients () =
+    (updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients, ())

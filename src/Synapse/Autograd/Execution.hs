@@ -33,7 +33,7 @@ evaluate ::
   (forall s. (Context s) => WithGrad s a -> WithGrad s b) ->
   a ->
   b
-evaluate f value = BPE.evalBP0 (pack (structure @b) (f (constant value)))
+evaluate f value = BPE.evalBP0 (pack (structureWith @b) (f (constant value)))
 
 -- | Return the function's value and its gradient with respect to the input, in that order.
 -- Each output leaf is seeded using its @Backpropagatable.one@ implementation with its value as a reference.
@@ -48,7 +48,7 @@ backprop ::
   (b, a)
 backprop f input =
   let (value, backward) = pullback f input
-   in (value, backward (ones (structure @b) value))
+   in (value, backward (ones (structureWith @b) value))
 
 -- | Return only the input gradient computed by 'backprop'.
 -- The output seed follows the same convention as 'backprop'.
@@ -71,7 +71,7 @@ pullback ::
   (forall s. (Context s) => WithGrad s a -> WithGrad s b) ->
   a ->
   (b, b -> a)
-pullback = Reverse.pullback (structure @a) (structure @b)
+pullback = Reverse.pullback (structureWith @a) (structureWith @b)
 
 -- | Introduce an ordinary value as a constant in a differentiation scope.
 -- Constants are not registered as inputs and receive no gradient contributions.
@@ -79,7 +79,7 @@ pullback = Reverse.pullback (structure @a) (structure @b)
 -- Operations involving constants can still propagate gradients to their other, variable inputs.
 -- Use 'stopGrad' instead to cut the history of a value already inside the differentiation scope.
 constant :: forall s a. (Differentiable a) => a -> WithGrad s a
-constant = constants @s (structure @a)
+constant = constants @s (structureWith @a)
 
 -- | Preserve a value while preventing differentiation through its history.
 -- This cuts only paths through the returned value; other uses of the original value retain their history.
@@ -90,4 +90,4 @@ constant = constants @s (structure @a)
 -- backprop (\x -> x * stopGrad x) (3 :: Double)
 -- @
 stopGrad :: forall s a. (Differentiable a) => WithGrad s a -> WithGrad s a
-stopGrad = stopped (structure @a)
+stopGrad = stopped (structureWith @a)

@@ -18,8 +18,9 @@ import Test.Tasty.Hedgehog (testProperty)
 newtype Single a = Single {singleValue :: a} deriving (Eq, Show)
 
 instance (AG.Differentiable a) => AG.Differentiable (Single a) where
+  type ParametersConstraints c (Single a) = D.FieldConstraints c '[a]
   type WithGrad s (Single a) = Single (AG.WithGrad s a)
-  structure =
+  structureWith =
     D.record Single Single
       D.<+> D.field singleValue singleValue
 
@@ -37,8 +38,9 @@ data PositionVar s = PositionVar
   }
 
 instance AG.Differentiable Position where
+  type ParametersConstraints c Position = D.FieldConstraints c '[Double, Float, Double]
   type WithGrad s Position = PositionVar s
-  structure =
+  structureWith =
     D.record Position PositionVar
       D.<+> D.field positionX variableX
       D.<+> D.field positionY variableY
@@ -61,8 +63,9 @@ data Wide a = Wide
   deriving (Eq, Show)
 
 instance (AG.Differentiable a) => AG.Differentiable (Wide a) where
+  type ParametersConstraints c (Wide a) = D.FieldConstraints c '[a, a, a, a, a, a, a, a, a, a, a, a]
   type WithGrad s (Wide a) = Wide (AG.WithGrad s a)
-  structure =
+  structureWith =
     D.record Wide Wide
       D.<+> D.field first first
       D.<+> D.field second second
@@ -90,8 +93,9 @@ instance
   ) =>
   AG.Differentiable (Parameters T.Tensor input output a)
   where
+  type ParametersConstraints c (Parameters T.Tensor input output a) = D.FieldConstraints c '[T.Tensor '[input, output] a, T.Tensor '[output] a, T.Tensor '[] a]
   type WithGrad s (Parameters T.Tensor input output a) = Parameters (AG.Tensor s) input output a
-  structure =
+  structureWith =
     D.record Parameters Parameters
       D.<+> D.field weights weights
       D.<+> D.field bias bias

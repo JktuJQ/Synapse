@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -10,6 +11,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Differentiable values and descriptions of their independently registered fields.
@@ -31,12 +33,16 @@
 --   type WithGrad s (Parameters a b) = Parameters (WithGrad s a) (WithGrad s b)
 -- @
 --
--- Instead of deriving 'Generic', the same instance can implement 'structure' explicitly:
+-- Without 'Generic', declare the field types with 'FieldConstraints' and describe their correspondence explicitly.
+-- This manual instance also requires @DataKinds@:
 --
 -- @
--- structure = record Parameters Parameters
---   <+> field first first
---   <+> field second second
+-- instance (Differentiable a, Differentiable b) => Differentiable (Parameters a b) where
+--   type WithGrad s (Parameters a b) = Parameters (WithGrad s a) (WithGrad s b)
+--   type ParametersConstraints c (Parameters a b) = FieldConstraints c '[a, b]
+--   structureWith = record Parameters Parameters
+--     <+> field first first
+--     <+> field second second
 -- @
 --
 -- Each selector pair must identify the same field in the ordinary and differentiable records.
@@ -45,8 +51,10 @@
 -- Each leaf is registered independently, so the containing record needs no 'Backpropagatable' instance.
 -- Nested records are traversed recursively.
 -- The generic default supports products, not sum types or constructors without fields.
+-- A manual description can still use generic field constraints when only the ordinary representation derives 'Generic'.
 module Synapse.Autograd.Differentiable
   ( Differentiable (..),
+    FieldConstraints,
     Structure,
     leaf,
     Record,
@@ -57,9 +65,9 @@ module Synapse.Autograd.Differentiable
   )
 where
 
-import Data.Kind (Type)
+import Data.Kind (Constraint, Type)
 import GHC.Generics (Generic (..), K1 (..), M1 (..), (:*:) (..))
-import Synapse.Autograd.Differentiable.Structure (Field, Structure)
+import Synapse.Autograd.Differentiable.Structure (Field, Structure, Unconstrained)
 import qualified Synapse.Autograd.Differentiable.Structure as S
 import Synapse.Autograd.Type (Backpropagatable, Var)
 
@@ -69,10 +77,10 @@ type instance S.Representation s a = WithGrad s a
 -- The value's 'Backpropagatable' instance initializes and combines its gradient contributions.
 -- Wrapping and unwrapping must be inverse operations that preserve the variable and its differentiation history.
 leaf ::
-  (Backpropagatable a) =>
+  (Backpropagatable a, c a) =>
   (forall s. Var s a -> WithGrad s a) ->
   (forall s. WithGrad s a -> Var s a) ->
-  Structure a
+  Structure c a
 leaf = S.Leaf
 
 -- | The result type of a curried constructor.
@@ -87,16 +95,16 @@ type family Arguments constructor where
 
 -- | A record description awaiting its remaining fields.
 -- Add fields with '<+>' until the description becomes a 'Structure'.
-newtype Record a fields = Record (S.Fields a fields -> Structure a)
+newtype Record c a fields = Record (S.Fields c a fields -> Structure c a)
 
 -- | The result after adding a field to a record description.
-type family RecordResult a fields where
-  RecordResult a '[] = Structure a
-  RecordResult a (field ': rest) = Record a (field ': rest)
+type family RecordResult c a fields where
+  RecordResult c a '[] = Structure c a
+  RecordResult c a (field ': rest) = Record c a (field ': rest)
 
 -- | Complete the description as soon as every constructor argument has a field.
 class Complete fields where
-  complete :: Record a fields -> RecordResult a fields
+  complete :: Record c a fields -> RecordResult c a fields
 
 instance Complete '[] where
   complete (Record build) = build S.NoFields
@@ -111,24 +119,24 @@ record ::
   (rest ~ S.Constructor (Arguments rest) (Result rest)) =>
   (a -> rest) ->
   (forall s. WithGrad s a -> S.GradientConstructor s (Arguments rest) (Result rest)) ->
-  Record (Result rest) (a ': Arguments rest)
+  Record c (Result rest) (a ': Arguments rest)
 record constructor differentiableConstructor = Record (\descriptions -> S.Record descriptions constructor differentiableConstructor)
 
 -- | Select the same component from the ordinary and differentiable records.
 -- Selectors must preserve the component's value and differentiation history.
 -- The component's 'Differentiable' instance describes its independently registered leaves.
 field ::
-  (Differentiable a) =>
+  (Differentiable a, ParametersConstraints c a) =>
   (record -> a) ->
   (forall s. WithGrad s record -> WithGrad s a) ->
-  Field record a
-field = S.Field structure
+  Field c record a
+field = S.Field structureWith
 
 infixl 4 <+>
 
 -- | Add the next field in constructor argument order.
 -- Adding the final field produces a 'Structure' without an explicit finishing operation.
-(<+>) :: (Complete rest) => Record a (b ': rest) -> Field a b -> RecordResult a rest
+(<+>) :: (Complete rest) => Record c a (b ': rest) -> Field c a b -> RecordResult c a rest
 Record build <+> next = complete (Record (build . S.MoreFields next))
 
 -- | The fields of a single-constructor generic representation.
@@ -169,51 +177,68 @@ instance
   variableFields = fields . from
   variableRecord = to . rebuildFields
 
+-- | Require a constraint on every leaf of the listed fields.
+type family FieldConstraints (c :: Type -> Constraint) (fields :: [Type]) :: Constraint where
+  FieldConstraints c '[] = ()
+  FieldConstraints c (a ': rest) = (ParametersConstraints c a, FieldConstraints c rest)
+
 -- | Values supported by reverse-mode differentiation.
--- Records with one constructor can derive 'structure' through 'Generic' when their differentiable fields correspond to 'WithGrad' of their ordinary fields.
+-- Records with one constructor can derive 'structureWith' through 'Generic' when their differentiable fields correspond to 'WithGrad' of their ordinary fields.
 -- Each 'WithGrad' representation must uniquely identify its ordinary type and differentiation scope.
 -- An instance describes representations and input registration; derivative rules belong to the operations on those representations.
-class Differentiable a where
+class (ParametersConstraints Unconstrained a) => Differentiable a where
+  -- | Apply a requirement to every independently registered leaf.
+  -- The default collects requirements from the ordinary record's generic fields.
+  type ParametersConstraints (c :: Type -> Constraint) a :: Constraint
+
+  type ParametersConstraints c a = ParametersConstraints c (Fields (Rep a))
+
   -- | The representation of a value inside differentiation scope @s@.
   -- Custom types define this correspondence explicitly; there is no automatic fallback to 'Var'.
   -- A distinct variable newtype can preserve the correspondence required by the injectivity annotation.
   type WithGrad s a = (result :: Type) | result -> s a
 
   -- | Describe the independently registered fields of a value.
-  -- Variable wrappers can use 'leaf'; records can use 'record', 'field', and '<+>'.
-  structure :: Structure a
-  default structure ::
+  -- Generic records propagate the requested constraint to each leaf.
+  structureWith :: (ParametersConstraints c a) => Structure c a
+  default structureWith ::
     ( Generic a,
       GenericFields (Rep a),
       Differentiable (Fields (Rep a)),
+      ParametersConstraints c (Fields (Rep a)),
       forall s. GenericVariables s a
     ) =>
-    Structure a
-  structure =
+    Structure c a
+  structureWith =
     S.Record
-      (S.MoreFields (S.Field (structure @(Fields (Rep a))) (fields . from) variableFields) S.NoFields)
+      (S.MoreFields (S.Field (structureWith @(Fields (Rep a))) (fields . from) variableFields) S.NoFields)
       (to . rebuildFields)
       variableRecord
 
 instance Differentiable Int where
+  type ParametersConstraints c Int = c Int
   type WithGrad s Int = Var s Int
-  structure = leaf id id
+  structureWith = leaf id id
 
 instance Differentiable Integer where
+  type ParametersConstraints c Integer = c Integer
   type WithGrad s Integer = Var s Integer
-  structure = leaf id id
+  structureWith = leaf id id
 
 instance Differentiable Float where
+  type ParametersConstraints c Float = c Float
   type WithGrad s Float = Var s Float
-  structure = leaf id id
+  structureWith = leaf id id
 
 instance Differentiable Double where
+  type ParametersConstraints c Double = c Double
   type WithGrad s Double = Var s Double
-  structure = leaf id id
+  structureWith = leaf id id
 
 instance (Differentiable a, Differentiable b) => Differentiable (a, b) where
   type WithGrad s (a, b) = (WithGrad s a, WithGrad s b)
-  structure =
+  type ParametersConstraints c (a, b) = (ParametersConstraints c a, ParametersConstraints c b)
+  structureWith =
     record (,) (,)
       <+> field fst fst
       <+> field snd snd

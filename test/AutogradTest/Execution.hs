@@ -26,8 +26,9 @@ instance AG.Backpropagatable Distance
 newtype DistanceVar s = DistanceVar (AG.Var s Distance)
 
 instance AG.Differentiable Distance where
+  type ParametersConstraints c Distance = c Distance
   type WithGrad s Distance = DistanceVar s
-  structure = D.leaf DistanceVar (\(DistanceVar value) -> value)
+  structureWith = D.leaf DistanceVar (\(DistanceVar value) -> value)
 
 data Point = Point Double Double deriving (Eq, Show)
 
@@ -39,8 +40,9 @@ instance AG.Backpropagatable Point where
 newtype PointVar s = PointVar (AG.Var s Point)
 
 instance AG.Differentiable Point where
+  type ParametersConstraints c Point = c Point
   type WithGrad s Point = PointVar s
-  structure = D.leaf PointVar (\(PointVar value) -> value)
+  structureWith = D.leaf PointVar (\(PointVar value) -> value)
 
 projection :: (AG.Context s) => PointVar s -> AG.Var s Double
 projection (PointVar (AG.Var value)) =
@@ -63,8 +65,9 @@ instance (AG.Differentiable a) => AG.Differentiable (Wrapped a) where
 data Manual a b = Manual {manualFirst :: a, manualSecond :: b} deriving (Eq, Show)
 
 instance (AG.Differentiable a, AG.Differentiable b) => AG.Differentiable (Manual a b) where
+  type ParametersConstraints c (Manual a b) = D.FieldConstraints c '[a, b]
   type WithGrad s (Manual a b) = Manual (AG.WithGrad s a) (AG.WithGrad s b)
-  structure =
+  structureWith =
     D.record Manual Manual
       D.<+> D.field manualFirst manualFirst
       D.<+> D.field manualSecond manualSecond

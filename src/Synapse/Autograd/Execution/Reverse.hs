@@ -16,7 +16,7 @@ where
 import Data.Functor.Identity (Identity (..))
 import Data.Vinyl.Core (Rec (..))
 import qualified Numeric.Backprop.Explicit as BPE
-import Synapse.Autograd.Differentiable.Structure (Constructor, Field (..), Fields (..), GradientConstructor, Representation, Structure (..))
+import Synapse.Autograd.Differentiable.Structure (Constructor, Field (..), Fields (..), GradientConstructor, Representation, Structure (..), Unconstrained)
 import Synapse.Autograd.Execution.Traversal (add, pack)
 import Synapse.Autograd.Type (Context)
 import qualified Synapse.Autograd.Type as AG
@@ -49,7 +49,7 @@ split (_ :& rest) (value :& values) =
    in (value :& left, right)
 
 -- | Register each leaf as its own tape input.
-inputs :: Structure a -> a -> Inputs a
+inputs :: Structure Unconstrained a -> a -> Inputs a
 inputs (Leaf wrap _) value =
   Inputs
     (BPE.ZF AG.zero :& RNil)
@@ -77,7 +77,7 @@ data FieldInputs a fields where
     FieldInputs a fields
 
 -- | Flatten nested field descriptions without registering the containing record as a single input.
-inputFields :: Fields a fields -> a -> FieldInputs a fields
+inputFields :: Fields Unconstrained a fields -> a -> FieldInputs a fields
 inputFields NoFields _ =
   FieldInputs
     RNil
@@ -97,8 +97,8 @@ inputFields (MoreFields (Field child getter _) rest) value =
 
 -- | Run a reverse pass while registering each leaf as an independent input.
 pullback ::
-  Structure a ->
-  Structure b ->
+  Structure Unconstrained a ->
+  Structure Unconstrained b ->
   (forall s. (Context s) => Representation s a -> Representation s b) ->
   a ->
   (b, b -> a)
@@ -113,7 +113,7 @@ pullback inputStructure resultStructure function input = case inputs inputStruct
 
 -- | Anchor the requested output to a live input so that it becomes the final tape node.
 -- The extra edge contributes a reference-shaped zero directly to the input.
-outputRoot :: (Context s) => Structure b -> Rec BPE.ZeroFunc xs -> Rec BPE.AddFunc xs -> Rec (BPE.BVar s) xs -> BPE.BVar s b -> BPE.BVar s b
+outputRoot :: (Context s) => Structure Unconstrained b -> Rec BPE.ZeroFunc xs -> Rec BPE.AddFunc xs -> Rec (BPE.BVar s) xs -> BPE.BVar s b -> BPE.BVar s b
 outputRoot result zeros additions variables value = case (zeros, additions, variables) of
   (zero :& _, addition :& _, variable :& _) ->
     BPE.liftOp2

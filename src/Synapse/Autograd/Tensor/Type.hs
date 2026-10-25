@@ -39,9 +39,11 @@ instance (Num (T.TensorElement a)) => Backpropagatable (T.TensorElement a)
 type instance T.Element (Tensor s) = TensorElement s
 
 instance (Num (T.Tensor sh a)) => Differentiable (T.Tensor sh a) where
+  type ParametersConstraints c (T.Tensor sh a) = c (T.Tensor sh a)
   type WithGrad s (T.Tensor sh a) = Tensor s sh a
-  structure = leaf Tensor unTensor
+  structureWith = leaf Tensor unTensor
 
 instance (Num (T.TensorElement a)) => Differentiable (T.TensorElement a) where
+  type ParametersConstraints c (T.TensorElement a) = c (T.TensorElement a)
   type WithGrad s (T.TensorElement a) = TensorElement s a
-  structure = leaf TensorElement unTensorElement
+  structureWith = leaf TensorElement unTensorElement

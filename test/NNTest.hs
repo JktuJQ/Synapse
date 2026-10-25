@@ -10,6 +10,8 @@ import qualified NNTest.Dense as Dense
 import qualified NNTest.Initialization as Initialization
 import qualified NNTest.Metrics as Metrics
 import qualified NNTest.Network as Network
+import qualified NNTest.Optimizer as Optimizer
+import qualified NNTest.Regression as Regression
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
@@ -22,7 +24,7 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests = testGroup "nn" [lossTests, Activation.tests, Initialization.tests, Metrics.tests, Dense.tests, Network.tests]
+tests = testGroup "nn" [lossTests, Activation.tests, Initialization.tests, Metrics.tests, Dense.tests, Network.tests, Optimizer.tests, Regression.tests]
 
 lossTests :: TestTree
 lossTests =
