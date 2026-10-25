@@ -2,19 +2,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Fully connected layers acting on the last input dimension.
-module Synapse.NN.Dense (Dense (..)) where
+module Synapse.NN.Dense (Dense (..), dense) where
 
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
 import Synapse.Autograd.Differentiable (Differentiable (..))
 import qualified Synapse.Autograd.Tensor as AG
-import Synapse.NN.Model (Model (..))
 import Synapse.Tensor.Ops.Math (LinearAlgebra, matmul)
 import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
@@ -25,8 +23,7 @@ import qualified Synapse.Tensor.Type as T
 
 -- | Parameters of an affine transformation @input * weights + bias@.
 -- Weights have shape @'[in_features, out_features]@ and bias has shape @'[out_features]@.
--- 'forward' preserves leading input dimensions and replaces the last dimension with @out_features@.
--- Construct parameters with any initialization functions before registering them for differentiation.
+-- 'dense' preserves leading input dimensions and replaces the last dimension with @out_features@.
 --
 -- @
 -- parameters :: Dense 2 3 T.Tensor Float
@@ -46,7 +43,10 @@ instance
   where
   type WithGrad s (Dense in_features out_features T.Tensor a) = Dense in_features out_features (AG.Tensor s) a
 
-instance
+-- | Apply @input * weights + bias@ along the last input dimension.
+-- The input must have at least one dimension, with @in_features@ elements on the last axis.
+-- Leading input dimensions are preserved, and the last dimension becomes @out_features@.
+dense ::
   ( KnownNat in_features,
     KnownNat out_features,
     Shape in_sh,
@@ -57,6 +57,7 @@ instance
     ShapeOps t a,
     Num (t out_sh a)
   ) =>
-  Model (Dense in_features out_features) in_sh out_sh t a
-  where
-  forward parameters input = matmul input (denseWeights parameters) + broadcast (denseBias parameters)
+  Dense in_features out_features t a ->
+  t in_sh a ->
+  t out_sh a
+dense parameters input = matmul input (denseWeights parameters) + broadcast (denseBias parameters)

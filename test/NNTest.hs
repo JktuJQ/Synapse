@@ -9,6 +9,7 @@ import qualified NNTest.Activation as Activation
 import qualified NNTest.Dense as Dense
 import qualified NNTest.Initialization as Initialization
 import qualified NNTest.Metrics as Metrics
+import qualified NNTest.Network as Network
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
@@ -21,7 +22,7 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests = testGroup "nn" [lossTests, Activation.tests, Initialization.tests, Metrics.tests, Dense.tests]
+tests = testGroup "nn" [lossTests, Activation.tests, Initialization.tests, Metrics.tests, Dense.tests, Network.tests]
 
 lossTests :: TestTree
 lossTests =

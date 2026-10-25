@@ -68,7 +68,6 @@ library
                     , Synapse.NN.Activation
                     , Synapse.NN.Initialization
                     , Synapse.NN.Metrics
-                    , Synapse.NN.Model
                     , Synapse.NN.Dense
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
@@ -143,6 +142,7 @@ test-suite synapse-test
                     , NNTest.Initialization
                     , NNTest.Metrics
                     , NNTest.Dense
+                    , NNTest.Network
                     , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise
