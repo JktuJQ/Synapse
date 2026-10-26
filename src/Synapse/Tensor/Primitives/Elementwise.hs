@@ -1,12 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Internal element transformations used to implement tensor primitives.
-module Synapse.Tensor.Ops.Elementwise.Helpers (map, zipWith, zipWith3) where
+module Synapse.Tensor.Primitives.Elementwise (map, zipWith, zipWith3) where
 
 import qualified Data.Array.Accelerate as A
-import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Type (Tensor (..), TensorElement (..))
+import Synapse.Tensor.Type (DType, Tensor (..), TensorElement (..))
 import Prelude hiding (map, zipWith, zipWith3)
 
 -- | Transform each element while retaining the tensor shape.

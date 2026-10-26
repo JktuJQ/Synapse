@@ -24,4 +24,4 @@ reverseRange :: T.Tensor '[3] Int
 reverseRange = T.slice @'[ 'T.RangeReverse 1 7 2] (T.zeros @'[8])
 
 scalar :: T.TensorElement Bool
-scalar = T.index @'[] (T.scalar (T.constant True))
+scalar = T.index @'[] (T.scalar (T.element True))

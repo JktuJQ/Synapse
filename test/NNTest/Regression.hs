@@ -21,11 +21,10 @@ import Test.Tasty.Hedgehog (testProperty)
 newtype Regression t a = Regression {regressionLayer :: NN.Dense 1 1 t a}
   deriving (Generic)
 
-instance AG.Differentiable (Regression T.Tensor Double) where
-  type WithGrad s (Regression T.Tensor Double) = Regression (AG.Tensor s) Double
+type instance T.WithTensor t (Regression T.Tensor Double) = Regression t Double
 
 forward ::
-  (T.LinearAlgebra t Double, T.ShapeOps t Double, Num (t '[4, 1] Double)) =>
+  (T.TensorOps t Double, Num (t '[4, 1] Double)) =>
   Regression t Double ->
   t '[4, 1] Double ->
   t '[4, 1] Double
@@ -57,18 +56,10 @@ prepareStep ::
   T.TensorData '[4, 1] Double ->
   T.TensorData '[4, 1] Double ->
   (T.TensorData '[] Double, Regression T.TensorData Double)
-prepareStep optimizer =
-  let execute = T.run4 T.CPU $ \weights bias inputs targets ->
-        let (loss, Regression updated) = step optimizer (Regression (NN.Dense weights bias)) inputs targets
-         in (loss, NN.denseWeights updated, NN.denseBias updated)
-   in \(Regression parameters) inputs targets ->
-        let (loss, weights, bias) = execute (NN.denseWeights parameters) (NN.denseBias parameters) inputs targets
-         in (loss, Regression (NN.Dense weights bias))
+prepareStep optimizer = T.run3 T.CPU (step optimizer)
 
 materialize :: Regression T.Tensor Double -> Regression T.TensorData Double
-materialize (Regression parameters) =
-  let (weights, bias) = T.run T.CPU (NN.denseWeights parameters, NN.denseBias parameters)
-   in Regression (NN.Dense weights bias)
+materialize = T.run T.CPU
 
 initialParameters :: Regression T.TensorData Double
 initialParameters =

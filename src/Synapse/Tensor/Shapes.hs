@@ -1,7 +1,5 @@
 -- | Tensor shape types, runtime dimensions, and operation constraints.
---
--- Definitions live in the corresponding Shapes submodules.
--- This module keeps the shared shape interface available through a single import.
+-- Shapes use left-to-right axis order, and each operation checks its required shape relationships at compile time.
 module Synapse.Tensor.Shapes
   ( ShapeToDIM,
     ShapeSize,

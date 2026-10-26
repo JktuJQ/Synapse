@@ -6,16 +6,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Tensor vector-Jacobian products and gradient shape transformations.
-module Synapse.Autograd.Tensor.Helpers
-  ( tensorUnary,
-    tensorBinary,
-    reshapeLike,
+-- | Shape transformations used by tensor pullbacks.
+module Synapse.Autograd.Tensor.Primitives.Shape
+  ( reshape,
+    broadcast,
+    permuteAxes,
+    transpose,
+    concat,
+    stack,
     expandReduced,
-    sumBroadcast,
     shapeOf,
     axesOf,
-    reindexGradient,
     singletonAxis,
   )
 where
@@ -23,13 +24,12 @@ where
 import qualified Data.Array.Accelerate as A
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
-import GHC.TypeLits (Nat)
-import Synapse.Autograd.Tensor.Type (Tensor (..))
-import Synapse.Autograd.Type (Backpropagatable, Context, add, liftBinary, liftUnary)
-import Synapse.Tensor.DType (DType)
+import GHC.TypeLits (KnownNat, Nat, natVal)
 import Synapse.Tensor.Shapes.Axes (Axes, axes)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, shape, shapeSize, strides)
+import Synapse.Tensor.Type (DType)
 import qualified Synapse.Tensor.Type as T
+import Prelude hiding (concat)
 
 -- | Turn a selected axis into a singleton axis list.
 singletonAxis :: proxy (axis :: Nat) -> Proxy '[axis]
@@ -48,14 +48,6 @@ reindexGradient :: forall from to a. (Shape from, Shape to, DType a) => ([A.Exp 
 reindexGradient coordinates (T.Tensor reference) (T.Tensor gradient) = T.Tensor $ A.generate (A.shape reference) $ \ix ->
   let offset = sum (zipWith (*) (coordinates (backendCoordinates @from ix)) (map A.constant (strides (shape @to))))
    in A.flatten gradient A.! A.index1 offset
-
--- | Register a tensor operation and its pullback to the input shape.
-tensorUnary :: (Context s, Backpropagatable (T.Tensor from a)) => (T.Tensor from a -> (T.Tensor to b, T.Tensor to b -> T.Tensor from a)) -> Tensor s from a -> Tensor s to b
-tensorUnary rule (Tensor x) = Tensor (liftUnary add rule x)
-
--- | Register a tensor operation with independently accumulated input gradients.
-tensorBinary :: (Context s, Backpropagatable (T.Tensor lhs a), Backpropagatable (T.Tensor rhs b)) => (T.Tensor lhs a -> T.Tensor rhs b -> (T.Tensor out c, T.Tensor out c -> (T.Tensor lhs a, T.Tensor rhs b))) -> Tensor s lhs a -> Tensor s rhs b -> Tensor s out c
-tensorBinary rule (Tensor x) (Tensor y) = Tensor (liftBinary add add rule x y)
 
 -- | Restore the reference shape without requiring a type-level proof in the reverse direction.
 reshapeLike :: (Shape from, Shape to, DType a) => T.Tensor from a -> T.Tensor to a -> T.Tensor from a
@@ -98,3 +90,37 @@ sumBroadcast (T.Tensor reference) (T.Tensor gradient) = T.Tensor $ A.reshape (A.
           target = inject (zip [0 ..] original) copies
           offset = foldl' (+) 0 (zipWith (*) target (map A.constant (strides toDims)))
        in A.flatten gradient A.! A.index1 offset
+
+-- | Restore the original shape after a reshape or singleton-axis transformation.
+reshape :: (Shape from, Shape to, DType a) => T.Tensor from a -> T.Tensor to a -> T.Tensor to a -> T.Tensor from a
+reshape input _ = reshapeLike input
+
+-- | Sum gradient contributions from every broadcast copy.
+broadcast :: (Shape from, Shape to, DType a, Num (T.TensorElement a)) => T.Tensor from a -> T.Tensor to a -> T.Tensor to a -> T.Tensor from a
+broadcast input _ = sumBroadcast input
+
+-- | Invert a validated permutation of the input axes.
+permuteAxes :: forall xs from to a proxy. (Axes xs, Shape from, Shape to, DType a) => proxy xs -> T.Tensor from a -> T.Tensor to a -> T.Tensor to a -> T.Tensor from a
+permuteAxes selected input _ = reindexGradient (\coordinates -> map (coordinates !!) (axesOf selected)) input
+
+-- | Invert the exchange of the last two axes.
+transpose :: (Shape from, Shape to, DType a) => T.Tensor from a -> T.Tensor to a -> T.Tensor to a -> T.Tensor from a
+transpose input _ =
+  let rank = length (shapeOf input)
+      order = [0 .. rank - 3] ++ [rank - 1, rank - 2]
+   in reindexGradient (\coordinates -> map (coordinates !!) order) input
+
+-- | Split a concatenated gradient at the original left input's axis extent.
+concat :: (KnownNat axis, Shape lhs, Shape rhs, Shape out, DType a) => proxy axis -> T.Tensor lhs a -> T.Tensor rhs a -> T.Tensor out a -> T.Tensor out a -> (T.Tensor lhs a, T.Tensor rhs a)
+concat selected left right _ gradient =
+  let axis = fromInteger (toInteger (natVal selected))
+      offset = shapeOf left !! axis
+      shift = zipWith (\i coordinate -> if i == axis then coordinate + A.constant offset else coordinate) [0 ..]
+   in (reindexGradient id left gradient, reindexGradient shift right gradient)
+
+-- | Select each input's position along the inserted stack axis.
+stack :: (KnownNat axis, Shape sh, Shape out, DType a) => proxy axis -> T.Tensor sh a -> T.Tensor sh a -> T.Tensor out a -> T.Tensor out a -> (T.Tensor sh a, T.Tensor sh a)
+stack selected left right _ gradient =
+  let axis = fromInteger (toInteger (natVal selected))
+      insert value coordinates = take axis coordinates ++ [value] ++ drop axis coordinates
+   in (reindexGradient (insert 0) left gradient, reindexGradient (insert 1) right gradient)

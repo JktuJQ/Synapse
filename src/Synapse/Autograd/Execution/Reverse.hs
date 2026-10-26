@@ -16,10 +16,10 @@ where
 import Data.Functor.Identity (Identity (..))
 import Data.Vinyl.Core (Rec (..))
 import qualified Numeric.Backprop.Explicit as BPE
-import Synapse.Autograd.Differentiable.Structure (Constructor, Field (..), Fields (..), GradientConstructor, Representation, Structure (..), Unconstrained)
-import Synapse.Autograd.Execution.Traversal (add, pack)
-import Synapse.Autograd.Type (Context)
-import qualified Synapse.Autograd.Type as AG
+import Synapse.Autograd.Execution.Variable (Unconstrained, ValueTree (..), Variables, add, pack)
+import qualified Synapse.Autograd.Tensor.Type as Tensor
+import Synapse.Autograd.Variable (Context)
+import qualified Synapse.Autograd.Variable as AG
 
 -- | Type-level concatenation of independently registered inputs.
 type family xs :++ ys where
@@ -33,7 +33,7 @@ data Inputs a where
     Rec BPE.AddFunc xs ->
     Rec Identity xs ->
     (Rec Identity xs -> a) ->
-    (forall s. Rec (BPE.BVar s) xs -> Representation s a) ->
+    (forall s. Rec (BPE.BVar s) xs -> Variables s a) ->
     Inputs a
 
 -- | Append input records without converting the stored values.
@@ -49,57 +49,29 @@ split (_ :& rest) (value :& values) =
    in (value :& left, right)
 
 -- | Register each leaf as its own tape input.
-inputs :: Structure Unconstrained a -> a -> Inputs a
-inputs (Leaf wrap _) value =
+inputs :: ValueTree Unconstrained a -> a -> Inputs a
+inputs TensorValues value =
   Inputs
     (BPE.ZF AG.zero :& RNil)
     (BPE.AF AG.add :& RNil)
     (Identity value :& RNil)
     (\(Identity x :& RNil) -> x)
-    (\(x :& RNil) -> wrap (AG.Var x))
-inputs (Record fields constructor differentiableConstructor) value = case inputFields fields value of
-  FieldInputs zeros additions values rebuild variables ->
-    Inputs
-      zeros
-      additions
-      values
-      (`rebuild` constructor)
-      (\(arguments :: Rec (BPE.BVar s) leaves) -> variables arguments (differentiableConstructor @s))
-
--- | Independently registered field leaves with constructor application in declaration order.
-data FieldInputs a fields where
-  FieldInputs ::
-    Rec BPE.ZeroFunc leaves ->
-    Rec BPE.AddFunc leaves ->
-    Rec Identity leaves ->
-    (Rec Identity leaves -> Constructor fields a -> a) ->
-    (forall s. Rec (BPE.BVar s) leaves -> GradientConstructor s fields a -> Representation s a) ->
-    FieldInputs a fields
-
--- | Flatten nested field descriptions without registering the containing record as a single input.
-inputFields :: Fields Unconstrained a fields -> a -> FieldInputs a fields
-inputFields NoFields _ =
-  FieldInputs
-    RNil
-    RNil
-    RNil
-    (\RNil value -> value)
-    (\RNil value -> value)
-inputFields (MoreFields (Field child getter _) rest) value =
-  case (inputs child (getter value), inputFields rest value) of
-    (Inputs leftZeros leftAdds leftValues rebuildLeft wrapLeft, FieldInputs rightZeros rightAdds rightValues rebuildRight wrapRight) ->
-      FieldInputs
+    (\(x :& RNil) -> Tensor.Tensor (AG.Var x))
+inputs (PairValues left right) (x, y) =
+  case (inputs left x, inputs right y) of
+    (Inputs leftZeros leftAdds leftValues rebuildLeft wrapLeft, Inputs rightZeros rightAdds rightValues rebuildRight wrapRight) ->
+      Inputs
         (append leftZeros rightZeros)
         (append leftAdds rightAdds)
         (append leftValues rightValues)
-        (\values constructor -> let (ls, rs) = split leftZeros values in rebuildRight rs (constructor (rebuildLeft ls)))
-        (\(variables :: Rec (BPE.BVar s) leaves) constructor -> let (ls, rs) = split leftZeros variables in wrapRight @s rs (constructor (wrapLeft ls)))
+        (\arguments -> let (ls, rs) = split leftZeros arguments in (rebuildLeft ls, rebuildRight rs))
+        (\(arguments :: Rec (BPE.BVar s) leaves) -> let (ls, rs) = split leftZeros arguments in (wrapLeft @s ls, wrapRight @s rs))
 
 -- | Run a reverse pass while registering each leaf as an independent input.
 pullback ::
-  Structure Unconstrained a ->
-  Structure Unconstrained b ->
-  (forall s. (Context s) => Representation s a -> Representation s b) ->
+  ValueTree Unconstrained a ->
+  ValueTree Unconstrained b ->
+  (forall s. (Context s) => Variables s a -> Variables s b) ->
   a ->
   (b, b -> a)
 pullback inputStructure resultStructure function input = case inputs inputStructure input of
@@ -113,7 +85,7 @@ pullback inputStructure resultStructure function input = case inputs inputStruct
 
 -- | Anchor the requested output to a live input so that it becomes the final tape node.
 -- The extra edge contributes a reference-shaped zero directly to the input.
-outputRoot :: (Context s) => Structure Unconstrained b -> Rec BPE.ZeroFunc xs -> Rec BPE.AddFunc xs -> Rec (BPE.BVar s) xs -> BPE.BVar s b -> BPE.BVar s b
+outputRoot :: (Context s) => ValueTree Unconstrained b -> Rec BPE.ZeroFunc xs -> Rec BPE.AddFunc xs -> Rec (BPE.BVar s) xs -> BPE.BVar s b -> BPE.BVar s b
 outputRoot result zeros additions variables value = case (zeros, additions, variables) of
   (zero :& _, addition :& _, variable :& _) ->
     BPE.liftOp2

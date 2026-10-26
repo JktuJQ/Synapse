@@ -92,16 +92,6 @@ tests =
         let input = T.full @'[] (3 :: Double)
             function x = T.scalar (T.index @'[] x * T.index @'[] x)
         values (AG.gradient function input) H.=== [6],
-      testProperty "element inputs support selection and tensor-valued outputs" $ H.withTests 1 $ H.property $ do
-        let function x = T.scalar (T.select (x T.> 0) (x * x) 0)
-            (value, gradient) = AG.backprop function (T.constant (3 :: Double))
-        values value H.=== [9]
-        values (T.scalar gradient) H.=== [6]
-        values (T.scalar (AG.gradient function (T.constant (-2 :: Double)))) H.=== [0],
-      testProperty "element constants, extrema and scalar conditions preserve derivatives" $ H.withTests 1 $ H.property $ do
-        let function x = T.cond (x T.< AG.constant (T.constant (0 :: Double))) (T.min x (-1)) (T.max x 1)
-        values (T.scalar (AG.gradient function (T.constant (1 :: Double)))) H.=== [0.5]
-        values (T.scalar (AG.gradient function (T.constant (-2 :: Double)))) H.=== [1],
       testProperty "prepared functions reuse a mask-dependent backward graph" $ H.withTests 1 $ H.property $ do
         let execute = T.run1 T.CPU (AG.backprop (\x -> T.select (x T.> 0) x 0))
             (firstValue, firstGradient) = execute (T.run T.CPU (T.fromList @'[3] [-2, 0, 3 :: Double]))

@@ -7,6 +7,7 @@ import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Type as Internal
+import qualified TensorTest.Backend.Structure
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
@@ -14,7 +15,8 @@ tests :: TestTree
 tests =
   testGroup
     "backend"
-    [ testProperty "run executes closed tensor computations on the CPU" (H.withTests 1 propCPUDispatch),
+    [ TensorTest.Backend.Structure.tests,
+      testProperty "run executes closed tensor computations on the CPU" (H.withTests 1 propCPUDispatch),
       testProperty "Accelerate representations can be unpacked and reused" (H.withTests 1 propAccelerateAccess),
       testProperty "run1 reuses a function with changing input values" (H.withTests 1 propRun1),
       testProperty "run1 permits changing output shape and element type" (H.withTests 1 propRun1Types),
@@ -150,7 +152,7 @@ propPreparedEdges = H.property $ do
       empty = T.run1 T.CPU (T.broadcast @'[2, 0, 3]) :: T.TensorData '[1, 3] Int -> T.TensorData '[2, 0, 3] Int
       emptySum = T.run2 T.CPU (+) :: T.TensorData '[0] Int -> T.TensorData '[0] Int -> T.TensorData '[0] Int
       input = T.run T.CPU (T.zeros @'[0] @Int)
-  T.toList (scalar (T.run T.CPU (T.scalar (T.constant (4 :: Int))))) H.=== [5]
+  T.toList (scalar (T.run T.CPU (T.scalar (T.element (4 :: Int))))) H.=== [5]
   T.toList (empty (T.run T.CPU (T.ones @'[1, 3] @Int))) H.=== []
   T.toList (emptySum input input) H.=== []
 
@@ -344,7 +346,7 @@ propRun3Outputs = H.property $ do
 
 propComputationEdges :: H.Property
 propComputationEdges = H.property $ do
-  let (empty, scalar) = T.run T.CPU (T.zeros @'[2, 0, 3] @Int, T.scalar (T.constant True))
+  let (empty, scalar) = T.run T.CPU (T.zeros @'[2, 0, 3] @Int, T.scalar (T.element True))
       execute :: T.TensorData '[0] Int -> (T.TensorData '[0] Bool, T.TensorData '[] Int)
       execute = T.run1 T.CPU (\x -> (x T.> 0, T.sum x))
       (emptyMask, total) = execute (T.run T.CPU (T.zeros @'[0] @Int))

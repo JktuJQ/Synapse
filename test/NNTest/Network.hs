@@ -26,14 +26,12 @@ data Parameters t a = Parameters
   }
   deriving (Generic)
 
-instance AG.Differentiable (Parameters T.Tensor Double) where
-  type WithGrad s (Parameters T.Tensor Double) = Parameters (AG.Tensor s) Double
+type instance T.WithTensor t (Parameters T.Tensor Double) = Parameters t Double
 
 newtype Shared t a = Shared {sharedLayer :: NN.Dense 2 2 t a}
   deriving (Generic)
 
-instance AG.Differentiable (Shared T.Tensor Double) where
-  type WithGrad s (Shared T.Tensor Double) = Shared (AG.Tensor s) Double
+type instance T.WithTensor t (Shared T.Tensor Double) = Shared t Double
 
 values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
@@ -45,8 +43,8 @@ parameters =
     (NN.Dense (T.fromList @'[2, 1] [3, 4]) (T.fromList @'[1] [0.5]))
 
 network ::
-  ( T.LinearAlgebra t a,
-    T.ShapeOps t a,
+  ( T.TensorOps t a,
+    Num (T.TensorElement a),
     Num (t '[2] a),
     Num (t '[1] a),
     E.Ord (t '[2] a),
@@ -61,7 +59,7 @@ network p = proc input -> do
   NN.dense (outputLayer p) -< NN.relu hidden
 
 sharedNetwork ::
-  (T.LinearAlgebra t a, T.ShapeOps t a, Num (t '[2] a)) =>
+  (T.TensorOps t a, Num (T.TensorElement a), Num (t '[2] a)) =>
   Shared t a ->
   (t '[2] a, t '[2] a) ->
   (t '[2] a, t '[2] a)

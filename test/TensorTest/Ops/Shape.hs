@@ -51,7 +51,7 @@ propReshape = H.property $ do
 
 propBroadcastScalar :: H.Property
 propBroadcastScalar = H.property $ do
-  let tensor = T.scalar (T.constant (3.0 :: T.Float32))
+  let tensor = T.scalar (T.element (3.0 :: T.Float32))
       broadcasted = T.broadcast @'[2, 2] tensor
   T.toList (T.run T.CPU broadcasted) H.=== [3.0, 3.0, 3.0, 3.0]
 
@@ -77,7 +77,7 @@ propReshapeRoundTrip = H.property $ do
 
 propReshapeEdges :: H.Property
 propReshapeEdges = H.property $ do
-  T.toList (T.run T.CPU (T.reshape @'[1, 1] (T.scalar (T.constant (7 :: Int))))) H.=== [7]
+  T.toList (T.run T.CPU (T.reshape @'[1, 1] (T.scalar (T.element (7 :: Int))))) H.=== [7]
   T.toList (T.run T.CPU (T.reshape @'[] (T.full @'[1, 1] (7 :: Int)))) H.=== [7]
   T.toList (T.run T.CPU (T.reshape @'[0] (T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int))) H.=== []
 
@@ -141,7 +141,7 @@ propSqueezeOneAxis = H.property $ do
 
 propAxisEdges :: H.Property
 propAxisEdges = H.property $ do
-  let scalar = T.scalar (T.constant (7 :: Int))
+  let scalar = T.scalar (T.element (7 :: Int))
       empty = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int
   T.toList (T.run T.CPU (T.squeeze @0 (T.unsqueeze @0 scalar))) H.=== [7]
   T.toList (T.run T.CPU (T.squeeze @1 (T.unsqueeze @1 empty))) H.=== []
@@ -177,7 +177,7 @@ propPermute = H.property $ do
 
 propPermutationEdges :: H.Property
 propPermutationEdges = H.property $ do
-  let scalar = T.scalar (T.constant True)
+  let scalar = T.scalar (T.element True)
       empty = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int
       flags = T.fromList @'[2, 3] [True, False, False, True, True, False]
   T.toList (T.run T.CPU (T.permuteAxes @'[] scalar)) H.=== [True]
@@ -226,7 +226,7 @@ propJoinEdges = H.property $ do
   T.toList (T.run T.CPU (T.concat @1 empty empty)) H.=== []
   T.toList (T.run T.CPU (T.concat @0 empty empty)) H.=== []
   T.toList (T.run T.CPU (T.stack @1 empty empty)) H.=== []
-  T.toList (T.run T.CPU (T.stack @0 (T.scalar (T.constant (3 :: Int))) (T.scalar 7))) H.=== [3, 7]
+  T.toList (T.run T.CPU (T.stack @0 (T.scalar (T.element (3 :: Int))) (T.scalar 7))) H.=== [3, 7]
 
 propJoinBoolean :: H.Property
 propJoinBoolean = H.property $ do

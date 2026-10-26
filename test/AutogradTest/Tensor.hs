@@ -7,16 +7,13 @@
 module AutogradTest.Tensor (tests) where
 
 import qualified AutogradTest.Tensor.Elementwise
+import qualified AutogradTest.Tensor.Lifting
 import qualified Hedgehog as H
-import qualified Numeric.Backprop.Explicit as BP
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
-
-constant :: T.Tensor sh a -> AG.Tensor s sh a
-constant = AG.Tensor . AG.Var . BP.auto
 
 differentiate :: (T.Shape from, T.Shape to) => (forall s. (AG.Context s) => AG.Tensor s from Double -> AG.Tensor s to Double) -> T.Tensor from Double -> (T.Tensor to Double, T.Tensor from Double)
 differentiate = AG.backprop
@@ -34,19 +31,38 @@ finiteDifferences f input = do
       numerical = [(evaluate (perturb axis step) - evaluate (perturb axis (negate step))) / (2 * step) | axis <- [0 .. length xs - 1]]
   approxList (values gradient) numerical
 
-forward :: (T.ShapeOps t Double, T.LinearAlgebra t Double, T.Reductions t Double) => t '[2, 3] Double -> t '[] Double
+forward :: (T.TensorOps t Double) => t '[2, 3] Double -> t '[] Double
 forward x = T.sum (T.matmul x (T.transpose x))
 
 tests :: TestTree
 tests =
   testGroup
     "tensor operations"
-    [ AutogradTest.Tensor.Elementwise.tests,
+    [ AutogradTest.Tensor.Lifting.tests,
+      AutogradTest.Tensor.Elementwise.tests,
       testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             (value, gradient) = differentiate forward input
         values value H.=== values (forward input)
         values gradient H.=== [10, 14, 18, 10, 14, 18],
+      testProperty "construction uses the same API inside a differentiation scope" $ H.withTests 1 $ H.property $ do
+        let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
+            generated = T.fromGen @'[2, 3] (\ix -> T.fromIntegral (T.coordinate @0 ix * 3 + T.coordinate @1 ix))
+            (_, gradient) = differentiate (\x -> T.sum (x * T.fromGen @'[2, 3] (\ix -> T.fromIntegral (T.coordinate @0 ix * 3 + T.coordinate @1 ix)))) input
+        values gradient H.=== values generated,
+      testProperty "host conversions construct constants in differentiation scopes" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[3] [1, 2, 3 :: Double]
+            host = T.run T.CPU input
+            (value, gradient) = differentiate (\x -> x * T.fromList [2, 3, 4] + T.unsafeFromList [5, 6, 7] + T.fromData host) input
+            (_, constantGradient) = differentiate (\_ -> T.fromList @'[3] [2, 3, 4] + T.unsafeFromList [5, 6, 7] + T.fromData host) input
+        values value H.=== [8, 14, 22]
+        values gradient H.=== [2, 3, 4]
+        values constantGradient H.=== [0, 0, 0],
+      testProperty "like constructors preserve shape without adding a gradient edge" $ H.withTests 1 $ H.property $ do
+        let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
+            (value, gradient) = differentiate (\x -> T.sum (x * T.fullLike x 3 + T.onesLike x + T.zerosLike x)) input
+        values value H.=== [69]
+        values gradient H.=== replicate 6 3,
       testProperty "reshape, squeeze and unsqueeze preserve gradient order" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             (_, gradient) = differentiate (\x -> T.squeeze @0 (T.unsqueeze @0 (T.reshape @'[3, 2] (x * x)))) input
@@ -54,7 +70,7 @@ tests =
       testProperty "axis permutations invert the gradient coordinates" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             weights = T.unsafeFromList [1 .. 6] :: T.Tensor '[3, 2] Double
-            (_, gradient) = differentiate (\x -> T.permuteAxes @'[1, 0] x * constant weights) input
+            (_, gradient) = differentiate (\x -> T.permuteAxes @'[1, 0] x * AG.constant weights) input
         values gradient H.=== [1, 3, 5, 2, 4, 6],
       testProperty "broadcast sums repeated gradient contributions" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1, 2, 3] :: T.Tensor '[1, 3, 1] Double
@@ -73,7 +89,7 @@ tests =
       testProperty "slices scatter gradients through steps, reverse ranges and fixed axes" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 12] :: T.Tensor '[2, 6] Double
             weights = T.unsafeFromList [2, 3, 5] :: T.Tensor '[3] Double
-            (_, gradient) = differentiate (\x -> T.slice @'[ 'T.At 1, 'T.RangeReverse 0 6 2] x * constant weights) input
+            (_, gradient) = differentiate (\x -> T.slice @'[ 'T.At 1, 'T.RangeReverse 0 6 2] x * AG.constant weights) input
         values gradient H.=== [0, 0, 0, 0, 0, 0, 5, 0, 3, 0, 2, 0],
       testProperty "empty slices return zero gradients" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[6] Double
@@ -81,13 +97,8 @@ tests =
         values gradient H.=== replicate 6 0,
       testProperty "index gradients occupy only the selected element" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
-            (value, gradient) =
-              BP.backprop
-                (BP.ZF AG.zero)
-                (BP.OF AG.one)
-                (AG.unVar . AG.unTensorElement . T.index @'[1, 2] . AG.Tensor . AG.Var)
-                input
-        values (T.scalar value) H.=== [6]
+            (value, gradient) = differentiate (T.scalar . T.index @'[1, 2]) input
+        values value H.=== [6]
         values gradient H.=== [0, 0, 0, 0, 0, 1],
       testProperty "sum and mean expand gradients over the reduced axes" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
@@ -101,11 +112,25 @@ tests =
             (_, minimumGradient) = differentiate T.minimum input
         values maximumGradient H.=== [0, 0.5, 0.5, 0.5, 0.5, 0]
         values minimumGradient H.=== [1, 0, 0, 0, 0, 0],
+      testProperty "arg extrema return ordinary indices that can be reshaped" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[2, 3] [1, 5, 2, 4, 3, 6 :: Double]
+            (maxima, minima) = T.run T.CPU $ AG.evaluate (\x -> AG.constant (T.reshape @'[2, 1] (T.argmax @1 x), T.reshape @'[2, 1] (T.argmin @1 x))) input
+        T.toList maxima H.=== [1, 2]
+        T.toList minima H.=== [0, 1],
+      testProperty "arg extrema can supply constants without adding gradient edges" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[2, 3] [1, 5, 2, 4, 3, 6 :: Double]
+            function x =
+              let indices = T.reshape @'[2, 1] (T.argmax @1 x + T.argmin @1 x)
+                  weights = T.broadcast @'[2, 3] (T.fromIntegral indices)
+               in x * AG.constant weights
+            (output, gradient) = differentiate function input
+        values output H.=== [1, 5, 2, 12, 9, 18]
+        values gradient H.=== [1, 1, 1, 3, 3, 3],
       testProperty "normalization pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [0.2, 0.5, 1.1, -0.3, 0.4, 0.8] :: T.Tensor '[2, 3] Double
             weights = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
-        finiteDifferences (\x -> T.softmax @1 x * constant weights) input
-        finiteDifferences (\x -> T.logSoftmax @1 x * constant weights) input
+        finiteDifferences (\x -> T.softmax @1 x * AG.constant weights) input
+        finiteDifferences (\x -> T.logSoftmax @1 x * AG.constant weights) input
         finiteDifferences T.logSumExp input
         finiteDifferences (T.logSumExpAxes @'[0]) input,
       testProperty "rectangular and batched matmul pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
@@ -113,29 +138,29 @@ tests =
             right = T.unsafeFromList [0.7, 0.8, 0.9, 1.0, 1.1, 1.2] :: T.Tensor '[3, 2] Double
             batchLeft = T.unsafeFromList [0.1, 0.2 .. 1.2] :: T.Tensor '[2, 2, 3] Double
             batchRight = T.unsafeFromList [0.2, 0.3 .. 1.3] :: T.Tensor '[2, 3, 2] Double
-        finiteDifferences (\x -> T.matmul x (constant right)) left
-        finiteDifferences (T.matmul (constant left)) right
-        finiteDifferences (\x -> T.matmul x (constant batchRight)) batchLeft
-        finiteDifferences (T.matmul (constant batchLeft)) batchRight,
+        finiteDifferences (\x -> T.matmul x (AG.constant right)) left
+        finiteDifferences (T.matmul (AG.constant left)) right
+        finiteDifferences (\x -> T.matmul x (AG.constant batchRight)) batchLeft
+        finiteDifferences (T.matmul (AG.constant batchLeft)) batchRight,
       testProperty "vector matmul pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
         let vector = T.fromList @'[3] [0.2, 0.4, 0.6 :: Double]
             other = T.fromList @'[3] [0.3, 0.5, 0.7 :: Double]
             matrix = T.fromList @'[2, 3] [0.1, 0.2 .. 0.6 :: Double]
             right = T.fromList @'[3, 2] [0.2, 0.3 .. 0.7 :: Double]
             batches = T.fromList @'[2, 3, 2] [0.1, 0.2 .. 1.2 :: Double]
-        finiteDifferences (\x -> T.matmul x (constant other)) vector
-        finiteDifferences (T.matmul (constant vector)) other
-        finiteDifferences (\x -> T.matmul x (constant right)) vector
-        finiteDifferences (T.matmul (constant vector)) right
-        finiteDifferences (\x -> T.matmul x (constant vector)) matrix
-        finiteDifferences (T.matmul (constant matrix)) vector
-        finiteDifferences (\x -> T.matmul x (constant batches)) vector
-        finiteDifferences (T.matmul (constant vector)) batches,
+        finiteDifferences (\x -> T.matmul x (AG.constant other)) vector
+        finiteDifferences (T.matmul (AG.constant vector)) other
+        finiteDifferences (\x -> T.matmul x (AG.constant right)) vector
+        finiteDifferences (T.matmul (AG.constant vector)) right
+        finiteDifferences (\x -> T.matmul x (AG.constant vector)) matrix
+        finiteDifferences (T.matmul (AG.constant matrix)) vector
+        finiteDifferences (\x -> T.matmul x (AG.constant batches)) vector
+        finiteDifferences (T.matmul (AG.constant vector)) batches,
       testProperty "broadcast matmul pullbacks agree with finite differences" $ H.withTests 1 $ H.property $ do
         let left = T.fromList @'[2, 1, 1, 2] [0.1, 0.2, 0.3, 0.4 :: Double]
             right = T.fromList @'[3, 2, 1] [0.2, 0.3 .. 0.7 :: Double]
-        finiteDifferences (\x -> T.matmul x (constant right)) left
-        finiteDifferences (T.matmul (constant left)) right,
+        finiteDifferences (\x -> T.matmul x (AG.constant right)) left
+        finiteDifferences (T.matmul (AG.constant left)) right,
       testProperty "broadcast matmul pullbacks respect nonuniform output seeds" $ H.withTests 1 $ H.property $ do
         let left = T.fromList @'[2, 1, 1, 2] [1, 2, 3, 4 :: Double]
             right = T.fromList @'[3, 2, 1] [5, 6, 7, 8, 9, 10 :: Double]
@@ -187,7 +212,7 @@ tests =
       testProperty "zero-size matrix contractions return zero gradients" $ H.withTests 1 $ H.property $ do
         let left = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             right = T.unsafeFromList [] :: T.Tensor '[3, 0] Double
-            (_, gradient) = differentiate (\x -> T.matmul x (constant right)) left
+            (_, gradient) = differentiate (\x -> T.matmul x (AG.constant right)) left
         values gradient H.=== replicate 6 0,
       testProperty "dot accumulates gradients from both vector arguments" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1, 2, 3] :: T.Tensor '[3] Double

@@ -31,15 +31,16 @@ module Synapse.NN.Metrics
 where
 
 import Synapse.NN.Loss (mae, mse)
+import Synapse.Tensor.Ops (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Reduction as R
-import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast)
+import Synapse.Tensor.Ops.Shape (broadcast)
 import Synapse.Tensor.Shapes.Axes (NonEmpty)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
-import Synapse.Tensor.Type (TensorLike)
+import Synapse.Tensor.Type (TensorElement, TensorLike)
 
 center ::
-  (Shape sh, R.MeanReductions t a, ShapeOps t a, Num (t sh a)) =>
+  (Shape sh, TensorOps t a, RealFloat a, Fractional (TensorElement a), Num (t sh a)) =>
   t sh a ->
   t sh a
 center input = input - broadcast (R.mean input)
@@ -73,7 +74,7 @@ rmse reduce predictions targets = sqrt $ mse reduce predictions targets
 -- A zero denominator gives NaN for perfect predictions and negative infinity otherwise.
 r2 ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, R.Reductions t a, R.MeanReductions t a, ShapeOps t a, Num (t sh a), Fractional (t '[] a)) =>
+  (Shape sh, TensorOps t a, RealFloat a, Fractional (TensorElement a), Num (t sh a), Fractional (t '[] a)) =>
   t sh a ->
   t sh a ->
   t '[] a
@@ -99,7 +100,7 @@ meanError reduce predictions targets = reduce $ predictions - targets
 -- Empty tensors are rejected at compile time and NaN values propagate to the result.
 maxError ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, NonEmpty sh, R.OrderedReductions t a, Num (t sh a)) =>
+  (Shape sh, NonEmpty sh, TensorOps t a, E.Ord (TensorElement a), Num (t sh a)) =>
   t sh a ->
   t sh a ->
   t '[] a
@@ -140,7 +141,7 @@ smape reduce epsilon predictions targets =
 -- Errors are weighted by target magnitude and the score can exceed one.
 wmape ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, RealFloat a, R.Reductions t a, Num (t sh a), Fractional (t '[] a), E.Ord (t '[] a)) =>
+  (Shape sh, RealFloat a, TensorOps t a, Num (TensorElement a), Num (t sh a), Fractional (t '[] a), E.Ord (t '[] a)) =>
   a ->
   t sh a ->
   t sh a ->
@@ -177,7 +178,7 @@ rmsle reduce predictions targets = sqrt $ msle reduce predictions targets
 -- A zero denominator gives NaN for perfect predictions and positive infinity otherwise.
 rae ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, R.Reductions t a, R.MeanReductions t a, ShapeOps t a, Num (t sh a), Fractional (t '[] a)) =>
+  (Shape sh, TensorOps t a, RealFloat a, Fractional (TensorElement a), Num (t sh a), Fractional (t '[] a)) =>
   t sh a ->
   t sh a ->
   t '[] a
@@ -190,7 +191,7 @@ rae predictions targets =
 -- A zero denominator gives NaN for perfect predictions and positive infinity otherwise.
 rse ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, R.Reductions t a, R.MeanReductions t a, ShapeOps t a, Num (t sh a), Fractional (t '[] a)) =>
+  (Shape sh, TensorOps t a, RealFloat a, Fractional (TensorElement a), Num (t sh a), Fractional (t '[] a)) =>
   t sh a ->
   t sh a ->
   t '[] a
@@ -204,7 +205,7 @@ rse predictions targets =
 -- At least two observations are required; a zero target variance produces NaN or negative infinity.
 explainedVariance ::
   forall {t :: TensorLike} sh a.
-  (Shape sh, R.Reductions t a, R.MeanReductions t a, ShapeOps t a, Num (t sh a), Fractional (t '[] a)) =>
+  (Shape sh, TensorOps t a, RealFloat a, Fractional (TensorElement a), Num (t sh a), Fractional (t '[] a)) =>
   t sh a ->
   t sh a ->
   t '[] a
@@ -222,10 +223,11 @@ pearson ::
   forall {t :: TensorLike} sh a.
   ( Shape sh,
     NonEmpty sh,
-    R.Reductions t a,
-    R.MeanReductions t a,
-    R.OrderedReductions t a,
-    ShapeOps t a,
+    TensorOps t a,
+    Num (TensorElement a),
+    RealFloat a,
+    Fractional (TensorElement a),
+    E.Ord (TensorElement a),
     Num (t sh a),
     Floating (t '[] a),
     E.Eq (t '[] a),

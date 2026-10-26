@@ -11,14 +11,13 @@ module Synapse.NN.Dense (Dense (..), dense) where
 
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
-import Synapse.Autograd.Differentiable (Differentiable (..))
-import qualified Synapse.Autograd.Tensor as AG
-import Synapse.Tensor.Ops.Math (LinearAlgebra, matmul)
-import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast)
+import Synapse.Tensor.Ops (TensorOps)
+import Synapse.Tensor.Ops.Math (matmul)
+import Synapse.Tensor.Ops.Shape (broadcast)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
-import Synapse.Tensor.Type (TensorLike)
+import Synapse.Tensor.Type (TensorLike, WithTensor)
 import qualified Synapse.Tensor.Type as T
 
 -- | Parameters of an affine transformation @input * weights + bias@.
@@ -37,11 +36,7 @@ data Dense (in_features :: Nat) (out_features :: Nat) (t :: TensorLike) a = Dens
   }
   deriving (Generic)
 
-instance
-  (Num (T.Tensor '[in_features, out_features] a), Num (T.Tensor '[out_features] a)) =>
-  Differentiable (Dense in_features out_features T.Tensor a)
-  where
-  type WithGrad s (Dense in_features out_features T.Tensor a) = Dense in_features out_features (AG.Tensor s) a
+type instance WithTensor t (Dense in_features out_features T.Tensor a) = Dense in_features out_features t a
 
 -- | Apply @input * weights + bias@ along the last input dimension.
 -- The input must have at least one dimension, with @in_features@ elements on the last axis.
@@ -53,8 +48,8 @@ dense ::
     out_sh ~ MatmulShape in_sh '[in_features, out_features],
     Shape out_sh,
     CanBroadcast '[out_features] out_sh,
-    LinearAlgebra t a,
-    ShapeOps t a,
+    TensorOps t a,
+    Num (T.TensorElement a),
     Num (t out_sh a)
   ) =>
   Dense in_features out_features t a ->

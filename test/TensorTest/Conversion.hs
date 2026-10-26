@@ -32,7 +32,7 @@ propFromListRoundTrip = H.property $ do
 
 propFromListExcess :: H.Property
 propFromListExcess = H.property $ do
-  result <- H.evalIO $ try @ErrorCall $ evaluate $ T.fromList @'[2] [1, 2, 3 :: Int]
+  result <- H.evalIO $ try @ErrorCall $ evaluate (T.fromList @'[2] [1, 2, 3] :: T.Tensor '[2] Int)
   case result of
     Left _ -> H.success
     Right _ -> H.failure
@@ -44,7 +44,7 @@ propFromListEdges = H.property $ do
 
 propFromListRejectsInvalidSize :: H.Property
 propFromListRejectsInvalidSize = H.property $ do
-  result <- H.evalIO $ try @ErrorCall $ evaluate $ T.fromList @'[2, 3] [1.0, 2.0 :: T.Float32]
+  result <- H.evalIO $ try @ErrorCall $ evaluate (T.fromList @'[2, 3] [1.0, 2.0] :: T.Tensor '[2, 3] T.Float32)
   case result of
     Left _ -> H.success
     Right _ -> H.failure

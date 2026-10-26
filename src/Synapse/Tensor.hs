@@ -5,21 +5,17 @@
 -- @
 -- import qualified Synapse.Tensor as T
 -- @
+--
+-- Tensor construction, shape transformations, reductions, and matrix products share the 'TensorOps' constraint.
+-- The same function can be used with ordinary tensors or the wrappers from "Synapse.Autograd.Tensor".
+--
+-- @
+-- gramTotal :: T.TensorOps t Double => t '[2, 3] Double -> t '[] Double
+-- gramTotal x = T.sum (T.matmul x (T.transpose x))
+-- @
 module Synapse.Tensor
-  ( Scalar,
-    Construction,
-    ElementConstant,
-    ShapeOps,
-    LinearAlgebra,
-    Reductions,
-    MeanReductions,
-    OrderedReductions,
-    BooleanReductions,
-    Normalization,
-    LogReductions,
-    Coordinates,
-    Indexing,
-    Slicing,
+  ( WithTensor,
+    TensorOps,
     Element,
     Tensor,
     TensorLike,
@@ -61,7 +57,7 @@ module Synapse.Tensor
     (>=),
     min,
     max,
-    constant,
+    element,
     fromIntegral,
     Backend (..),
     DType,
@@ -126,10 +122,10 @@ module Synapse.Tensor
 where
 
 import Synapse.Tensor.Backend (Backend (..), run, run1, run2, run3, run4, run5, run6, run7, run8, run9)
-import Synapse.Tensor.Construction
-  ( Construction,
-    Scalar,
-    arange,
+import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
+import Synapse.Tensor.Ops (TensorOps)
+import Synapse.Tensor.Ops.Construction
+  ( arange,
     eye,
     fill,
     fromGen,
@@ -144,14 +140,12 @@ import Synapse.Tensor.Construction
     zeros,
     zerosLike,
   )
-import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
-import Synapse.Tensor.DType (DType, Float32, Float64)
 import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, isInfinite, isNaN, max, min, not, quot, rem, select, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
-import Synapse.Tensor.Ops.Index (Coordinates, Indexable, Indexing, Slicing, coordinate, index, slice, (!!))
-import Synapse.Tensor.Ops.Math (LinearAlgebra, dot, matmul)
-import Synapse.Tensor.Ops.Reduction (BooleanReductions, LogReductions, MeanReductions, Normalization, OrderedReductions, Reductions, all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
-import Synapse.Tensor.Ops.Shape (ShapeOps, broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
+import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
+import Synapse.Tensor.Ops.Math (dot, matmul)
+import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
+import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
-import Synapse.Tensor.Type (Element, ElementConstant, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, TensorLike, constant, fromIntegral)
+import Synapse.Tensor.Type (DType, Element, Float32, Float64, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, TensorLike, WithTensor, element, fromIntegral)
 import Prelude hiding (Eq, Integral, Ord, RealFloat, all, any, concat, fromIntegral, isInfinite, isNaN, max, maximum, min, minimum, not, quot, rem, sum, (!!), (&&), (/=), (<), (<=), (==), (>), (>=), (||))

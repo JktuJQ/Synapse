@@ -63,16 +63,16 @@ propCond = H.property $ do
   let lhs = T.fromList @'[3] [1, 2, 3 :: Int]
       rhs = T.fromList @'[3] [4, 5, 6 :: Int]
   T.toList (T.run T.CPU (T.cond (T.sum lhs T.> 0) (lhs + 1) rhs)) H.=== [2, 3, 4]
-  T.toList (T.run T.CPU (T.cond (T.scalar (T.constant False)) lhs rhs)) H.=== [4, 5, 6]
+  T.toList (T.run T.CPU (T.cond (T.scalar (T.element False)) lhs rhs)) H.=== [4, 5, 6]
 
 propSelectEdges :: H.Property
 propSelectEdges = H.property $ do
   let empty = T.zeros @'[2, 0] :: T.Tensor '[2, 0] Int
       emptyMask = T.full @'[2, 0] True
-      scalarMask = T.scalar (T.constant False)
+      scalarMask = T.scalar (T.element False)
   T.toList (T.run T.CPU (T.select emptyMask empty empty)) H.=== []
   T.toList (T.run T.CPU (T.not emptyMask T.|| emptyMask)) H.=== []
-  T.toList (T.run T.CPU (T.select scalarMask (T.scalar (T.constant True)) (T.scalar (T.constant False)))) H.=== [False]
+  T.toList (T.run T.CPU (T.select scalarMask (T.scalar (T.element True)) (T.scalar (T.element False)))) H.=== [False]
   let lhs = T.fromList @'[2] [(1 :: Int, True), (2, False)]
       rhs = T.fromList @'[2] [(3 :: Int, False), (4, True)]
   T.toList (T.run T.CPU (T.select (T.fromList @'[2] [True, False]) lhs rhs)) H.=== [(1, True), (4, True)]
@@ -90,8 +90,8 @@ propIntegral = H.property $ do
 
 propClassification :: H.Property
 propClassification = H.property $ do
-  let input = T.fromList @'[5] [0 / 0, 1 / 0, -(1 / 0), 0, -3 :: Double]
-      single = T.fromList @'[3] [0 / 0, 1 / 0, 2 :: Float]
+  let input = T.fromList @'[5] [0 / 0, 1 / 0, -(1 / 0), 0, -3 :: Double] :: T.Tensor '[5] Double
+      single = T.fromList @'[3] [0 / 0, 1 / 0, 2 :: Float] :: T.Tensor '[3] Float
   T.toList (T.run T.CPU (T.isNaN input)) H.=== [True, False, False, False, False]
   T.toList (T.run T.CPU (T.isInfinite input)) H.=== [False, True, True, False, False]
   T.toList (T.run T.CPU (T.isNaN single)) H.=== [True, False, False]

@@ -35,8 +35,16 @@ import GHC.TypeLits
   )
 
 -- | Ranges use an exclusive stop and a positive step.
--- RangeReverse selects the same coordinates as Range, but returns them in reverse order.
-data SliceAxis a = All | At a | Range a a a | RangeReverse a a a
+data SliceAxis a
+  = -- | Keep the entire axis.
+    All
+  | -- | Select a zero-based coordinate and remove the axis from the result.
+    At a
+  | -- | @Range start stop step@ selects coordinates starting at @start@, strictly below @stop@, spaced by @step@.
+    -- A stop at or before the start produces an empty axis.
+    Range a a a
+  | -- | @RangeReverse start stop step@ selects the same coordinates as 'Range' and returns them in reverse order.
+    RangeReverse a a a
 
 type family CheckCoordinate (order :: Ordering) (axis :: Nat) (coordinate :: Nat) (dim :: Nat) :: Constraint where
   CheckCoordinate 'LT axis coordinate dim = ()

@@ -1,28 +1,26 @@
--- | Reverse-mode differentiation of ordinary values and staged tensor expressions.
--- 'WithGrad' selects the representation used inside a differentiable function: t'Var' for scalar numbers and t'Tensor' for tensors.
--- 'backprop' returns the function's value and its input gradient, while 'gradient' returns only the gradient.
--- 'pullback' accepts a caller-supplied output gradient instead of the default seed.
+-- | Reverse-mode differentiation of staged tensor functions.
+-- Tensor records derive @Generic@ and define one @WithTensor@ correspondence in "Synapse.Tensor" for differentiation and execution.
+-- Each tensor is registered independently; results and gradients retain their ordinary tensor structure.
+-- Scalars use rank-zero tensors, while element expressions are implementation details of tensor operations.
+-- Tensor primitives require fractional element types when recording gradients.
 --
 -- This module is intended to be imported qualified:
 --
 -- @
 -- import qualified Synapse.Autograd as AG
+-- import qualified Synapse.Tensor as T
 --
--- -- Returns (9, 6).
--- AG.backprop (\x -> x * x) (3 :: Double)
+-- AG.backprop (\x -> x * x) (T.full @'[] (3 :: Double))
 -- @
 --
--- Tensor values and gradients remain staged expressions; execute them through "Synapse.Tensor".
--- Differentiable tensor operations use the same polymorphic functions as ordinary tensor operations.
--- See "Synapse.Autograd.Tensor" for the supported operations and "Synapse.Autograd.Differentiable" for custom records.
--- This API provides differentiation primitives rather than layers, optimizers, or a training loop.
+-- Tensor values and gradients remain staged; execute them through "Synapse.Tensor".
 module Synapse.Autograd
-  ( Backpropagatable (..),
-    Context,
+  ( Context,
     Var (..),
     Tensor (..),
-    TensorElement (..),
-    Differentiable (WithGrad),
+    Differentiable,
+    WithGrad,
+    ParametersConstraints,
     evaluate,
     backprop,
     gradient,
@@ -32,7 +30,6 @@ module Synapse.Autograd
   )
 where
 
-import Synapse.Autograd.Differentiable (Differentiable (WithGrad))
 import Synapse.Autograd.Execution (backprop, constant, evaluate, gradient, pullback, stopGrad)
-import Synapse.Autograd.Tensor (Tensor (..), TensorElement (..))
-import Synapse.Autograd.Type (Backpropagatable (..), Context, Var (..))
+import Synapse.Autograd.Tensor (Tensor (..))
+import Synapse.Autograd.Type (Context, Differentiable, ParametersConstraints, Var (..), WithGrad)

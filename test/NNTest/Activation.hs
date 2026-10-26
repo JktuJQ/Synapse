@@ -100,14 +100,14 @@ tests =
         values (NN.sigmoid empty) H.=== []
         values (NN.tanh empty) H.=== []
         values (NN.softplus empty) H.=== []
-        let element = T.constant (0 :: Double)
+        let element = T.full @'[] (0 :: Double)
             (output, gradient) = AG.backprop NN.sigmoid element
             (softOutput, softGradient) = AG.backprop NN.softplus element
-        values (T.scalar output) H.=== [0.5]
-        values (T.scalar gradient) H.=== [0.25]
-        approxList (values (T.scalar softOutput)) [log 2]
-        approxList (values (T.scalar softGradient)) [0.5]
-        values (T.scalar (NN.relu (T.constant (-2 :: Double)))) H.=== [0],
+        values output H.=== [0.5]
+        values gradient H.=== [0.25]
+        approxList (values softOutput) [log 2]
+        approxList (values softGradient) [0.5]
+        values (T.scalar (NN.relu (T.element (-2 :: Double)))) H.=== [0],
       testProperty "activation composition supports seeded pullbacks and prepared execution" $ H.withTests 1 $ H.property $ do
         let input = T.fromList @'[3] [-1, 0, 1 :: Double]
             (_, backward) = AG.pullback (NN.sigmoid . NN.relu) input

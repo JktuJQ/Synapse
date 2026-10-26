@@ -156,7 +156,7 @@ propFloatingComparisons = H.property $ do
 
 propComparisonEdges :: H.Property
 propComparisonEdges = H.property $ do
-  let scalar = T.scalar (T.constant True)
+  let scalar = T.scalar (T.element True)
       empty = T.zeros @'[2, 0] :: T.Tensor '[2, 0] Int
   T.toList (T.run T.CPU (scalar T.== scalar)) H.=== [True]
   let lhs = T.fromList @'[4] [False, False, True, True]
@@ -174,8 +174,8 @@ propComparisonDTypes :: H.Property
 propComparisonDTypes = H.property $ do
   let check :: (T.DType a, T.Ord (T.TensorElement a)) => a -> a -> H.PropertyT IO ()
       check low high = do
-        let lhs = T.scalar (T.constant low)
-            rhs = T.scalar (T.constant high)
+        let lhs = T.scalar (T.element low)
+            rhs = T.scalar (T.element high)
         T.toList (T.run T.CPU (lhs T.< rhs)) H.=== [True]
         T.toList (T.run T.CPU (lhs T.== lhs)) H.=== [True]
         T.toList (T.run T.CPU (lhs T./= rhs)) H.=== [True]
@@ -187,11 +187,11 @@ propComparisonDTypes = H.property $ do
   check False True
   check (-1 :: Float) 2
   check (-1 :: Double) 2
-  let lhs = T.fromList @'[2] [(1 :: Int, True), (2, False)]
-      rhs = T.fromList @'[2] [(1 :: Int, True), (2, True)]
+  let lhs = T.fromList @'[2] [(1 :: Int, True), (2, False)] :: T.Tensor '[2] (Int, Bool)
+      rhs = T.fromList @'[2] [(1 :: Int, True), (2, True)] :: T.Tensor '[2] (Int, Bool)
   T.toList (T.run T.CPU (lhs T.== rhs)) H.=== [True, False]
   T.toList (T.run T.CPU (lhs T./= rhs)) H.=== [False, True]
-  let nan = T.scalar (T.constant (0 / 0 :: Float))
+  let nan = T.scalar (T.element (0 / 0 :: Float))
   T.toList (T.run T.CPU (nan T.== nan)) H.=== [False]
   T.toList (T.run T.CPU (nan T./= nan)) H.=== [True]
   H.assert (all isNaN (T.toList (T.run T.CPU (T.min nan nan))))

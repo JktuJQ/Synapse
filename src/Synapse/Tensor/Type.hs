@@ -6,47 +6,79 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Core tensor type.
+-- | Staged tensors, materialized data, element expressions, and representation correspondences.
 module Synapse.Tensor.Type
-  ( ElementConstant (..),
+  ( DType,
+    Float32,
+    Float64,
+    WithTensor,
     Tensor (..),
     TensorLike,
     Element,
     TensorElement (..),
     TensorIndex (..),
     TensorData (..),
-    constant,
+    element,
     FromIntegral (..),
   )
 where
 
 import qualified Data.Array.Accelerate as A
+import Data.Int (Int32, Int64)
 import Data.Kind (Type)
+import Data.Word (Word32, Word64)
 import GHC.TypeLits (Nat)
-import Synapse.Tensor.DType (DType)
 import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
 import Prelude hiding (fromIntegral)
 
--- | Embedding host values into element expressions.
-class ElementConstant element where
-  -- | Embed a host value in an element expression.
-  constantOp ::
-    forall a.
-    (DType a) =>
-    a ->
-    element a
+-- | Single-precision floating point tensor element.
+type Float32 = Float
 
-instance ElementConstant TensorElement where
-  constantOp = TensorElement . A.constant
+-- | Double-precision floating point tensor element.
+type Float64 = Double
+
+-- | Element types supported by Synapse tensors.
+class (A.Elt a) => DType a
+
+instance DType Float
+
+instance DType Double
+
+instance DType Int
+
+instance DType Int32
+
+instance DType Int64
+
+instance DType Word32
+
+instance DType Word64
+
+instance DType Bool
+
+instance (DType a, DType b) => DType (a, b)
+
+instance (DType a, DType b, DType c) => DType (a, b, c)
+
+instance (DType a, DType b, DType c, DType d) => DType (a, b, c, d)
+
+instance (DType a, DType b, DType c, DType d, DType e) => DType (a, b, c, d, e)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f) => DType (a, b, c, d, e, f)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g) => DType (a, b, c, d, e, f, g)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h) => DType (a, b, c, d, e, f, g, h)
+
+instance (DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i) => DType (a, b, c, d, e, f, g, h, i)
 
 -- | Embed a host value in an element expression.
-constant :: forall a. (DType a) => a -> TensorElement a
-constant = constantOp @TensorElement @a
+element :: forall a. (DType a) => a -> TensorElement a
+element = TensorElement . A.constant
 
 -- | A staged tensor expression.
 --
@@ -57,12 +89,46 @@ newtype Tensor (sh :: [Nat]) a
   = Tensor {unTensor :: A.Acc (A.Array (ShapeToDIM sh) a)}
 
 -- | An element expression evaluated inside a tensor computation.
+-- Element expressions describe local scalar arithmetic rather than independently executable tensors.
+-- Use a rank-zero t'Tensor' for a scalar differentiation input or result.
 newtype TensorElement a
   = TensorElement {unTensorElement :: A.Exp a}
 
 -- | Kind of tensor representations indexed by a static shape and an element type.
 -- This synonym describes the type parameters without requiring any tensor operations.
 type TensorLike = [Nat] -> Type -> Type
+
+-- | Replace staged tensors with the selected representation, preserving shapes and element types.
+-- Use @AG.Tensor s@ inside differentiation and @TensorData@ for materialized values.
+-- The resulting type must uniquely identify both the representation and the original staged type.
+-- This correspondence lets execution and differentiation infer their ordinary tensor types.
+-- Single-constructor tensor records derive @Generic@ and define the correspondence once:
+--
+-- @
+-- type instance WithTensor t (Parameters Tensor a) = Parameters t a
+-- @
+--
+-- Records must have one constructor and contain at least one field, with every field holding a tensor or a nested tensor record.
+-- Sum types and records containing ordinary configuration fields are not supported by execution or differentiation.
+type family WithTensor (t :: TensorLike) a = (result :: Type) | result -> t a
+
+type instance WithTensor t (Tensor sh a) = t sh a
+
+type instance WithTensor t (a1, a2) = (WithTensor t a1, WithTensor t a2)
+
+type instance WithTensor t (a1, a2, a3) = (WithTensor t a1, WithTensor t a2, WithTensor t a3)
+
+type instance WithTensor t (a1, a2, a3, a4) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4)
+
+type instance WithTensor t (a1, a2, a3, a4, a5) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5)
+
+type instance WithTensor t (a1, a2, a3, a4, a5, a6) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5, WithTensor t a6)
+
+type instance WithTensor t (a1, a2, a3, a4, a5, a6, a7) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5, WithTensor t a6, WithTensor t a7)
+
+type instance WithTensor t (a1, a2, a3, a4, a5, a6, a7, a8) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5, WithTensor t a6, WithTensor t a7, WithTensor t a8)
+
+type instance WithTensor t (a1, a2, a3, a4, a5, a6, a7, a8, a9) = (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5, WithTensor t a6, WithTensor t a7, WithTensor t a8, WithTensor t a9)
 
 -- | Element expressions associated with a tensor representation.
 -- Each element representation identifies its corresponding tensor representation.
@@ -83,7 +149,7 @@ deriving instance (Fractional (A.Exp a)) => Fractional (TensorElement a)
 deriving instance (Floating (A.Exp a)) => Floating (TensorElement a)
 
 -- | Materialized input or output data.
--- Direct construction requires runtime dimensions to match the type-level shape, just as for 'Tensor'.
+-- Direct construction requires runtime dimensions to match the type-level shape, just as for t'Tensor'.
 -- The underlying array can be converted using <https://hackage.haskell.org/package/accelerate Accelerate>.
 newtype TensorData (sh :: [Nat]) a
   = TensorData {unTensorData :: A.Array (ShapeToDIM sh) a}

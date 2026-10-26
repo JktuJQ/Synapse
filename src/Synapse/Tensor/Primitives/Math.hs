@@ -1,23 +1,27 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
--- | Internal matrix contractions and addressing of broadcast batches.
-module Synapse.Tensor.Ops.Math.Helpers
-  ( matrixDimensions,
-    broadcastDimensions,
-    broadcastBatchIndex,
-    broadcastCopies,
-    multiply,
-    contract,
-    matrixProduct,
-  )
-where
+-- | Staged matrix computations and elementwise numeric instances.
+module Synapse.Tensor.Primitives.Math (matrixDimensions, broadcastDimensions, broadcastBatchIndex, broadcastCopies, multiply, contract, dot, matmul) where
 
 import qualified Data.Array.Accelerate as A
-import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Shapes.Dimensions (strides)
-import Synapse.Tensor.Type (TensorElement (..))
+import Data.Proxy (Proxy (..))
+import Synapse.Tensor.Primitives.Construction (full)
+import Synapse.Tensor.Primitives.Elementwise (map, zipWith)
+import qualified Synapse.Tensor.Primitives.Reduction as Reduction
+import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shape, strides)
+import Synapse.Tensor.Shapes.Matmul (MatmulShape)
+import Synapse.Tensor.Type (DType, Tensor (..), TensorElement (..))
+import Prelude hiding (map, zipWith)
+import qualified Prelude as P
 
 -- | Promote a left vector to a row or a right vector to a column.
 matrixDimensions :: Bool -> [Int] -> ([Int], Int, Int)
@@ -39,7 +43,7 @@ broadcastDimensions lhs rhs = reverse (combine (reverse lhs) (reverse rhs))
 
 -- | Decode a row-major position into one coordinate per dimension.
 coordinates :: [Int] -> A.Exp Int -> [A.Exp Int]
-coordinates dims linear = zipWith (\dim stride -> linear `A.quot` A.constant stride `A.rem` A.constant dim) dims (strides dims)
+coordinates dims linear = P.zipWith (\dim stride -> linear `A.quot` A.constant stride `A.rem` A.constant dim) dims (strides dims)
 
 -- | Project a common batch index onto an operand's original batch dimensions.
 broadcastBatchIndex :: [Int] -> [Int] -> A.Exp Int -> A.Exp Int
@@ -70,7 +74,7 @@ broadcastCopies source target
                 value : values -> value : merge rest values
                 [] -> error "Synapse.Tensor.matmul: inconsistent broadcast coordinates"
             | otherwise = coordinate : merge rest remaining
-       in sum (zipWith (*) (merge (zip [0 ..] fixed) varying) (map A.constant (strides target)))
+       in sum (P.zipWith (*) (merge (zip [0 ..] fixed) varying) (P.map A.constant (strides target)))
 
 -- | Multiply scalar expressions using the element arithmetic instance.
 multiply :: (Num (TensorElement a)) => A.Exp a -> A.Exp a -> A.Exp a
@@ -114,3 +118,57 @@ matrixProduct leftBatch rightBatch batchDims rows shared cols left right =
      in multiply (left A.! A.index1 (leftOffset + inner)) (packedRight A.! A.index1 (rightOffset + inner))
   where
     packedRight = packColumns shared cols right
+
+-- | Sum pairwise products of equally sized vectors.
+dot :: (Shape '[n], DType a, Num (TensorElement a)) => Tensor '[n] a -> Tensor '[n] a -> Tensor '[] a
+dot x y = Reduction.sum (zipWith (*) x y)
+
+-- | Multiply promoted matrices over their broadcast batch dimensions.
+matmul ::
+  forall lhs rhs a.
+  (DType a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs)) =>
+  Tensor lhs a ->
+  Tensor rhs a ->
+  Tensor (MatmulShape lhs rhs) a
+matmul (Tensor left) (Tensor right) =
+  Tensor $
+    A.reshape (A.constant (backendShape (Proxy @(MatmulShape lhs rhs)))) $
+      matrixProduct leftBatch rightBatch batchDims rows shared cols (A.flatten left) (A.flatten right)
+  where
+    (leftBatch, rows, shared) = matrixDimensions True (shape @lhs)
+    (rightBatch, _, cols) = matrixDimensions False (shape @rhs)
+    batchDims = broadcastDimensions leftBatch rightBatch
+
+instance (Shape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) where
+  (+) = zipWith (+)
+  (-) = zipWith (-)
+  (*) = zipWith (*)
+  negate = map negate
+  abs = map abs
+  signum = map signum
+  fromInteger = full @sh . fromInteger
+
+instance (Shape sh, DType a, Fractional a, Fractional (TensorElement a)) => Fractional (Tensor sh a) where
+  (/) = zipWith (/)
+  recip = map recip
+  fromRational = full @sh . fromRational
+
+instance (Shape sh, DType a, Floating a, Floating (TensorElement a)) => Floating (Tensor sh a) where
+  pi = full @sh pi
+  exp = map exp
+  log = map log
+  sqrt = map sqrt
+  (**) = zipWith (**)
+  logBase = zipWith logBase
+  sin = map sin
+  cos = map cos
+  tan = map tan
+  asin = map asin
+  acos = map acos
+  atan = map atan
+  sinh = map sinh
+  cosh = map cosh
+  tanh = map tanh
+  asinh = map asinh
+  acosh = map acosh
+  atanh = map atanh

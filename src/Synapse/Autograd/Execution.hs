@@ -1,45 +1,39 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
--- | Evaluation and reverse-mode differentiation of functions.
--- Tensor values and gradients remain staged expressions; execute them separately through "Synapse.Tensor".
-module Synapse.Autograd.Execution
-  ( evaluate,
-    backprop,
-    gradient,
-    pullback,
-    stopGrad,
-    constant,
-  )
-where
+-- | Evaluation and reverse-mode differentiation of tensor functions.
+-- Tensor records preserve their structure and register each tensor as an independent input.
+-- Values and gradients remain staged expressions; execute them through "Synapse.Tensor".
+module Synapse.Autograd.Execution (evaluate, backprop, gradient, pullback, stopGrad, constant) where
 
 import qualified Numeric.Backprop.Explicit as BPE
-import Synapse.Autograd.Differentiable (Differentiable (..))
 import qualified Synapse.Autograd.Execution.Reverse as Reverse
-import Synapse.Autograd.Execution.Traversal (constants, ones, pack, stopped)
+import Synapse.Autograd.Execution.Variable (GradientView (..), Values (..), Variables, constants, ones, pack, stopped)
 import Synapse.Autograd.Tensor ()
-import Synapse.Autograd.Type (Context)
+import Synapse.Autograd.Type (Differentiable, WithGrad)
+import Synapse.Autograd.Variable (Context)
+import Synapse.Tensor.Fields (Flatten (..), Leaves)
+import qualified Synapse.Tensor.Type as T
 
--- | Evaluate a function without running a reverse pass.
--- Inputs are introduced as constants, allowing operations to skip recording gradient history.
--- The result uses the ordinary representation corresponding to the function's output.
--- Evaluating a tensor function here builds its expression without executing the tensor graph.
+-- | Evaluate a tensor function with constant inputs, without a reverse pass.
+-- This builds staged tensor expressions without executing the backend.
 evaluate ::
   forall a b.
   (Differentiable a, Differentiable b) =>
   (forall s. (Context s) => WithGrad s a -> WithGrad s b) ->
   a ->
   b
-evaluate f value = BPE.evalBP0 (pack (structureWith @b) (f (constant value)))
+evaluate f input = rebuild @T.Tensor $ BPE.evalBP0 result
+  where
+    result :: forall s. (Context s) => BPE.BVar s (Leaves T.Tensor b)
+    result = pack (values @(Leaves T.Tensor b)) (gradientFields @s @b (f @s (constant @s @a input)))
 
--- | Return the function's value and its gradient with respect to the input, in that order.
--- Each output leaf is seeded using its @Backpropagatable.one@ implementation with its value as a reference.
--- For the standard numeric and tensor instances, this differentiates the sum of all output elements.
--- Input leaves that do not affect the result receive their reference-shaped zero gradient.
--- Records retain their ordinary structure in both the value and the gradient.
+-- | Return the output and the gradient of the sum of its tensor elements.
+-- Unused inputs receive zero tensors with their original shapes.
 backprop ::
   forall a b.
   (Differentiable a, Differentiable b) =>
@@ -47,47 +41,44 @@ backprop ::
   a ->
   (b, a)
 backprop f input =
-  let (value, backward) = pullback f input
-   in (value, backward (ones (structureWith @b) value))
+  let (output, backward) = pullback @a @b f input
+      seed = rebuild @T.Tensor (ones (values @(Leaves T.Tensor b)) (flatten @T.Tensor output))
+   in (output, backward seed)
 
 -- | Return only the input gradient computed by 'backprop'.
--- The output seed follows the same convention as 'backprop'.
 gradient ::
   forall a b.
   (Differentiable a, Differentiable b) =>
   (forall s. (Context s) => WithGrad s a -> WithGrad s b) ->
   a ->
   a
-gradient f = snd . backprop f
+gradient f = snd . backprop @a @b f
 
--- | Return the function's value and a function that propagates an output gradient back to the input.
--- For a function @f@ evaluated at @x@, the returned function computes @J_f(x)^T seed@.
--- The seed must have the same structure and tensor shapes as the output value.
--- The input gradient has the same structure and tensor shapes as the original input.
--- The returned function can be applied repeatedly with different seeds to the same forward computation.
+-- | Return the output and a reusable vector-Jacobian product.
+-- Output seeds must preserve the output structure and tensor shapes.
 pullback ::
   forall a b.
   (Differentiable a, Differentiable b) =>
   (forall s. (Context s) => WithGrad s a -> WithGrad s b) ->
   a ->
   (b, b -> a)
-pullback = Reverse.pullback (structureWith @a) (structureWith @b)
+pullback f input =
+  let wrapped :: forall s. (Context s) => Variables s (Leaves T.Tensor a) -> Variables s (Leaves T.Tensor b)
+      wrapped = gradientFields @s @b . f @s . gradientRecord @s @a
+      (output, backward) =
+        Reverse.pullback
+          (values @(Leaves T.Tensor a))
+          (values @(Leaves T.Tensor b))
+          wrapped
+          (flatten @T.Tensor input)
+   in (rebuild @T.Tensor output, rebuild @T.Tensor . backward . flatten @T.Tensor)
 
--- | Introduce an ordinary value as a constant in a differentiation scope.
--- Constants are not registered as inputs and receive no gradient contributions.
--- Structured values preserve their field representations, and tensor expressions remain staged.
--- Operations involving constants can still propagate gradients to their other, variable inputs.
--- Use 'stopGrad' instead to cut the history of a value already inside the differentiation scope.
+-- | Introduce staged tensors without registering them as differentiation inputs.
+-- Constants can change between backend calls when supplied as computation inputs.
 constant :: forall s a. (Differentiable a) => a -> WithGrad s a
-constant = constants @s (structureWith @a)
+constant = gradientRecord @s @a . constants @s (values @(Leaves T.Tensor a)) . flatten @T.Tensor
 
--- | Preserve a value while preventing differentiation through its history.
--- This cuts only paths through the returned value; other uses of the original value retain their history.
--- Tensor expressions remain staged.
---
--- @
--- -- Returns (9, 3): only the first factor contributes to the derivative.
--- backprop (\x -> x * stopGrad x) (3 :: Double)
--- @
+-- | Preserve tensor values while discarding their incoming differentiation history.
+-- Other uses of the original tensors retain their histories.
 stopGrad :: forall s a. (Differentiable a) => WithGrad s a -> WithGrad s a
-stopGrad = stopped (structureWith @a)
+stopGrad = gradientRecord @s @a . stopped (values @(Leaves T.Tensor a)) . gradientFields @s @a

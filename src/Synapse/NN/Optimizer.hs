@@ -20,9 +20,11 @@ module Synapse.NN.Optimizer
   )
 where
 
-import Synapse.Autograd.Differentiable (Differentiable (..))
-import Synapse.Autograd.Differentiable.Structure (Field (..), Structure (..), rebuild)
+import Synapse.Autograd.Execution.Variable (ValueTree (..), Values (..))
 import Synapse.Autograd.Tensor ()
+import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
+import Synapse.Tensor.Fields (Flatten (..), Leaves)
+import qualified Synapse.Tensor.Type as T
 
 -- | Optimizers for a parameter structure.
 -- The initial state is constructed before the first step.
@@ -65,11 +67,11 @@ updateParameters ::
   -- | Updated parameters with the same structure and tensor shapes.
   parameters
 updateParameters formula =
-  let applyUpdate :: Structure c p -> p -> p -> p
-      applyUpdate (Leaf _ _) = formula
-      applyUpdate (Record fields constructor _) = \parameters gradients ->
-        rebuild (\(Field child getter _) -> applyUpdate child (getter parameters) (getter gradients)) fields constructor
-   in applyUpdate (structureWith @parameters @c)
+  let applyUpdate :: ValueTree c p -> p -> p -> p
+      applyUpdate TensorValues = formula
+      applyUpdate (PairValues left right) = \(p1, p2) (g1, g2) ->
+        (applyUpdate left p1 g1, applyUpdate right p2 g2)
+   in \parameters gradients -> rebuild @T.Tensor (applyUpdate (values @(Leaves T.Tensor parameters) @c) (flatten @T.Tensor parameters) (flatten @T.Tensor gradients))
 
 -- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
 -- The caller supplies a finite, nonnegative learning rate.

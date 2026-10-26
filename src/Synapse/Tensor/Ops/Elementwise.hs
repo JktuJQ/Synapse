@@ -16,10 +16,9 @@ module Synapse.Tensor.Ops.Elementwise
 where
 
 import qualified Data.Array.Accelerate as A
-import Synapse.Tensor.DType (DType)
-import Synapse.Tensor.Ops.Elementwise.Helpers (map, zipWith, zipWith3)
+import Synapse.Tensor.Primitives.Elementwise (map, zipWith, zipWith3)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Type (Tensor (..), TensorElement (..))
+import Synapse.Tensor.Type (DType, Tensor (..), TensorElement (..))
 import Prelude hiding (Eq, Integral, Ord, RealFloat, isInfinite, isNaN, map, max, min, not, quot, rem, zipWith, zipWith3, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 
 -- | Boolean operations on element expressions and equally shaped masks.

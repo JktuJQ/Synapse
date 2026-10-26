@@ -18,8 +18,7 @@ data Parameters t = Parameters
   }
   deriving (Generic)
 
-instance AG.Differentiable (Parameters T.Tensor) where
-  type WithGrad s (Parameters T.Tensor) = Parameters (AG.Tensor s)
+type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
 
 predict :: (AG.Context s) => Parameters (AG.Tensor s) -> AG.Tensor s '[4, 2] Double -> AG.Tensor s '[4, 1] Double
 predict parameters input = T.matmul input (weights parameters) + T.broadcast (bias parameters)
@@ -47,11 +46,12 @@ scalarDerivatives :: IO ()
 scalarDerivatives = do
   putStrLn "\nScalar values: f(x) = x * x + sin x"
   let function x = x * x + sin x
-      input = 0.5 :: Double
-  putStrLn ("evaluate = " ++ show (AG.evaluate function input))
-  putStrLn ("backprop (value, gradient) = " ++ show (AG.backprop function input))
-  putStrLn ("gradient = " ++ show (AG.gradient function input))
-  putStrLn ("analytic gradient = " ++ show (2 * input + cos input))
+      input = T.full @'[] (0.5 :: Double)
+      (value, derivative) = AG.backprop function input
+  showTensor "evaluate" (AG.evaluate function input)
+  showTensor "value" value
+  showTensor "gradient" derivative
+  showTensor "analytic gradient" (2 * input + cos input)
 
 vectorPullbacks :: IO ()
 vectorPullbacks = do
@@ -76,7 +76,7 @@ gradientPaths = do
   showTensor "gradient of sum (x * constant frozen)" (AG.gradient (\x -> T.sum (x * AG.constant frozen)) input)
   showTensor "gradient with respect to x" dx
   showTensor "gradient with respect to stopped y" dy
-  showTensor "gradient of index [1]" (AG.gradient (T.index @'[1]) input)
+  showTensor "gradient of index [1]" (AG.gradient (T.scalar . T.index @'[1]) input)
   showTensor "gradient of sum of slice [1:3]" (AG.gradient (T.sum . T.slice @'[ 'T.Range 1 3 1]) input)
 
 maskedValues :: IO ()

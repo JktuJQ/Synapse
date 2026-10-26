@@ -36,7 +36,7 @@ transposed :: T.Tensor '[2, 8, 4, 3] Float
 transposed = T.transpose (T.zeros @'[2, 8, 3, 4])
 
 permutedScalar :: T.Tensor '[] Bool
-permutedScalar = T.permuteAxes @'[] (T.scalar (T.constant True))
+permutedScalar = T.permuteAxes @'[] (T.scalar (T.element True))
 
 joined :: T.Tensor '[2, 7] Int
 joined = T.concat @1 (T.zeros @'[2, 3]) (T.zeros @'[2, 4])
@@ -45,4 +45,4 @@ stacked :: T.Tensor '[2, 3, 2] Float
 stacked = T.stack @2 (T.zeros @'[2, 3]) (T.zeros @'[2, 3])
 
 stackedScalars :: T.Tensor '[2] Bool
-stackedScalars = T.stack @0 (T.scalar (T.constant True)) (T.scalar (T.constant False))
+stackedScalars = T.stack @0 (T.scalar (T.element True)) (T.scalar (T.element False))

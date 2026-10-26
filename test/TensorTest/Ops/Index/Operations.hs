@@ -98,7 +98,7 @@ propReverseRange = H.property $ do
 
 propEdges :: H.Property
 propEdges = H.property $ do
-  let scalar = T.scalar (T.constant (7 :: Int))
+  let scalar = T.scalar (T.element (7 :: Int))
       vector = T.arange @4 (0 :: Int) 1
       empty = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int
   T.toList (T.run T.CPU (T.scalar (T.index @'[] scalar))) H.=== [7]
@@ -118,7 +118,7 @@ propOperators = H.property $ do
   let source = T.fromList @'[2, 3] [0 .. 5 :: Int]
       generated = T.fromGen @'[2, 3] (\ix -> (ix T.!! Proxy @0) * 10 + ix T.!! Proxy @1)
       copied = T.fromGen @'[2, 3] (source T.!!)
-      scalar = T.scalar (T.constant True)
+      scalar = T.scalar (T.element True)
   T.toList (T.run T.CPU (T.scalar (source T.!! Proxy @'[1, 2]))) H.=== [5]
   T.toList (T.run T.CPU generated) H.=== [0, 1, 2, 10, 11, 12]
   T.toList (T.run T.CPU copied) H.=== [0 .. 5]

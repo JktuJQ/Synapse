@@ -15,11 +15,10 @@ module Synapse.NN.Initialization
   )
 where
 
-import Synapse.Tensor.Construction (full)
 import Synapse.Tensor.Conversion (unsafeFromList)
-import Synapse.Tensor.DType (DType)
+import Synapse.Tensor.Ops.Construction (full)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
-import Synapse.Tensor.Type (Tensor)
+import Synapse.Tensor.Type (DType, Tensor)
 import System.Random (RandomGen, UniformRange, uniformR, uniformRs)
 
 finite :: (RealFloat a) => a -> Bool

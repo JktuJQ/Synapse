@@ -1,154 +1,121 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 
--- | Tensor execution backends.
---
--- The public 'run' function is the boundary between staged tensor graphs and materialized tensor values.
-module Synapse.Tensor.Backend
-  ( Backend (..),
-    run,
-    run1,
-    run2,
-    run3,
-    run4,
-    run5,
-    run6,
-    run7,
-    run8,
-    run9,
-  )
-where
+-- | Prepared execution of tensors and tensor records.
+-- Records derive @Generic@ and define 'WithTensor' once for both differentiation and execution.
+module Synapse.Tensor.Backend (Backend (..), Computation, run, run1, run2, run3, run4, run5, run6, run7, run8, run9) where
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.LLVM.Native as CPU
 #ifdef SYNAPSE_GPU
 import qualified Data.Array.Accelerate.LLVM.PTX as GPU
 #endif
-
-import Synapse.Tensor.DType (DType)
+import Synapse.Tensor.Fields (Flatten (..), Leaves)
 import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
-import Synapse.Tensor.Type (Tensor (..), TensorData (..))
+import Synapse.Tensor.Type (DType, Tensor, TensorData, WithTensor)
+import qualified Synapse.Tensor.Type as Raw
+import qualified Synapse.Tensor.Type as T
 
 -- | Execution backend.
-data Backend
-  = CPU
-  | GPU
-  deriving (Eq, Show)
+data Backend = CPU | GPU deriving (Eq, Show)
 
--- | A staged tensor or tuple of computations with a corresponding materialized result.
--- Tensor shapes and element types are preserved, including in nested tuples.
-class
-  (A.Arrays (ComputationTensors staged)) =>
-  Computation staged materialized
-    | staged -> materialized,
-      materialized -> staged
+-- | Backend array products preserving tensor shapes and element types.
+class (A.Arrays (BackendLeaves a)) => BackendTree a where
+  type BackendLeaves a
+  type MaterialLeaves a
+  pack :: a -> A.Acc (BackendLeaves a)
+  unpack :: A.Acc (BackendLeaves a) -> a
+  upload :: MaterialLeaves a -> BackendLeaves a
+  download :: BackendLeaves a -> MaterialLeaves a
+
+instance (Shape sh, DType a) => BackendTree (T.Tensor sh a) where
+  type BackendLeaves (T.Tensor sh a) = A.Array (ShapeToDIM sh) a
+  type MaterialLeaves (T.Tensor sh a) = T.TensorData sh a
+  pack = Raw.unTensor
+  unpack = Raw.Tensor
+  upload = Raw.unTensorData
+  download = Raw.TensorData
+
+instance (BackendTree a, BackendTree b) => BackendTree (a, b) where
+  type BackendLeaves (a, b) = (BackendLeaves a, BackendLeaves b)
+  type MaterialLeaves (a, b) = (MaterialLeaves a, MaterialLeaves b)
+  pack (a, b) = A.lift (pack a, pack b)
+  unpack value = let (a, b) = A.unlift value in (unpack a, unpack b)
+  upload (a, b) = (upload @a a, upload @b b)
+  download (a, b) = (download @a a, download @b b)
+
+-- | Tensor structures accepted by prepared backend computations.
+-- Each invocation packs and reconstructs the record without executing its fields separately.
+class (Flatten Tensor a, BackendTree (Leaves Tensor a)) => Computation a where
+  inputData :: WithTensor T.TensorData a -> BackendLeaves (Leaves Tensor a)
+  outputData :: BackendLeaves (Leaves Tensor a) -> WithTensor T.TensorData a
+
+instance
+  ( Flatten Tensor a,
+    BackendTree (Leaves Tensor a),
+    Flatten TensorData (WithTensor T.TensorData a),
+    Leaves TensorData (WithTensor T.TensorData a) ~ MaterialLeaves (Leaves Tensor a)
+  ) =>
+  Computation a
   where
-  -- | Backend representation of the collection of tensors returned by a computation.
-  type ComputationTensors staged
+  inputData = upload @(Leaves Tensor a) . flatten @TensorData
+  outputData = rebuild @TensorData . download @(Leaves Tensor a)
 
-  -- | Pack staged outputs into one backend computation without executing it.
-  toBackend :: staged -> A.Acc (ComputationTensors staged)
-
-  -- | Wrap the outputs of one backend execution in their materialized tensor types.
-  fromBackend :: ComputationTensors staged -> materialized
-
-instance (Shape sh, DType a) => Computation (Tensor sh a) (TensorData sh a) where
-  type ComputationTensors (Tensor sh a) = A.Array (ShapeToDIM sh) a
-  toBackend = unTensor
-  fromBackend = TensorData
-
-instance (Computation a v1, Computation b v2) => Computation (a, b) (v1, v2) where
-  type ComputationTensors (a, b) = (ComputationTensors a, ComputationTensors b)
-  toBackend (x1, x2) = A.lift (toBackend x1, toBackend x2)
-  fromBackend (x1, x2) = (fromBackend x1, fromBackend x2)
-
-instance (Computation a v1, Computation b v2, Computation c v3) => Computation (a, b, c) (v1, v2, v3) where
-  type ComputationTensors (a, b, c) = (ComputationTensors a, ComputationTensors b, ComputationTensors c)
-  toBackend (x1, x2, x3) = A.lift (toBackend x1, toBackend x2, toBackend x3)
-  fromBackend (x1, x2, x3) = (fromBackend x1, fromBackend x2, fromBackend x3)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4) => Computation (a, b, c, d) (v1, v2, v3, v4) where
-  type ComputationTensors (a, b, c, d) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d)
-  toBackend (x1, x2, x3, x4) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4)
-  fromBackend (x1, x2, x3, x4) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4, Computation e v5) => Computation (a, b, c, d, e) (v1, v2, v3, v4, v5) where
-  type ComputationTensors (a, b, c, d, e) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d, ComputationTensors e)
-  toBackend (x1, x2, x3, x4, x5) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4, toBackend x5)
-  fromBackend (x1, x2, x3, x4, x5) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4, fromBackend x5)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4, Computation e v5, Computation f v6) => Computation (a, b, c, d, e, f) (v1, v2, v3, v4, v5, v6) where
-  type ComputationTensors (a, b, c, d, e, f) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d, ComputationTensors e, ComputationTensors f)
-  toBackend (x1, x2, x3, x4, x5, x6) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4, toBackend x5, toBackend x6)
-  fromBackend (x1, x2, x3, x4, x5, x6) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4, fromBackend x5, fromBackend x6)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4, Computation e v5, Computation f v6, Computation g v7) => Computation (a, b, c, d, e, f, g) (v1, v2, v3, v4, v5, v6, v7) where
-  type ComputationTensors (a, b, c, d, e, f, g) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d, ComputationTensors e, ComputationTensors f, ComputationTensors g)
-  toBackend (x1, x2, x3, x4, x5, x6, x7) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4, toBackend x5, toBackend x6, toBackend x7)
-  fromBackend (x1, x2, x3, x4, x5, x6, x7) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4, fromBackend x5, fromBackend x6, fromBackend x7)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4, Computation e v5, Computation f v6, Computation g v7, Computation h v8) => Computation (a, b, c, d, e, f, g, h) (v1, v2, v3, v4, v5, v6, v7, v8) where
-  type ComputationTensors (a, b, c, d, e, f, g, h) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d, ComputationTensors e, ComputationTensors f, ComputationTensors g, ComputationTensors h)
-  toBackend (x1, x2, x3, x4, x5, x6, x7, x8) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4, toBackend x5, toBackend x6, toBackend x7, toBackend x8)
-  fromBackend (x1, x2, x3, x4, x5, x6, x7, x8) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4, fromBackend x5, fromBackend x6, fromBackend x7, fromBackend x8)
-
-instance (Computation a v1, Computation b v2, Computation c v3, Computation d v4, Computation e v5, Computation f v6, Computation g v7, Computation h v8, Computation i v9) => Computation (a, b, c, d, e, f, g, h, i) (v1, v2, v3, v4, v5, v6, v7, v8, v9) where
-  type ComputationTensors (a, b, c, d, e, f, g, h, i) = (ComputationTensors a, ComputationTensors b, ComputationTensors c, ComputationTensors d, ComputationTensors e, ComputationTensors f, ComputationTensors g, ComputationTensors h, ComputationTensors i)
-  toBackend (x1, x2, x3, x4, x5, x6, x7, x8, x9) = A.lift (toBackend x1, toBackend x2, toBackend x3, toBackend x4, toBackend x5, toBackend x6, toBackend x7, toBackend x8, toBackend x9)
-  fromBackend (x1, x2, x3, x4, x5, x6, x7, x8, x9) = (fromBackend x1, fromBackend x2, fromBackend x3, fromBackend x4, fromBackend x5, fromBackend x6, fromBackend x7, fromBackend x8, fromBackend x9)
-
--- | Execute a tensor or tuple of tensor computations and materialize every output.
-run :: (Computation staged materialized) => Backend -> staged -> materialized
-run backend computation =
-  case backend of
-    CPU -> fromBackend (CPU.runN (toBackend computation))
-#ifdef SYNAPSE_GPU
-    GPU -> fromBackend (GPU.runN (toBackend computation))
-#else
-    GPU -> error "Synapse.Tensor.run: GPU backend is not enabled in this build"
-#endif
-
--- | Prepare a function of one tensor for repeated execution on materialized inputs.
--- The result may be a tensor or a tuple of tensors with independent shapes and element types.
--- Bind the returned function once and reuse it to retain the prepared computation.
--- Preparation is lazy, so the first application may compile the graph.
--- Values captured by the function remain fixed; pass changing data through its input.
---
--- @
--- let evaluate = run1 CPU (\x -> x * 2 + 1)
--- in evaluate inputData
--- @
-run1 ::
-  (Shape sh1, DType a, Computation result value) =>
-  Backend ->
-  (Tensor sh1 a -> result) ->
-  (TensorData sh1 a -> value)
-run1 backend f = fromBackend . execute . unTensorData
+-- | Execute all tensor leaves in one backend computation and restore the result structure.
+run :: forall a. (Computation a) => Backend -> a -> WithTensor TensorData a
+run backend value = outputData @a (execute (pack (flatten @Tensor value)))
   where
     execute = case backend of
-      CPU -> CPU.run1 (toBackend . f . Tensor)
+      CPU -> CPU.runN
 #ifdef SYNAPSE_GPU
-      GPU -> GPU.run1 (toBackend . f . Tensor)
+      GPU -> GPU.runN
+#else
+      GPU -> error "Synapse.Tensor.run: GPU backend is not enabled in this build"
+#endif
+
+-- | Prepare a function of one tensor structure for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
+run1 ::
+  forall a1 result.
+  (Computation a1, Computation result) =>
+  Backend ->
+  (a1 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData result
+run1 backend f = outputData @result . execute . inputData @a1
+  where
+    program x1 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1))))
+    execute = case backend of
+      CPU -> CPU.runN program
+#ifdef SYNAPSE_GPU
+      GPU -> GPU.runN program
 #else
       GPU -> error "Synapse.Tensor.run1: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of two tensors for repeated execution on materialized inputs.
--- Bind the returned function once and pass changing data through its two arguments.
--- Input shapes and element types may differ; preparation is lazy as for 'run1'.
+-- | Prepare a function of 2 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run2 ::
-  (Shape sh1, Shape sh2, DType a, DType b, Computation result value) =>
+  forall a1 a2 result.
+  (Computation a1, Computation a2, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> value)
-run2 backend f = \x y -> fromBackend (execute (unTensorData x) (unTensorData y))
+  (a1 -> a2 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData result
+run2 backend f = \x1 x2 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2))
   where
-    program x y = toBackend (f (Tensor x) (Tensor y))
+    program x1 x2 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -157,17 +124,21 @@ run2 backend f = \x y -> fromBackend (execute (unTensorData x) (unTensorData y))
       GPU -> error "Synapse.Tensor.run2: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of three tensors for repeated execution on materialized inputs.
--- Bind the returned function once and pass changing data through its three arguments.
--- Input shapes and element types may differ; preparation is lazy as for 'run1'.
+-- | Prepare a function of 3 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run3 ::
-  (Shape sh1, Shape sh2, Shape sh3, DType a, DType b, DType c, Computation result value) =>
+  forall a1 a2 a3 result.
+  (Computation a1, Computation a2, Computation a3, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> value)
-run3 backend f = \x y z -> fromBackend (execute (unTensorData x) (unTensorData y) (unTensorData z))
+  (a1 -> a2 -> a3 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData result
+run3 backend f = \x1 x2 x3 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3))
   where
-    program x y z = toBackend (f (Tensor x) (Tensor y) (Tensor z))
+    program x1 x2 x3 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -176,16 +147,22 @@ run3 backend f = \x y z -> fromBackend (execute (unTensorData x) (unTensorData y
       GPU -> error "Synapse.Tensor.run3: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 4 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 4 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run4 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, DType a, DType b, DType c, DType d, Computation result value) =>
+  forall a1 a2 a3 a4 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> value)
-run4 backend f = \x1 x2 x3 x4 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4))
+  (a1 -> a2 -> a3 -> a4 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData result
+run4 backend f = \x1 x2 x3 x4 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4))
   where
-    program x1 x2 x3 x4 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4))
+    program x1 x2 x3 x4 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -194,16 +171,23 @@ run4 backend f = \x1 x2 x3 x4 -> fromBackend (execute (unTensorData x1) (unTenso
       GPU -> error "Synapse.Tensor.run4: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 5 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 5 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run5 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, DType a, DType b, DType c, DType d, DType e, Computation result value) =>
+  forall a1 a2 a3 a4 a5 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> Tensor sh5 e -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> TensorData sh5 e -> value)
-run5 backend f = \x1 x2 x3 x4 x5 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4) (unTensorData x5))
+  (a1 -> a2 -> a3 -> a4 -> a5 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData a5 ->
+  WithTensor TensorData result
+run5 backend f = \x1 x2 x3 x4 x5 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4) (inputData @a5 x5))
   where
-    program x1 x2 x3 x4 x5 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5))
+    program x1 x2 x3 x4 x5 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4)) (rebuild @Tensor (unpack x5))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -212,16 +196,24 @@ run5 backend f = \x1 x2 x3 x4 x5 -> fromBackend (execute (unTensorData x1) (unTe
       GPU -> error "Synapse.Tensor.run5: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 6 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 6 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run6 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, DType a, DType b, DType c, DType d, DType e, DType f, Computation result value) =>
+  forall a1 a2 a3 a4 a5 a6 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation a6, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> Tensor sh5 e -> Tensor sh6 f -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> TensorData sh5 e -> TensorData sh6 f -> value)
-run6 backend f = \x1 x2 x3 x4 x5 x6 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4) (unTensorData x5) (unTensorData x6))
+  (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData a5 ->
+  WithTensor TensorData a6 ->
+  WithTensor TensorData result
+run6 backend f = \x1 x2 x3 x4 x5 x6 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4) (inputData @a5 x5) (inputData @a6 x6))
   where
-    program x1 x2 x3 x4 x5 x6 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6))
+    program x1 x2 x3 x4 x5 x6 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4)) (rebuild @Tensor (unpack x5)) (rebuild @Tensor (unpack x6))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -230,16 +222,25 @@ run6 backend f = \x1 x2 x3 x4 x5 x6 -> fromBackend (execute (unTensorData x1) (u
       GPU -> error "Synapse.Tensor.run6: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 7 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 7 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run7 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7, DType a, DType b, DType c, DType d, DType e, DType f, DType g, Computation result value) =>
+  forall a1 a2 a3 a4 a5 a6 a7 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation a6, Computation a7, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> Tensor sh5 e -> Tensor sh6 f -> Tensor sh7 g -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> TensorData sh5 e -> TensorData sh6 f -> TensorData sh7 g -> value)
-run7 backend f = \x1 x2 x3 x4 x5 x6 x7 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4) (unTensorData x5) (unTensorData x6) (unTensorData x7))
+  (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData a5 ->
+  WithTensor TensorData a6 ->
+  WithTensor TensorData a7 ->
+  WithTensor TensorData result
+run7 backend f = \x1 x2 x3 x4 x5 x6 x7 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4) (inputData @a5 x5) (inputData @a6 x6) (inputData @a7 x7))
   where
-    program x1 x2 x3 x4 x5 x6 x7 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7))
+    program x1 x2 x3 x4 x5 x6 x7 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4)) (rebuild @Tensor (unpack x5)) (rebuild @Tensor (unpack x6)) (rebuild @Tensor (unpack x7))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -248,16 +249,26 @@ run7 backend f = \x1 x2 x3 x4 x5 x6 x7 -> fromBackend (execute (unTensorData x1)
       GPU -> error "Synapse.Tensor.run7: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 8 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 8 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run8 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7, Shape sh8, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, Computation result value) =>
+  forall a1 a2 a3 a4 a5 a6 a7 a8 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation a6, Computation a7, Computation a8, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> Tensor sh5 e -> Tensor sh6 f -> Tensor sh7 g -> Tensor sh8 h -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> TensorData sh5 e -> TensorData sh6 f -> TensorData sh7 g -> TensorData sh8 h -> value)
-run8 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4) (unTensorData x5) (unTensorData x6) (unTensorData x7) (unTensorData x8))
+  (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> a8 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData a5 ->
+  WithTensor TensorData a6 ->
+  WithTensor TensorData a7 ->
+  WithTensor TensorData a8 ->
+  WithTensor TensorData result
+run8 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4) (inputData @a5 x5) (inputData @a6 x6) (inputData @a7 x7) (inputData @a8 x8))
   where
-    program x1 x2 x3 x4 x5 x6 x7 x8 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8))
+    program x1 x2 x3 x4 x5 x6 x7 x8 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4)) (rebuild @Tensor (unpack x5)) (rebuild @Tensor (unpack x6)) (rebuild @Tensor (unpack x7)) (rebuild @Tensor (unpack x8))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -266,16 +277,27 @@ run8 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 -> fromBackend (execute (unTensorData 
       GPU -> error "Synapse.Tensor.run8: GPU backend is not enabled in this build"
 #endif
 
--- | Prepare a function of 9 tensors for repeated execution on materialized inputs.
--- Bind the returned function once; input shapes and element types may differ, as for 'run1'.
+-- | Prepare a function of 9 tensor structures for repeated execution.
+-- Bind the returned function once and pass changing tensors through its inputs.
+-- Captured values remain fixed and preparation may compile lazily on the first invocation.
 run9 ::
-  (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7, Shape sh8, Shape sh9, DType a, DType b, DType c, DType d, DType e, DType f, DType g, DType h, DType i, Computation result value) =>
+  forall a1 a2 a3 a4 a5 a6 a7 a8 a9 result.
+  (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation a6, Computation a7, Computation a8, Computation a9, Computation result) =>
   Backend ->
-  (Tensor sh1 a -> Tensor sh2 b -> Tensor sh3 c -> Tensor sh4 d -> Tensor sh5 e -> Tensor sh6 f -> Tensor sh7 g -> Tensor sh8 h -> Tensor sh9 i -> result) ->
-  (TensorData sh1 a -> TensorData sh2 b -> TensorData sh3 c -> TensorData sh4 d -> TensorData sh5 e -> TensorData sh6 f -> TensorData sh7 g -> TensorData sh8 h -> TensorData sh9 i -> value)
-run9 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 x9 -> fromBackend (execute (unTensorData x1) (unTensorData x2) (unTensorData x3) (unTensorData x4) (unTensorData x5) (unTensorData x6) (unTensorData x7) (unTensorData x8) (unTensorData x9))
+  (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> a8 -> a9 -> result) ->
+  WithTensor TensorData a1 ->
+  WithTensor TensorData a2 ->
+  WithTensor TensorData a3 ->
+  WithTensor TensorData a4 ->
+  WithTensor TensorData a5 ->
+  WithTensor TensorData a6 ->
+  WithTensor TensorData a7 ->
+  WithTensor TensorData a8 ->
+  WithTensor TensorData a9 ->
+  WithTensor TensorData result
+run9 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 x9 -> outputData @result (execute (inputData @a1 x1) (inputData @a2 x2) (inputData @a3 x3) (inputData @a4 x4) (inputData @a5 x5) (inputData @a6 x6) (inputData @a7 x7) (inputData @a8 x8) (inputData @a9 x9))
   where
-    program x1 x2 x3 x4 x5 x6 x7 x8 x9 = toBackend (f (Tensor x1) (Tensor x2) (Tensor x3) (Tensor x4) (Tensor x5) (Tensor x6) (Tensor x7) (Tensor x8) (Tensor x9))
+    program x1 x2 x3 x4 x5 x6 x7 x8 x9 = pack (flatten @Tensor (f (rebuild @Tensor (unpack x1)) (rebuild @Tensor (unpack x2)) (rebuild @Tensor (unpack x3)) (rebuild @Tensor (unpack x4)) (rebuild @Tensor (unpack x5)) (rebuild @Tensor (unpack x6)) (rebuild @Tensor (unpack x7)) (rebuild @Tensor (unpack x8)) (rebuild @Tensor (unpack x9))))
     execute = case backend of
       CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU

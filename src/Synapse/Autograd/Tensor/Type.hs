@@ -13,9 +13,8 @@ module Synapse.Autograd.Tensor.Type
 where
 
 import GHC.TypeLits (Nat)
-import Synapse.Autograd.Differentiable (Differentiable (..), leaf)
-import Synapse.Autograd.Type (Backpropagatable, Var)
-import Synapse.Tensor.Ops.Math ()
+import Synapse.Autograd.Variable (Backpropagatable, Var)
+import Synapse.Tensor.Primitives.Math ()
 import qualified Synapse.Tensor.Type as T
 
 -- | A differentiable tensor with statically known dimensions.
@@ -37,13 +36,3 @@ instance (Num (T.Tensor sh a)) => Backpropagatable (T.Tensor sh a)
 instance (Num (T.TensorElement a)) => Backpropagatable (T.TensorElement a)
 
 type instance T.Element (Tensor s) = TensorElement s
-
-instance (Num (T.Tensor sh a)) => Differentiable (T.Tensor sh a) where
-  type ParametersConstraints c (T.Tensor sh a) = c (T.Tensor sh a)
-  type WithGrad s (T.Tensor sh a) = Tensor s sh a
-  structureWith = leaf Tensor unTensor
-
-instance (Num (T.TensorElement a)) => Differentiable (T.TensorElement a) where
-  type ParametersConstraints c (T.TensorElement a) = c (T.TensorElement a)
-  type WithGrad s (T.TensorElement a) = TensorElement s a
-  structureWith = leaf TensorElement unTensorElement

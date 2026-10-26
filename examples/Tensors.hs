@@ -157,7 +157,7 @@ preparedFunctions = do
   showSummary first
   showSummary second
   putStrLn "run: return several materialized tensors"
-  let (values, flags) = T.run T.CPU (T.fromData first, T.fromData first T.> 2)
+  let (values, flags) = T.run T.CPU (T.fromData first, (T.fromData first :: T.Tensor '[3] Double) T.> 2)
   showData "values" values
   showData "flags" flags
   putStrLn "run4: partially apply inputs, weights, and bias; vary the mask"

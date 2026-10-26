@@ -95,7 +95,7 @@ propNoAxes = H.property $ do
 
 propScalar :: H.Property
 propScalar = H.property $ do
-  let input = T.scalar (T.constant (7 :: Double))
+  let input = T.scalar (T.element (7 :: Double))
   values (T.sum input) H.=== [7]
   values (T.mean input) H.=== [7]
   values (T.minimum input) H.=== [7]
@@ -170,7 +170,7 @@ propBooleanEmpty = H.property $ do
   values (T.allAxes @'[1] input) H.=== replicate 6 True
   values (T.anyAxes @'[1] input) H.=== replicate 6 False
   values (T.allAxes @'[2] input) H.=== []
-  values (T.any (T.scalar (T.constant True))) H.=== [True]
+  values (T.any (T.scalar (T.element True))) H.=== [True]
 
 propNormalization :: H.Property
 propNormalization = H.property $ do
@@ -202,7 +202,7 @@ propLogSumExpAxes = H.property $ do
       expected = [log (sum [exp (xs !! ((i * 3 + j) * 2 + k)) | i <- [0, 1], k <- [0, 1]]) | j <- [0 .. 2]]
   approxList (values (T.logSumExpAxes @'[2, 0] input)) expected
   values (T.logSumExpAxes @'[] input) H.=== xs
-  approxList (values (T.logSumExp (T.scalar (T.constant (3 :: Double))))) [3]
+  approxList (values (T.logSumExp (T.scalar (T.element (3 :: Double))))) [3]
 
 propLogSumExpEdges :: H.Property
 propLogSumExpEdges = H.property $ do
@@ -235,7 +235,7 @@ firstPosition extremum xs = elemIndex (extremum xs) xs
 propArgExtrema :: H.Property
 propArgExtrema = H.property $ do
   xs <- H.forAll $ Gen.list (Range.singleton 12) (Gen.int (Range.linear (-10) 10))
-  let input = T.fromList @'[3, 4] xs
+  let input = T.fromList @'[3, 4] xs :: T.Tensor '[3, 4] Int
       rows = [take 4 (drop (4 * i) xs) | i <- [0 .. 2]]
       cols = [[xs !! (4 * i + j) | i <- [0 .. 2]] | j <- [0 .. 3]]
   map Just (values (T.argmax @1 input)) H.=== map (firstPosition maximum) rows
@@ -245,23 +245,23 @@ propArgExtrema = H.property $ do
 
 propArgAxes :: H.Property
 propArgAxes = H.property $ do
-  let input = T.fromList @'[2, 3, 2] [1, 9, 5, 2, 5, 7, 8, 1, 4, 3, 0, 6 :: Int]
+  let input = T.fromList @'[2, 3, 2] [1, 9, 5, 2, 5, 7, 8, 1, 4, 3, 0, 6 :: Int] :: T.Tensor '[2, 3, 2] Int
   values (T.argmax @1 input) H.=== [1, 0, 0, 2]
   values (T.argmin @1 input) H.=== [0, 1, 2, 0]
   values (T.argmax @0 input) H.=== [1, 0, 0, 1, 0, 0]
   values (T.argmin @2 input) H.=== [0, 1, 0, 1, 1, 0]
-  let mask = T.fromList @'[2, 3] [False, True, True, False, False, False]
+  let mask = T.fromList @'[2, 3] [False, True, True, False, False, False] :: T.Tensor '[2, 3] Bool
   values (T.argmax @1 mask) H.=== [1, 0]
   values (T.argmin @1 mask) H.=== [0, 0]
 
 propArgSpecial :: H.Property
 propArgSpecial = H.property $ do
-  let input = T.fromList @'[4, 4] [3, 3, 1, 1, 0, 0 / 0, 2, 0 / 0, 0 / 0, 9, 0 / 0, 1, -(1 / 0), 1 / 0, 1 / 0, -(1 / 0) :: Double]
+  let input = T.fromList @'[4, 4] [3, 3, 1, 1, 0, 0 / 0, 2, 0 / 0, 0 / 0, 9, 0 / 0, 1, -(1 / 0), 1 / 0, 1 / 0, -(1 / 0) :: Double] :: T.Tensor '[4, 4] Double
   values (T.argmax @1 input) H.=== [0, 1, 0, 1]
   values (T.argmin @1 input) H.=== [2, 1, 0, 0]
-  values (T.argmax @0 (T.fromList @'[3] [-0.0, 0.0, -0.0 :: Float])) H.=== [0]
-  values (T.argmin @0 (T.fromList @'[3] [-0.0, 0.0, -0.0 :: Float])) H.=== [0]
-  let acrossBlocks = T.fromList @'[1024] (replicate 500 1 ++ [0 / 0] ++ replicate 522 2 ++ [0 / 0 :: Float])
+  values (T.argmax @0 (T.fromList @'[3] [-0.0, 0.0, -0.0 :: Float] :: T.Tensor '[3] Float)) H.=== [0]
+  values (T.argmin @0 (T.fromList @'[3] [-0.0, 0.0, -0.0 :: Float] :: T.Tensor '[3] Float)) H.=== [0]
+  let acrossBlocks = T.fromList @'[1024] (replicate 500 1 ++ [0 / 0] ++ replicate 522 2 ++ [0 / 0 :: Float]) :: T.Tensor '[1024] Float
   values (T.argmax @0 acrossBlocks) H.=== [500]
   values (T.argmin @0 acrossBlocks) H.=== [500]
 
@@ -269,5 +269,5 @@ propArgEmpty :: H.Property
 propArgEmpty = H.property $ do
   values (T.argmax @1 (T.zeros @'[0, 3] :: T.Tensor '[0, 3] Int)) H.=== []
   values (T.argmin @1 (T.zeros @'[0, 3] :: T.Tensor '[0, 3] Float)) H.=== []
-  values (T.argmax @1 (T.fromList @'[3, 1] [1, 2, 3 :: Double])) H.=== [0, 0, 0]
-  values (T.argmin @0 (T.fromList @'[1] [True])) H.=== [0]
+  values (T.argmax @1 (T.fromList @'[3, 1] [1, 2, 3 :: Double] :: T.Tensor '[3, 1] Double)) H.=== [0, 0, 0]
+  values (T.argmin @0 (T.fromList @'[1] [True] :: T.Tensor '[1] Bool)) H.=== [0]

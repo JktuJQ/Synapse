@@ -72,13 +72,13 @@ library
                     , Synapse.NN.Optimizer
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
+                    , Synapse.Autograd.Type
                     , Synapse.Autograd.Execution
-                    , Synapse.Autograd.Differentiable
                     , Synapse.Tensor
                     , Synapse.Tensor.Backend
-                    , Synapse.Tensor.Construction
+                    , Synapse.Tensor.Ops.Construction
                     , Synapse.Tensor.Conversion
-                    , Synapse.Tensor.DType
+                    , Synapse.Tensor.Ops
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Index
@@ -93,19 +93,24 @@ library
                     , Synapse.Tensor.Shapes.Matmul
                     , Synapse.Tensor.Type
 
-    other-modules:    Synapse.Tensor.Ops.Elementwise.Helpers
-                    , Synapse.Tensor.Ops.Math.Helpers
-                    , Synapse.Autograd.Type
-                    , Synapse.Autograd.Differentiable.Structure
+    other-modules:    Synapse.Tensor.Fields
+                    , Synapse.Tensor.Primitives.Construction
+                    , Synapse.Tensor.Primitives.Index
+                    , Synapse.Autograd.Execution.Variable
+                    , Synapse.Tensor.Primitives.Math
+                    , Synapse.Tensor.Primitives.Shape
+                    , Synapse.Tensor.Primitives.Reduction
+                    , Synapse.Autograd.Tensor.Primitives.Elementwise
+                    , Synapse.Autograd.Tensor.Primitives.Math
+                    , Synapse.Autograd.Tensor.Primitives.Index
+                    , Synapse.Autograd.Tensor.Primitives.Shape
+                    , Synapse.Autograd.Tensor.Primitives.Reduction
+                    , Synapse.Tensor.Primitives.Elementwise
+                    , Synapse.Autograd.Variable
                     , Synapse.Autograd.Execution.Reverse
-                    , Synapse.Autograd.Execution.Traversal
                     , Synapse.Autograd.Tensor.Type
+                    , Synapse.Autograd.Tensor.Ops
                     , Synapse.Autograd.Tensor.Ops.Elementwise
-                    , Synapse.Autograd.Tensor.Ops.Math
-                    , Synapse.Autograd.Tensor.Ops.Shape
-                    , Synapse.Autograd.Tensor.Ops.Reduction
-                    , Synapse.Autograd.Tensor.Ops.Index
-                    , Synapse.Autograd.Tensor.Helpers
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
@@ -149,11 +154,13 @@ test-suite synapse-test
                     , AutogradTest
                     , AutogradTest.Tensor
                     , AutogradTest.Tensor.Elementwise
+                    , AutogradTest.Tensor.Lifting
                     , AutogradTest.Execution
                     , AutogradTest.Execution.Public
                     , AutogradTest.Differentiable
                     , TensorTest
                     , TensorTest.Backend
+                    , TensorTest.Backend.Structure
                     , TensorTest.Construction
                     , TensorTest.Conversion
                     , TensorTest.Compiler

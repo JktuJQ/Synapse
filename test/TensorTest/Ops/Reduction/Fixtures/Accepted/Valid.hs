@@ -42,10 +42,10 @@ booleanRows :: T.Tensor '[2] Bool
 booleanRows = T.allAxes @'[1] (T.full @'[2, 0] True)
 
 positions :: T.Tensor '[2, 4] Int
-positions = T.argmax @1 (T.zeros @'[2, 3, 4] @Float)
+positions = T.argmax @1 (T.zeros :: T.Tensor '[2, 3, 4] Float)
 
 minimumPosition :: T.Tensor '[] Int
-minimumPosition = T.argmin @0 (T.zeros @'[3] @Int)
+minimumPosition = T.argmin @0 (T.zeros :: T.Tensor '[3] Int)
 
 emptyPositions :: T.Tensor '[0] Int
-emptyPositions = T.argmax @1 (T.zeros @'[0, 3] @Double)
+emptyPositions = T.argmax @1 (T.zeros :: T.Tensor '[0, 3] Double)

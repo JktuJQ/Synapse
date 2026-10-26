@@ -22,7 +22,7 @@ empty = T.matmul (T.ones @'[2, 0]) (T.ones @'[0, 3])
 expanded :: T.Tensor '[8, 2, 4] Float
 expanded = T.matmul (T.broadcast @'[8, 2, 3] (T.ones @'[2, 3])) (T.ones @'[8, 3, 4])
 
-project :: (T.LinearAlgebra t Double) => t '[2, 3] Double -> t '[3, 4] Double -> t '[2, 4] Double
+project :: (T.TensorOps t Double) => t '[2, 3] Double -> t '[3, 4] Double -> t '[2, 4] Double
 project = T.matmul
 
 vectorInner :: T.Tensor '[] Double
@@ -34,23 +34,23 @@ sharedWeights = T.matmul (T.ones @'[2, 5, 3]) (T.ones @'[3, 4])
 crossBatches :: T.Tensor '[2, 5, 3, 6] Float
 crossBatches = T.matmul (T.ones @'[2, 1, 3, 4]) (T.ones @'[5, 4, 6])
 
-squaredTotal :: (T.Reductions t Double, Num (t '[2, 3] Double)) => t '[2, 3] Double -> t '[] Double
+squaredTotal :: (T.TensorOps t Double, Num (t '[2, 3] Double)) => t '[2, 3] Double -> t '[] Double
 squaredTotal input = T.sum (input * input)
 
-reshapeMatrix :: (T.ShapeOps t Double) => t '[2, 3] Double -> t '[3, 2] Double
+reshapeMatrix :: (T.TensorOps t Double) => t '[2, 3] Double -> t '[3, 2] Double
 reshapeMatrix = T.reshape @'[3, 2]
 
 convertElements :: (T.FromIntegral (t '[3] Int) (t '[3] Double)) => t '[3] Int -> t '[3] Double
 convertElements = T.fromIntegral
 
-generateCoordinates :: (T.Construction t, T.Coordinates (T.Element t), Num (T.Element t Int)) => t '[2, 3] Int
+generateCoordinates :: (T.TensorOps t Int) => t '[2, 3] Int
 generateCoordinates = T.fromGen @'[2, 3] (\ix -> T.coordinate @0 ix * 10 + T.coordinate @1 ix)
 
-readElement :: (T.Indexing t Double) => t '[2, 3] Double -> T.Element t Double
+readElement :: (T.TensorOps t Double) => t '[2, 3] Double -> T.Element t Double
 readElement = T.index @'[1, 2]
 
-selectRow :: (T.Slicing t Double) => t '[2, 3] Double -> t '[3] Double
+selectRow :: (T.TensorOps t Double) => t '[2, 3] Double -> t '[3] Double
 selectRow = T.slice @'[ 'T.At 1, 'T.All]
 
-makeScalar :: (T.Scalar t Double) => T.Element t Double -> t '[] Double
+makeScalar :: (T.TensorOps t Double) => T.Element t Double -> t '[] Double
 makeScalar = T.scalar
