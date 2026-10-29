@@ -71,6 +71,7 @@ module Synapse.Tensor
     eye,
     fill,
     fromGen,
+    fromListData,
     fromList,
     fromData,
     full,
@@ -122,7 +123,7 @@ module Synapse.Tensor
 where
 
 import Synapse.Tensor.Backend (Backend (..), run, run1, run2, run3, run4, run5, run6, run7, run8, run9)
-import Synapse.Tensor.Conversion (fromData, fromList, toList, unsafeFromList)
+import Synapse.Tensor.Conversion (fromData, fromList, fromListData, toList, unsafeFromList)
 import Synapse.Tensor.Ops (TensorOps)
 import Synapse.Tensor.Ops.Construction
   ( arange,

@@ -11,8 +11,8 @@ module Synapse.Autograd.Tensor.Ops () where
 
 import qualified Data.Array.Accelerate as A
 import Data.Functor.Identity (Identity (..))
-import Data.Vinyl.Core (Rec (..))
 import qualified Numeric.Backprop.Explicit as BPE
+import Numeric.Backprop.Op (Rec (..))
 import Synapse.Autograd.Tensor.Type (Tensor (..), TensorElement (..))
 import Synapse.Autograd.Variable (Context, Var (..), add, liftUnary, variableValue)
 import Synapse.Tensor.Ops (TensorOps (..))

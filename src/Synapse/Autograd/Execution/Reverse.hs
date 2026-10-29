@@ -14,8 +14,8 @@ module Synapse.Autograd.Execution.Reverse
 where
 
 import Data.Functor.Identity (Identity (..))
-import Data.Vinyl.Core (Rec (..))
 import qualified Numeric.Backprop.Explicit as BPE
+import Numeric.Backprop.Op (Rec (..))
 import Synapse.Autograd.Execution.Variable (Unconstrained, ValueTree (..), Variables, add, pack)
 import qualified Synapse.Autograd.Tensor.Type as Tensor
 import Synapse.Autograd.Variable (Context)

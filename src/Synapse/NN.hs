@@ -6,7 +6,17 @@
 -- import qualified Synapse.NN as NN
 -- @
 module Synapse.NN
-  ( Dense (..),
+  ( Dataset (..),
+    getSample,
+    loadBatches,
+    LastBatch (..),
+    Batch (..),
+    SomeBatch (..),
+    shuffle,
+    withBatch,
+    batchSize,
+    batchMask,
+    Dense (..),
     dense,
     Optimizer (..),
     SGD (..),
@@ -43,6 +53,7 @@ module Synapse.NN
 where
 
 import Synapse.NN.Activation (leakyRelu, relu, sigmoid, softplus, tanh)
+import Synapse.NN.Data (Batch (..), Dataset (..), LastBatch (..), SomeBatch (..), batchMask, batchSize, getSample, loadBatches, shuffle, withBatch)
 import Synapse.NN.Dense (Dense (..), dense)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Loss (huber, mae, mse, smoothL1)
