@@ -288,6 +288,23 @@ tests =
           T.toList (NN.batchInputs batch) H.=== []
           T.toList (NN.batchTargets batch) H.=== [True, True, False]
           NN.validCount batch H.=== 2,
+      testProperty "rebuilt backend functions train across full and smaller batches" $ H.withTests 1 $ H.property $ do
+        let sample index = let x = fromIntegral (index + 1) in pure (T.fromListData @'[1] [x], T.fromListData @'[1] [2 * x + 1 :: Double])
+            source = NN.Indexed 5 sample
+            initial = T.run T.CPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
+            analytic (weight, bias) inputs =
+              let residual x = weight * x + bias - (2 * x + 1)
+                  scale = 0.02 / fromIntegral (length inputs)
+               in (weight - scale * sum [residual x * x | x <- inputs], bias - scale * sum (map residual inputs))
+            (expectedWeight, expectedBias) = foldl' analytic (0, 0) (concat (replicate 12 [[1, 2, 3], [4, 5]]))
+            update :: NN.Dense 1 1 T.TensorData Double -> Identity (NN.SomeBatch '[1] '[1] Double Double) -> IO (NN.Dense 1 1 T.TensorData Double)
+            update parameters load = NN.withBatch (runIdentity load) $ \(batch :: NN.Batch batch '[1] '[1] Double Double) -> do
+              let updated = T.run4 T.CPU (step @batch) parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
+              _ <- evaluate (sum (T.toList (NN.denseWeights updated)) + sum (T.toList (NN.denseBias updated)))
+              pure updated
+        trained <- H.evalIO $ foldM update initial (concat (replicate 12 (NN.loadBatches 3 NN.KeepLast source)))
+        approxList (T.toList (NN.denseWeights trained)) [expectedWeight]
+        approxList (T.toList (NN.denseBias trained)) [expectedBias],
       testProperty "grouped length checks stop at the first excess example" $ H.withTests 1 $ H.property $ do
         let source = NN.Grouped 1 (\_ -> pure (1 : 2 : error "unexpected traversal")) :: NN.Dataset Identity Int
         result <- H.evalIO $ try @ErrorCall $ evaluate (runIdentity (NN.getSample source 0))

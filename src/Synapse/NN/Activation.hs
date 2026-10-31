@@ -4,10 +4,10 @@
 
 -- | Shape-preserving activation functions for tensors and element expressions.
 -- Ordinary and differentiable values use the same functions.
-module Synapse.NN.Activation (relu, leakyRelu, sigmoid, tanh, softplus) where
+module Synapse.NN.Activation (relu, leakyRelu, sigmoid, tanh, sin, softplus) where
 
 import qualified Synapse.Tensor.Ops.Elementwise as E
-import Prelude hiding (tanh)
+import Prelude hiding (sin, tanh)
 import qualified Prelude as P
 
 -- | Apply the rectified linear activation @relu x = max 0 x@ elementwise.
@@ -31,6 +31,10 @@ sigmoid x =
 -- | Apply the hyperbolic tangent @tanh x = (exp x - exp (-x)) / (exp x + exp (-x))@ elementwise.
 tanh :: (Floating a) => a -> a
 tanh = P.tanh
+
+-- | Apply the sine activation @sin x@ elementwise, with angles in radians.
+sin :: (Floating a) => a -> a
+sin = P.sin
 
 -- | Apply @softplus x = log (1 + exp x)@ elementwise as a smooth approximation to 'relu'.
 softplus :: (Floating a, E.Ord a, E.Conditional a, E.Condition a ~ E.Comparison a) => a -> a

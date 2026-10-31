@@ -52,6 +52,13 @@ tests =
         approxList (values (NN.tanh input)) expected
         approxList (values output) expected
         approxList (values gradient) (fmap (\y -> 1 - y * y) expected),
+      testProperty "sine agrees with Prelude and differentiates to cosine" $ H.withTests 1 $ H.property $ do
+        let xs = [-pi, -0.5, 0, 0.5, pi :: Double]
+            input = T.fromList @'[5] xs
+            (output, gradient) = AG.backprop NN.sin input
+        approxList (values (NN.sin input)) (map sin xs)
+        approxList (values output) (map sin xs)
+        approxList (values gradient) (map cos xs),
       testProperty "softplus agrees with its formula and has a half derivative at zero" $ H.withTests 1 $ H.property $ do
         let xs = [-2, -0.5, 0, 0.5, 2 :: Double]
             input = T.fromList @'[5] xs
