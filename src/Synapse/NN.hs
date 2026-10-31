@@ -6,7 +6,9 @@
 -- import qualified Synapse.NN as NN
 -- @
 module Synapse.NN
-  ( Dataset (..),
+  ( extractWeights,
+    loadWeights,
+    Dataset (..),
     getSample,
     loadBatches,
     LastBatch (..),
@@ -60,4 +62,5 @@ import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform
 import Synapse.NN.Loss (huber, mae, mse, smoothL1)
 import Synapse.NN.Metrics (explainedVariance, mape, maxError, meanError, msle, pearson, r2, rae, rmse, rmsle, rse, smape, wmape)
 import Synapse.NN.Optimizer (Optimizer (..), SGD (..), updateParameters)
+import Synapse.NN.Weights (extractWeights, loadWeights)
 import Prelude hiding (sin, tanh)

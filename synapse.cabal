@@ -56,6 +56,7 @@ library
 
     build-depends:    base >= 4.19 && < 4.22
                     , array >= 0.5 && < 0.6
+                    , containers >= 0.6 && < 0.9
                     , backprop >= 0.2.7.2 && < 0.3
                     , random >= 1.3 && < 1.4
                     , accelerate >= 1.3 && < 1.5
@@ -64,6 +65,7 @@ library
     hs-source-dirs:   src
     exposed-modules:  Synapse
                     , Synapse.NN
+                    , Synapse.NN.Weights
                     , Synapse.NN.Data
                     , Synapse.NN.Loss
                     , Synapse.NN.Activation
@@ -156,6 +158,8 @@ test-suite synapse-test
     hs-source-dirs:   test
     main-is:          Main.hs
     other-modules:    NNTest
+                    , NNTest.Weights
+                    , NNTest.Weights.Public
                     , NNTest.Data
                     , NNTest.Activation
                     , NNTest.Initialization

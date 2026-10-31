@@ -14,7 +14,10 @@
 -- gramTotal x = T.sum (T.matmul x (T.transpose x))
 -- @
 module Synapse.Tensor
-  ( WithTensor,
+  ( FieldPath,
+    TensorFields,
+    traverseTensors,
+    WithTensor,
     TensorOps,
     Element,
     Tensor,
@@ -124,6 +127,7 @@ where
 
 import Synapse.Tensor.Backend (Backend (..), run, run1, run2, run3, run4, run5, run6, run7, run8, run9)
 import Synapse.Tensor.Conversion (fromData, fromList, fromListData, toList, unsafeFromList)
+import Synapse.Tensor.Fields (FieldPath, TensorFields (traverseTensors))
 import Synapse.Tensor.Ops (TensorOps)
 import Synapse.Tensor.Ops.Construction
   ( arange,
