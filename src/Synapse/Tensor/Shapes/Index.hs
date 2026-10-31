@@ -15,6 +15,7 @@ module Synapse.Tensor.Shapes.Index
     Index (..),
     Slice (..),
     CanIndex,
+    CanGather,
     CanSlice,
     SliceShape,
   )
@@ -33,6 +34,12 @@ import GHC.TypeLits
     type (+),
     type (-),
   )
+import Synapse.Tensor.Shapes.Axes (CanSelectAxes, RemoveAxis)
+
+-- | Gather indices have the same rank and dimensions as the source outside the selected axis.
+-- The result has the shape of the indices.
+type CanGather axis source indices =
+  (CanSelectAxes '[axis] source, CanSelectAxes '[axis] indices, RemoveAxis axis source ~ RemoveAxis axis indices)
 
 -- | Ranges use an exclusive stop and a positive step.
 data SliceAxis a

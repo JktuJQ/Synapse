@@ -8,9 +8,11 @@ module AutogradTest.Tensor (tests) where
 
 import qualified AutogradTest.Tensor.Elementwise
 import qualified AutogradTest.Tensor.Lifting
+import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
+import qualified Synapse.Tensor.Type as Internal
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -100,6 +102,30 @@ tests =
             (value, gradient) = differentiate (T.scalar . T.index @'[1, 2]) input
         values value H.=== [6]
         values gradient H.=== [0, 0, 0, 0, 0, 1],
+      testProperty "gather accumulates repeated selections and respects output seeds" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[2, 3] [1 .. 6 :: Double]
+            indices = T.fromList @'[2, 3] [2, 2, 0, 1, 0, 1]
+            (_, backward) = AG.pullback (\x -> T.unsafeGather @1 x indices) input
+            gradient = backward (T.fromList @'[2, 3] [1 .. 6])
+            (_, checked) = differentiate (\x -> T.gatherOr @1 0 x indices) input
+        values gradient H.=== [3, 0, 3, 5, 10, 0]
+        values checked H.=== [1, 0, 2, 1, 2, 0],
+      testProperty "safe gather discards invalid gradients and supports empty source axes" $ H.withTests 1 $ H.property $ do
+        let indices = T.fromList @'[2, 3] [-1, 3, 0, 1, maxBound, minBound]
+            (result, gradient) = differentiate (\x -> T.gatherOr @1 9 x indices) (T.fromList @'[2, 3] [1 .. 6 :: Double])
+            (emptyResult, emptyGradient) = differentiate (\x -> T.gatherOr @1 9 x indices) (T.fromList @'[2, 0] [] :: T.Tensor '[2, 0] Double)
+        values result H.=== [9, 9, 1, 5, 9, 9]
+        values gradient H.=== [1, 0, 0, 0, 1, 0]
+        values emptyResult H.=== replicate 6 9
+        values emptyGradient H.=== [],
+      testProperty "dynamic index gradients reject invalid coordinate aliases" $ H.withTests 1 $ H.property $ do
+        let selected row col = Internal.TensorIndex (A.index2 (A.constant row) (A.constant col))
+            input = T.fromList @'[2, 3] [1 .. 6 :: Double]
+            (_, valid) = differentiate (\x -> T.scalar (T.unsafeDynamicIndex x (selected 1 0))) input
+            (fallback, invalid) = differentiate (\x -> T.scalar (T.dynamicIndexOr 7 x (selected 0 3))) input
+        values valid H.=== [0, 0, 0, 1, 0, 0]
+        values fallback H.=== [7]
+        values invalid H.=== replicate 6 0,
       testProperty "sum and mean expand gradients over the reduced axes" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             (_, summed) = differentiate (T.sumAxes @'[1]) input

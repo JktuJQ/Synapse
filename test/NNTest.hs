@@ -32,7 +32,100 @@ lossTests :: TestTree
 lossTests =
   testGroup
     "nn loss"
-    [ testProperty "mse supports partially applied mean, sum, and identity reductions" $ H.withTests 1 $ H.property $ do
+    [ testProperty "label smoothing preserves distributions and endpoints" $ H.withTests 1 $ H.property $ do
+        let targets = T.fromList @'[2, 3] [1, 0, 0, 0.2, 0.3, 0.5 :: Double]
+        values (NN.smoothLabels @1 0 targets) H.=== values targets
+        approxList (values $ NN.smoothLabels @1 0.3 targets) [0.8, 0.1, 0.1, 0.24, 0.31, 0.45]
+        approxList (values $ NN.smoothLabels @1 1 targets) $ replicate 6 (1 / 3)
+        approxList (values $ T.sumAxes @'[1] $ NN.smoothLabels @1 0.3 targets) [1, 1],
+      testProperty "smoothed integer and probability losses have matching values and gradients" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 3] [1, 2, 3, 3, 2, 1 :: Double]
+            labels = T.fromList @'[2] [2, 0]
+            targets = T.fromList @'[2, 3] [0, 0, 1, 1, 0, 0]
+            (loss, gradient) = AG.backprop (\x -> NN.unsafeCrossEntropySmoothed @1 T.mean 0.2 x labels) logits
+            (reference, referenceGradient) = AG.backprop (\x -> NN.crossEntropy @1 T.mean x $ NN.smoothLabels @1 0.2 $ AG.constant targets) logits
+        approxList (values loss) $ values reference
+        approxList (values gradient) $ values referenceGradient
+        approxList (values $ NN.unsafeCrossEntropySmoothed @1 T.mean 0 logits labels) $ values $ NN.unsafeCrossEntropy @1 T.mean logits labels
+        approxList (values $ NN.unsafeCrossEntropySmoothed @1 T.mean 1 logits labels) $ values $ NN.crossEntropy @1 T.mean logits $ NN.smoothLabels @1 1 targets,
+      testProperty "label smoothing supports arbitrary class axes and output seeds" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 3] [1, 2, 3, 3, 2, 1 :: Double]
+            labels = T.fromList @'[2] [2, 0]
+            (_, backward) = AG.pullback (\x -> NN.unsafeCrossEntropySmoothed @1 id 0.2 x labels) logits
+            (_, referenceBackward) = AG.pullback (\x -> NN.crossEntropy @1 id x $ NN.smoothLabels @1 0.2 $ AG.constant $ T.fromList @'[2, 3] [0, 0, 1, 1, 0, 0]) logits
+            seed = T.fromList @'[2] [2, 5]
+        approxList (values $ backward seed) $ values $ referenceBackward seed
+        approxList (values $ NN.unsafeCrossEntropySmoothed @0 T.mean 0.2 (T.transpose logits) labels) $ values $ NN.unsafeCrossEntropySmoothed @1 T.mean 0.2 logits labels,
+      testProperty "smoothing differentiates soft labels and supports Float and empty observations" $ H.withTests 1 $ H.property $ do
+        let targets = T.fromList @'[3] [1, 0, 0 :: Double]
+            (_, gradient) = AG.backprop (NN.smoothLabels @0 0.2) targets
+            empty = T.fromList @'[0, 3] [] :: T.Tensor '[0, 3] Double
+            labels = T.fromList @'[0] []
+        approxList (values gradient) [0.8, 0.8, 0.8]
+        values (NN.unsafeCrossEntropySmoothed @1 T.sum 0.2 empty labels) H.=== [0]
+        values (NN.smoothLabels @1 0.2 empty) H.=== []
+        let floatTargets = T.fromList @'[2] [1, 0] :: T.Tensor '[2] Float
+        approxList (T.toList $ T.run T.CPU $ NN.smoothLabels @0 0.2 floatTargets) [0.9, 0.1],
+      testProperty "classification losses agree for one-hot and integer targets" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 3] [1, 2, 3, 3, 2, 1 :: Double]
+            labels = T.fromList @'[2] [2, 0]
+            targets = T.fromList @'[2, 3] [0, 0, 1, 1, 0, 0]
+            expected = log (1 + exp (-1) + exp (-2))
+            (loss, gradient) = AG.backprop (\x -> NN.unsafeCrossEntropy @1 T.mean x labels) logits
+            (_, reference) = AG.backprop (\x -> NN.crossEntropy @1 T.mean x (AG.constant targets)) logits
+        approxList (values loss) [expected]
+        approxList (values gradient) (values reference)
+        approxList (values (NN.unsafeNegativeLogLikelihood @1 id (T.logSoftmax @1 logits) labels)) [expected, expected]
+        approxList (values (NN.unsafeCrossEntropy @0 T.mean (T.transpose logits) labels)) [expected],
+      testProperty "classification losses support soft labels and their gradients" $ H.withTests 1 $ H.property $ do
+        let logits = T.full @'[2, 3] (0 :: Double)
+            targets = T.fromList @'[2, 3] [0.2, 0.3, 0.5, 1, 0, 0]
+            (loss, (dx, dy)) = AG.backprop (uncurry (NN.crossEntropy @1 T.mean)) (logits, targets)
+        approxList (values loss) [log 3]
+        approxList (values dx) (map (\y -> (1 / 3 - y) / 2) [0.2, 0.3, 0.5, 1, 0, 0])
+        approxList (values dy) (replicate 6 (log 3 / 2)),
+      testProperty "classification logits remain finite at extreme values" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 3] [1000, 0, -1000, -1000, 0, 1000 :: Double]
+            labels = T.fromList @'[2] [0, 0]
+            (loss, gradient) = AG.backprop (\x -> NN.unsafeCrossEntropy @1 T.sum x labels) logits
+        approxList (values loss) [2000]
+        approxList (values gradient) [0, 0, 0, -1, 0, 1],
+      testProperty "binary losses agree between logits and interior probabilities" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[4] [-2, 0, 1, 3 :: Double]
+            targets = T.fromList @'[4] [0, 0.3, 1, 0.8]
+            (loss, (dx, dy)) = AG.backprop (uncurry (NN.binaryCrossEntropyWithLogits T.sum)) (logits, targets)
+            probabilities = NN.sigmoid logits
+        approxList (values loss) (values (NN.binaryCrossEntropy T.sum probabilities targets))
+        approxList (values dx) (zipWith (-) (values probabilities) [0, 0.3, 1, 0.8])
+        approxList (values dy) [2, 0, -1, -3],
+      testProperty "binary logits and zero-point gradients are stable" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[5] [-1e200, 1e200, 0, 0, 0 :: Double]
+            targets = T.fromList @'[5] [0, 1, 0, 0.5, 1]
+            (loss, gradient) = AG.backprop (\x -> NN.binaryCrossEntropyWithLogits id x (AG.constant targets)) logits
+        approxList (values loss) [0, 0, log 2, log 2, log 2]
+        approxList (values gradient) [0, 0, 0.5, 0, -0.5],
+      testProperty "probability BCE handles endpoints with finite losses" $ H.withTests 1 $ H.property $ do
+        let probabilities = T.fromList @'[4] [0, 1, 0, 1 :: Double]
+            targets = T.fromList @'[4] [0, 1, 1, 0]
+            (loss, gradient) = AG.backprop (\x -> NN.binaryCrossEntropy id x (AG.constant targets)) probabilities
+        values loss H.=== [0, 0, 100, 100]
+        approxList (map (/ 1e12) (values gradient)) [0, 0, -1, 1],
+      testProperty "empty observations and single classes retain classification shapes" $ H.withTests 1 $ H.property $ do
+        let empty = T.fromList @'[0, 3] [] :: T.Tensor '[0, 3] Double
+            labels = T.fromList @'[0] []
+        values (NN.unsafeCrossEntropy @1 T.sum empty labels) H.=== [0]
+        values (NN.crossEntropy @1 id empty empty) H.=== []
+        values (NN.unsafeCrossEntropy @1 id (T.full @'[2, 1] (10 :: Double)) (T.fromList @'[2] [0, 0])) H.=== [0, 0],
+      testProperty "classification metrics use explicit thresholds and class indices" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[4] [-2, 0, 1, 3] :: T.Tensor '[4] Double
+            targets = T.fromList @'[4] [0, 0, 1, 1]
+            classes = T.fromList @'[2, 3] [0, 0, 0, -2, 5, 1] :: T.Tensor '[2, 3] Double
+            labels = T.fromList @'[2] [0, 1]
+        values (NN.binaryAccuracy 0 logits targets) H.=== [0.75]
+        values (NN.binaryAccuracy 0.5 (NN.sigmoid logits) targets) H.=== [0.75]
+        values (NN.accuracy @1 classes labels) H.=== [1]
+        values (NN.accuracy @0 (T.transpose classes) labels) H.=== [1],
+      testProperty "mse supports partially applied mean, sum, and identity reductions" $ H.withTests 1 $ H.property $ do
         let predictions = T.fromList @'[2, 2] [1, 2, 3, 4 :: Double]
             targets = T.fromList @'[2, 2] [1, 0, 5, 1 :: Double]
             meanLoss = NN.mse T.mean

@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
 module NNTest.Metrics (tests) where
@@ -11,7 +10,6 @@ import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.NN.Metrics as Metrics
 import qualified Synapse.Tensor as T
-import qualified TensorTest.Compiler as Compiler
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -19,27 +17,90 @@ import Test.Tasty.Hedgehog (testProperty)
 values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
-checkGradient ::
-  (forall s. (AG.Context s) => AG.Tensor s '[3] Double -> AG.Tensor s '[] Double) ->
-  H.PropertyT IO ()
-checkGradient function = do
-  let input = [0.7, 2.2, 4.6 :: Double]
-      step = 1e-4
-      execute = T.run1 T.CPU (AG.backprop function)
-      evaluateAt xs = execute (T.run T.CPU (T.fromList @'[3] xs))
-      lossAt xs = case T.toList (fst (evaluateAt xs)) of
-        [loss] -> loss
-        _ -> error "Expected a scalar metric result"
-      perturb axis delta = zipWith (\i x -> if i == axis then x + delta else x) [0 :: Int ..] input
-      expected = [(lossAt (perturb axis step) - lossAt (perturb axis (-step))) / (2 * step) | axis <- [0 .. 2]]
-      (_, gradient) = evaluateAt input
-  approxList (T.toList gradient) expected
-
 tests :: TestTree
 tests =
   testGroup
     "metrics"
-    [ testProperty "metrics share mse and mae with losses" $ H.withTests 1 $ H.property $ do
+    [ testProperty "multiclass scores distinguish micro, macro and support weighting" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[6, 3] [4, 0, 0, 4, 0, 0, 0, 4, 0, 0, 4, 0, 0, 0, 4, 0, 0, 4] :: T.Tensor '[6, 3] Double
+            targets = T.fromList @'[6] [0, 0, 0, 1, 1, 2]
+        approxList (values $ NN.precisionPerClass @1 logits targets) [1, 0.5, 0.5]
+        approxList (values $ NN.recallPerClass @1 logits targets) [2 / 3, 0.5, 1]
+        approxList (values $ NN.f1PerClass @1 logits targets) [0.8, 0.5, 2 / 3]
+        approxList (values $ NN.precision @1 NN.Micro logits targets) [2 / 3]
+        approxList (values $ NN.recall @1 NN.Micro logits targets) [2 / 3]
+        approxList (values $ NN.f1 @1 NN.Micro logits targets) [2 / 3]
+        approxList (values $ NN.precision @1 NN.Macro logits targets) [2 / 3]
+        approxList (values $ NN.recall @1 NN.Macro logits targets) [13 / 18]
+        approxList (values $ NN.f1 @1 NN.Macro logits targets) [59 / 90]
+        approxList (values $ NN.precision @1 NN.Weighted logits targets) [0.75]
+        approxList (values $ NN.recall @1 NN.Weighted logits targets) [2 / 3]
+        approxList (values $ NN.f1 @1 NN.Weighted logits targets) [61 / 90]
+        T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== [2, 1, 0, 0, 1, 1, 0, 0, 1],
+      testProperty "classification metrics preserve axis conventions and probability predictions" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[3, 3] [4, 0, 0, 0, 4, 0, 0, 4, 0] :: T.Tensor '[3, 3] Double
+            targets = T.fromList @'[3] [0, 1, 2]
+        approxList (values $ NN.precision @0 NN.Macro (T.transpose logits) targets) [0.5]
+        approxList (values $ NN.recall @1 NN.Macro (T.softmax @1 logits) targets) [2 / 3]
+        approxList (values $ NN.f1PerClass @1 logits targets) [1, 2 / 3, 0]
+        T.toList (T.run T.CPU $ NN.confusionMatrix @0 (T.transpose logits) targets) H.=== [1, 0, 0, 0, 1, 0, 0, 1, 0],
+      testProperty "absent classes contribute zero to macro and no weight to weighted scores" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 4] [3, 0, 0, 0, 0, 3, 0, 0] :: T.Tensor '[2, 4] Double
+            targets = T.fromList @'[2] [0, 1]
+        values (NN.precisionPerClass @1 logits targets) H.=== [1, 1, 0, 0]
+        values (NN.recall @1 NN.Macro logits targets) H.=== [0.5]
+        values (NN.f1 @1 NN.Weighted logits targets) H.=== [1]
+        values (NN.f1 @1 NN.Micro logits targets) H.=== [1],
+      testProperty "empty observations produce zero class scores and confusion counts" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[0, 3] [] :: T.Tensor '[0, 3] Double
+            targets = T.fromList @'[0] []
+        values (NN.precisionPerClass @1 logits targets) H.=== [0, 0, 0]
+        values (NN.recallPerClass @1 logits targets) H.=== [0, 0, 0]
+        values (NN.f1PerClass @1 logits targets) H.=== [0, 0, 0]
+        values (NN.precision @1 NN.Micro logits targets) H.=== [0]
+        values (NN.recall @1 NN.Macro logits targets) H.=== [0]
+        values (NN.f1 @1 NN.Weighted logits targets) H.=== [0]
+        T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0,
+      testProperty "invalid target labels cannot index outside class statistics" $ H.withTests 1 $ H.property $ do
+        let logits = T.full @'[4, 3] 0 :: T.Tensor '[4, 3] Double
+            targets = T.fromList @'[4] [minBound, -1, 3, maxBound]
+        values (NN.precision @1 NN.Micro logits targets) H.=== [0]
+        values (NN.f1PerClass @1 logits targets) H.=== [0, 0, 0]
+        T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0,
+      testProperty "binary precision recall and F1 count the positive label" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[6] [1, 2, -1, 3, 4, -2] :: T.Tensor '[6] Double
+            targets = T.fromList @'[6] [1, 1, 1, 0, 0, 0]
+        values (NN.binaryPrecision 0 logits targets) H.=== [0.5]
+        approxList (values $ NN.binaryRecall 0 logits targets) [2 / 3]
+        approxList (values $ NN.binaryF1 0 logits targets) [4 / 7]
+        approxList (values $ NN.binaryF1 0.5 (NN.sigmoid logits) targets) [4 / 7],
+      testProperty "binary scores define zero denominators thresholds and empty observations" $ H.withTests 1 $ H.property $ do
+        let empty = T.fromList @'[0] [] :: T.Tensor '[0] Double
+            zero = T.zeros @'[3] :: T.Tensor '[3] Double
+        values (NN.binaryPrecision 0.5 zero zero) H.=== [0]
+        values (NN.binaryRecall 0 zero zero) H.=== [0]
+        values (NN.binaryF1 0.5 empty empty) H.=== [0]
+        values (NN.binaryPrecision 0 zero (T.ones @'[3])) H.=== [1],
+      testProperty "class metrics handle unbatched and spatial observations" $ H.withTests 1 $ H.property $ do
+        let unbatched = T.fromList @'[3] [0, 0, 0] :: T.Tensor '[3] Double
+            spatial = T.fromList @'[1, 3, 2] [3, 0, 0, 3, 0, 0] :: T.Tensor '[1, 3, 2] Double
+        values (NN.precisionPerClass @0 unbatched (T.full @'[] 0)) H.=== [1, 0, 0]
+        values (NN.f1 @1 NN.Micro spatial (T.fromList @'[1, 2] [0, 1])) H.=== [1],
+      testProperty "class metrics accept differentiable predictions without recording gradients" $ H.withTests 1 $ H.property $ do
+        let logits = T.fromList @'[2, 3] [3, 0, 0, 0, 3, 0] :: T.Tensor '[2, 3] Double
+            targets = T.fromList @'[2] [0, 1]
+            (score, gradient) = AG.backprop (\x -> AG.constant $ NN.f1 @1 NN.Micro x targets) logits
+        values score H.=== [1]
+        values gradient H.=== replicate 6 0,
+      testProperty "prepared class metrics accept changing inputs and preserve Float" $ H.withTests 1 $ H.property $ do
+        let execute = T.run2 T.CPU $ \predictions targets -> (NN.f1 @1 NN.Micro (predictions :: T.Tensor '[2, 2] Float) targets, NN.confusionMatrix @1 predictions targets)
+            logits = T.fromListData @'[2, 2] [3, 0, 0, 3 :: Float]
+            (perfect, matrix) = execute logits $ T.fromListData @'[2] [0, 1]
+            (wrong, _) = execute logits $ T.fromListData @'[2] [1, 0]
+        T.toList perfect H.=== [1]
+        T.toList wrong H.=== [0]
+        T.toList matrix H.=== [1, 0, 0, 1],
+      testProperty "metrics share mse and mae with losses" $ H.withTests 1 $ H.property $ do
         let predictions = T.fromList @'[3] [1, 3, 5 :: Double]
             targets = T.fromList @'[3] [0, 1, 3 :: Double]
         values (Metrics.mse T.mean predictions targets) H.=== [3]
@@ -102,131 +163,6 @@ tests =
         values score H.=== [0]
         approxList (values dp) [1, 0, -1]
         approxList (values dt) [-2, 0, 2],
-      testProperty "signed, maximum, and percentage errors agree with reference values" $ H.withTests 1 $ H.property $ do
-        let predictions = T.fromList @'[3] [2, 2, 5 :: Double]
-            targets = T.fromList @'[3] [1, 2, 4 :: Double]
-        approxList (values (NN.meanError T.mean predictions targets)) [2 / 3]
-        values (NN.meanError id predictions targets) H.=== [1, 0, 1]
-        values (NN.maxError predictions targets) H.=== [1]
-        approxList (values (NN.mape T.mean 1e-6 predictions targets)) [5 / 12]
-        approxList (values (NN.smape T.mean 1e-6 predictions targets)) [8 / 27]
-        approxList (values (NN.wmape 1e-6 predictions targets)) [2 / 7],
-      testProperty "percentage errors stabilize zero targets with an explicit epsilon" $ H.withTests 1 $ H.property $ do
-        let predictions = T.fromList @'[2] [0, 1 :: Double]
-            targets = T.zeros @'[2] @Double
-        values (NN.mape T.mean 0.5 predictions targets) H.=== [1]
-        values (NN.smape T.mean 0.5 predictions targets) H.=== [1]
-        values (NN.wmape 0.5 predictions targets) H.=== [2]
-        values (NN.mape T.mean 0.5 targets targets) H.=== [0]
-        values (NN.smape T.mean 0.5 targets targets) H.=== [0]
-        values (NN.wmape 0.5 targets targets) H.=== [0],
-      testProperty "percentage errors support negative targets and smape is symmetric" $ H.withTests 1 $ H.property $ do
-        let predictions = T.fromList @'[2] [-2, 4 :: Double]
-            targets = T.fromList @'[2] [-1, -2 :: Double]
-        values (NN.mape id 0.1 predictions targets) H.=== [1, 3]
-        approxList (values (NN.smape T.mean 0.1 predictions targets)) [4 / 3]
-        values (NN.smape T.mean 0.1 predictions targets) H.=== values (NN.smape T.mean 0.1 targets predictions)
-        approxList (values (NN.wmape 0.1 predictions targets)) [7 / 3],
-      testProperty "logarithmic errors support reductions and preserve their domain" $ H.withTests 1 $ H.property $ do
-        let predictions = T.fromList @'[2] [0, 3 :: Double]
-            targets = T.ones @'[2] @Double
-            squaredLog = log 2 * log 2
-        approxList (values (NN.msle id predictions targets)) [squaredLog, squaredLog]
-        approxList (values (NN.msle T.mean predictions targets)) [squaredLog]
-        approxList (values (NN.rmsle T.mean predictions targets)) [log 2]
-        values (NN.msle T.mean targets targets) H.=== [0]
-        H.assert (all isNaN (values (NN.msle id (T.full @'[] (-2 :: Double)) (T.zeros @'[]))))
-        values (NN.msle id (T.full @'[] (-1 :: Double)) (T.zeros @'[])) H.=== [1 / 0],
-      testProperty "relative errors and explained variance agree with reference values" $ H.withTests 1 $ H.property $ do
-        let predictions = T.fromList @'[3] [2, 2, 5 :: Double]
-            targets = T.fromList @'[3] [1, 2, 4 :: Double]
-        approxList (values (NN.rae predictions targets)) [0.6]
-        approxList (values (NN.rse predictions targets)) [3 / 7]
-        approxList (values (NN.explainedVariance predictions targets)) [6 / 7]
-        approxList (values (NN.pearson predictions targets)) [5 / sqrt 28]
-        approxList (values (NN.r2 predictions targets + NN.rse predictions targets)) [1]
-        values (NN.rae targets targets) H.=== [0]
-        values (NN.rse targets targets) H.=== [0],
-      testProperty "explained variance and correlation ignore constant offsets" $ H.withTests 1 $ H.property $ do
-        let targets = T.fromList @'[3] [1, 2, 4 :: Double]
-        approxList (values (NN.explainedVariance (targets + 10) targets)) [1]
-        approxList (values (NN.pearson (2 * targets + 10) targets)) [1]
-        approxList (values (NN.pearson (10 - 2 * targets) targets)) [-1]
-        approxList (values (NN.pearson targets (2 * targets + 10))) [1],
-      testProperty "undefined variance and relative-error denominators remain nonfinite" $ H.withTests 1 $ H.property $ do
-        let targets = T.full @'[3] (2 :: Double)
-            predictions = T.fromList @'[3] [1, 2, 3 :: Double]
-        H.assert (all isNaN (values (NN.rae targets targets)))
-        H.assert (all isNaN (values (NN.rse targets targets)))
-        H.assert (all isNaN (values (NN.explainedVariance targets targets)))
-        H.assert (all isNaN (values (NN.pearson predictions targets)))
-        H.assert (all isNaN (values (NN.pearson targets predictions)))
-        values (NN.rae predictions targets) H.=== [1 / 0]
-        values (NN.rse predictions targets) H.=== [1 / 0]
-        values (NN.explainedVariance predictions targets) H.=== [-(1 / 0)],
-      testProperty "new metrics support empty, scalar, axis-wise, and Float inputs" $ H.withTests 1 $ H.property $ do
-        let empty = T.zeros @'[0] @Double
-            predictions = T.fromList @'[2, 2] [2, 4, 6, 8 :: Double]
-            targets = T.fromList @'[2, 2] [1, 2, 3, 4 :: Double]
-        values (NN.mape (T.meanAxes @'[1]) 0.1 predictions targets) H.=== [1, 1]
-        approxList (values (NN.smape (T.meanAxes @'[1]) 0.1 predictions targets)) [2 / 3, 2 / 3]
-        values (NN.meanError (T.sumAxes @'[1]) predictions targets) H.=== [3, 7]
-        values (NN.mape id 0.1 empty empty) H.=== []
-        values (NN.msle id empty empty) H.=== []
-        values (NN.wmape 0.1 empty empty) H.=== [0]
-        H.assert (all isNaN (values (NN.smape T.mean 0.1 empty empty)))
-        values (NN.maxError (T.full @'[] (3 :: Double)) (T.full @'[] 1)) H.=== [2]
-        let floatInput = T.fromList @'[3] [1, 2, 4 :: Float]
-            runFloat = T.toList . T.run T.CPU :: T.Tensor '[] Float -> [Float]
-        approxList (runFloat (NN.mape T.mean 0.1 (2 * floatInput) floatInput)) [1]
-        approxList (runFloat (NN.pearson floatInput floatInput)) [1]
-        approxList (runFloat (NN.rmsle T.mean floatInput floatInput)) [0],
-      testProperty "percentage metrics reject nonpositive and nonfinite epsilon" $ H.withTests 1 $ H.property $ do
-        let input = T.ones @'[2] @Double :: T.Tensor '[2] Double
-            rejects :: T.Tensor '[] Double -> H.PropertyT IO ()
-            rejects score = do
-              result <- H.evalIO $ try @ErrorCall $ evaluate score
-              case result of
-                Left _ -> pure ()
-                Right _ -> H.failure
-        mapM_ (\epsilon -> rejects (NN.mape T.mean epsilon input input)) [0, -1, 0 / 0, 1 / 0, -(1 / 0)]
-        mapM_ (\epsilon -> rejects (NN.smape T.mean epsilon input input)) [0, -1, 0 / 0, 1 / 0, -(1 / 0)]
-        mapM_ (\epsilon -> rejects (NN.wmape epsilon input input)) [0, -1, 0 / 0, 1 / 0, -(1 / 0)],
-      testProperty "global variance metrics reject undersized inputs" $ H.withTests 1 $ H.property $ do
-        let input = T.ones @'[1] @Double :: T.Tensor '[1] Double
-            empty = T.zeros @'[0] @Double :: T.Tensor '[0] Double
-            rejects :: T.Tensor '[] Double -> H.PropertyT IO ()
-            rejects score = do
-              result <- H.evalIO $ try @ErrorCall $ evaluate score
-              case result of
-                Left _ -> pure ()
-                Right _ -> H.failure
-        rejects (NN.rae input input)
-        rejects (NN.rse input input)
-        rejects (NN.explainedVariance input input)
-        rejects (NN.pearson input input)
-        rejects (NN.rae empty empty)
-        rejects (NN.rse empty empty)
-        rejects (NN.explainedVariance empty empty),
-      testProperty "new metric gradients agree with finite differences" $ H.withTests 1 $ H.property $ do
-        let targets = T.fromList @'[3] [1, 2, 4 :: Double]
-        checkGradient (\p -> NN.meanError T.mean p (AG.constant targets))
-        checkGradient (\p -> NN.maxError p (AG.constant targets))
-        checkGradient (\p -> NN.mape T.mean 0.1 p (AG.constant targets))
-        checkGradient (\p -> NN.smape T.mean 0.1 p (AG.constant targets))
-        checkGradient (\p -> NN.wmape 0.1 p (AG.constant targets))
-        checkGradient (\p -> NN.msle T.mean p (AG.constant targets))
-        checkGradient (\p -> NN.rmsle T.mean p (AG.constant targets))
-        checkGradient (\p -> NN.rae p (AG.constant targets))
-        checkGradient (\p -> NN.rse p (AG.constant targets))
-        checkGradient (\p -> NN.explainedVariance p (AG.constant targets))
-        checkGradient (\p -> NN.pearson p (AG.constant targets)),
-      testProperty "maximum error rejects empty tensors" $
-        H.withTests 1 $
-          Compiler.rejects "test/NNTest/Fixtures/Rejected/MaxErrorEmpty.hs" "Cannot reduce empty tensor",
-      testProperty "pearson rejects empty tensors" $
-        H.withTests 1 $
-          Compiler.rejects "test/NNTest/Fixtures/Rejected/PearsonEmpty.hs" "Cannot reduce empty tensor",
       testProperty "prepared metrics accept changing predictions" $ H.withTests 1 $ H.property $ do
         let execute = T.run2 T.CPU $ \predictions targets ->
               (NN.rmse T.mean predictions targets, NN.r2 predictions targets)

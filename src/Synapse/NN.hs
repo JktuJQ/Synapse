@@ -27,19 +27,29 @@ module Synapse.NN
     mae,
     huber,
     smoothL1,
+    binaryCrossEntropy,
+    binaryCrossEntropyWithLogits,
+    negativeLogLikelihood,
+    crossEntropy,
+    unsafeNegativeLogLikelihood,
+    unsafeCrossEntropy,
+    smoothLabels,
+    unsafeCrossEntropySmoothed,
     rmse,
     r2,
-    meanError,
-    maxError,
-    mape,
-    smape,
-    wmape,
-    msle,
-    rmsle,
-    rae,
-    rse,
-    explainedVariance,
-    pearson,
+    binaryAccuracy,
+    accuracy,
+    Averaging (..),
+    precision,
+    recall,
+    f1,
+    precisionPerClass,
+    recallPerClass,
+    f1PerClass,
+    confusionMatrix,
+    binaryPrecision,
+    binaryRecall,
+    binaryF1,
     relu,
     leakyRelu,
     sigmoid,
@@ -59,8 +69,8 @@ import Synapse.NN.Activation (leakyRelu, relu, sigmoid, sin, softplus, tanh)
 import Synapse.NN.Data (Batch (..), Dataset (..), LastBatch (..), SomeBatch (..), batchMask, batchSize, getSample, loadBatches, shuffle, withBatch)
 import Synapse.NN.Dense (Dense (..), dense)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
-import Synapse.NN.Loss (huber, mae, mse, smoothL1)
-import Synapse.NN.Metrics (explainedVariance, mape, maxError, meanError, msle, pearson, r2, rae, rmse, rmsle, rse, smape, wmape)
+import Synapse.NN.Loss (binaryCrossEntropy, binaryCrossEntropyWithLogits, crossEntropy, huber, mae, mse, negativeLogLikelihood, smoothL1, smoothLabels, unsafeCrossEntropy, unsafeCrossEntropySmoothed, unsafeNegativeLogLikelihood)
+import Synapse.NN.Metrics (Averaging (..), accuracy, binaryAccuracy, binaryF1, binaryPrecision, binaryRecall, confusionMatrix, f1, f1PerClass, precision, precisionPerClass, r2, recall, recallPerClass, rmse)
 import Synapse.NN.Optimizer (Optimizer (..), SGD (..), updateParameters)
 import Synapse.NN.Weights (extractWeights, loadWeights)
 import Prelude hiding (sin, tanh)

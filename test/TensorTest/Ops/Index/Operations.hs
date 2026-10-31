@@ -19,7 +19,9 @@ tests :: TestTree
 tests =
   testGroup
     "operations"
-    [ testProperty "index operators read coordinates and elements" (H.withTests 1 propOperators),
+    [ testProperty "dynamic indexing and fallback respect individual coordinates" (H.withTests 1 propDynamic),
+      testProperty "gather selects each axis and safely handles empty inputs" (H.withTests 1 propGather),
+      testProperty "index operators read coordinates and elements" (H.withTests 1 propOperators),
       testProperty "index reads elements in row-major order" propIndex,
       testProperty "index composes with element expressions" (H.withTests 1 propIndexExpression),
       testProperty "mixed selections preserve axis order" propMixedSlice,
@@ -130,3 +132,32 @@ propHighRankIndex = H.property $ do
       selected = T.slice @'[ 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.RangeReverse 1 4 2] source
   T.toList (T.run T.CPU (T.scalar (T.index @'[0, 0, 0, 0, 0, 0, 0, 0, 0, 2] source))) H.=== [3]
   T.toList (T.run T.CPU selected) H.=== [4, 2]
+
+propDynamic :: H.Property
+propDynamic = H.property $ do
+  let input = T.fromList @'[2, 3] [0 .. 5 :: Int]
+      selected row col = Internal.TensorIndex (A.index2 (A.constant row) (A.constant col))
+      evaluateIndex ix = T.toList (T.run T.CPU (T.scalar (T.dynamicIndexOr (-1) input ix)))
+  T.toList (T.run T.CPU (T.scalar (T.unsafeDynamicIndex input (selected 1 2)))) H.=== [5]
+  evaluateIndex (selected 0 3) H.=== [-1]
+  evaluateIndex (selected 1 (-1)) H.=== [-1]
+  evaluateIndex (selected minBound maxBound) H.=== [-1]
+  evaluateIndex (selected 1 1) H.=== [4]
+  T.toList (T.run T.CPU (T.scalar (T.dynamicIndexOr True (T.fromList @'[0] []) (Internal.TensorIndex (A.index1 0))))) H.=== [True]
+  T.toList (T.run T.CPU (T.scalar (T.dynamicIndexOr False (T.full @'[] True) (Internal.TensorIndex A.index0)))) H.=== [True]
+
+propGather :: H.Property
+propGather = H.property $ do
+  let input = T.fromList @'[2, 3] [0 .. 5 :: Int]
+      indices = T.fromList @'[2, 2] [2, 0, 1, 1]
+      invalid = T.fromList @'[2, 2] [-1, 3, minBound, maxBound]
+  T.toList (T.run T.CPU (T.unsafeGather @1 input indices)) H.=== [2, 0, 4, 4]
+  T.toList (T.run T.CPU (T.gatherOr @1 (-1) input indices)) H.=== [2, 0, 4, 4]
+  T.toList (T.run T.CPU (T.gatherOr @1 (-1) input invalid)) H.=== replicate 4 (-1)
+  T.toList (T.run T.CPU (T.unsafeGather @0 input (T.fromList @'[1, 3] [1, 0, 1]))) H.=== [3, 1, 5]
+  T.toList (T.run T.CPU (T.gatherOr @1 True (T.fromList @'[2, 0] []) invalid)) H.=== replicate 4 True
+  T.toList (T.run T.CPU (T.gatherOr @1 (-1) input (T.fromList @'[2, 0] []))) H.=== []
+  let execute = T.run2 T.CPU (T.unsafeGather @1 :: T.Tensor '[2, 3] Int -> T.Tensor '[2, 2] Int -> T.Tensor '[2, 2] Int)
+      host = T.run T.CPU input
+  T.toList (execute host (T.run T.CPU indices)) H.=== [2, 0, 4, 4]
+  T.toList (execute host (T.run T.CPU (T.fromList [0, 0, 2, 0]))) H.=== [0, 0, 5, 3]

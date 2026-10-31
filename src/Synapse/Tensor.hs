@@ -26,6 +26,10 @@ module Synapse.Tensor
     TensorElement,
     TensorIndex,
     coordinate,
+    unsafeDynamicIndex,
+    dynamicIndexOr,
+    unsafeGather,
+    gatherOr,
     Indexable,
     (!!),
     FromIntegral,
@@ -146,7 +150,7 @@ import Synapse.Tensor.Ops.Construction
     zerosLike,
   )
 import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, isInfinite, isNaN, max, min, not, quot, rem, select, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
-import Synapse.Tensor.Ops.Index (Indexable, coordinate, index, slice, (!!))
+import Synapse.Tensor.Ops.Index (Indexable, coordinate, dynamicIndexOr, gatherOr, index, slice, unsafeDynamicIndex, unsafeGather, (!!))
 import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
