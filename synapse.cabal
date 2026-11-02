@@ -75,6 +75,12 @@ library
                     , Synapse.NN.Metrics
                     , Synapse.NN.Layers
                     , Synapse.NN.Layers.Convolution
+                    , Synapse.NN.Execution
+                    , Synapse.NN.Layers.Normalization
+                    , Synapse.NN.Layers.Normalization.LayerNorm
+                    , Synapse.NN.Layers.Normalization.BatchNorm
+                    , Synapse.NN.Layers.Dropout
+                    , Synapse.Tensor.Shapes.Normalization
                     , Synapse.NN.Layers.Dense
                     , Synapse.NN.Optimizers
                     , Synapse.NN.Optimizers.Type
@@ -109,7 +115,8 @@ library
                     , Synapse.Tensor.Type
                     , Synapse.Tensor.Random
 
-    other-modules:    Synapse.Tensor.Fields
+    other-modules:    Synapse.NN.Layers.Normalization.Statistics
+                    , Synapse.Tensor.Fields
                     , Synapse.Tensor.Ops.Primitives.Convolution
                     , Synapse.Tensor.Ops.Primitives.Window
                     , Synapse.Autograd.Tensor.Ops.Primitives.Window
@@ -193,6 +200,8 @@ test-suite synapse-test
                     , NNTest.Metrics
                     , NNTest.Layers
                     , NNTest.Layers.Convolution
+                    , NNTest.Layers.Normalization
+                    , NNTest.Layers.Dropout
                     , NNTest.Layers.Dense
                     , NNTest.Network
                     , NNTest.Optimizer

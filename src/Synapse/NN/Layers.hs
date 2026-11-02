@@ -3,8 +3,12 @@
 module Synapse.NN.Layers
   ( module Synapse.NN.Layers.Dense,
     module Synapse.NN.Layers.Convolution,
+    module Synapse.NN.Layers.Normalization,
+    module Synapse.NN.Layers.Dropout,
   )
 where
 
 import Synapse.NN.Layers.Convolution
 import Synapse.NN.Layers.Dense
+import Synapse.NN.Layers.Dropout
+import Synapse.NN.Layers.Normalization
