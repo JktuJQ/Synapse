@@ -29,10 +29,10 @@ module Synapse.Tensor.Ops.Reduction
 where
 
 import Data.Proxy (Proxy (..))
-import qualified Synapse.Autograd.Tensor.Primitives.Reduction as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Reduction as Pullback
 import Synapse.Tensor.Ops (TensorOps (..))
 import qualified Synapse.Tensor.Ops.Elementwise as E
-import qualified Synapse.Tensor.Primitives.Reduction as Raw
+import qualified Synapse.Tensor.Ops.Primitives.Reduction as Raw
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, CanReduceNonEmpty, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Tensor, TensorElement)

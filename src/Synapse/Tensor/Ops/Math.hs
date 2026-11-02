@@ -6,9 +6,9 @@
 -- | Inner products and batched matrix multiplication.
 module Synapse.Tensor.Ops.Math (dot, matmul) where
 
-import qualified Synapse.Autograd.Tensor.Primitives.Math as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Math as Pullback
 import Synapse.Tensor.Ops (TensorOps (..))
-import qualified Synapse.Tensor.Primitives.Math as Raw
+import qualified Synapse.Tensor.Ops.Primitives.Math as Raw
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Synapse.Tensor.Type (TensorElement)

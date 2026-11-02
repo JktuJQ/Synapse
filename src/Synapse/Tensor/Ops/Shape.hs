@@ -10,9 +10,9 @@ module Synapse.Tensor.Ops.Shape (broadcast, reshape, squeeze, unsqueeze, transpo
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
-import qualified Synapse.Autograd.Tensor.Primitives.Shape as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Shape as Pullback
 import Synapse.Tensor.Ops (TensorOps (..))
-import qualified Synapse.Tensor.Primitives.Shape as Raw
+import qualified Synapse.Tensor.Ops.Primitives.Shape as Raw
 import Synapse.Tensor.Shapes.Axes (Axes, CanSqueeze, ConcatShape, InsertAxis, PermuteAxes, RemoveAxis, TransposeShape)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)

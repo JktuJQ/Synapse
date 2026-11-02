@@ -11,7 +11,9 @@ extra-doc-files:    README.md
                   , CHANGELOG.md
                   , SynapseLogo.png
 
-extra-source-files: test/AutogradTest/Differentiable/Fixtures/Rejected/*.hs
+extra-source-files: test/TensorTest/Ops/Convolution/Fixtures/Accepted/*.hs
+                  , test/TensorTest/Ops/Convolution/Fixtures/Rejected/*.hs
+                  , test/AutogradTest/Differentiable/Fixtures/Rejected/*.hs
                   , test/NNTest/Fixtures/Rejected/*.hs
                   , test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
                   , test/TensorTest/Shapes/Axes/Fixtures/Rejected/*.hs
@@ -71,7 +73,9 @@ library
                     , Synapse.NN.Activation
                     , Synapse.NN.Initialization
                     , Synapse.NN.Metrics
-                    , Synapse.NN.Dense
+                    , Synapse.NN.Layers
+                    , Synapse.NN.Layers.Convolution
+                    , Synapse.NN.Layers.Dense
                     , Synapse.NN.Optimizer
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
@@ -84,6 +88,8 @@ library
                     , Synapse.Tensor.Ops
                     , Synapse.Tensor.Ops.Elementwise
                     , Synapse.Tensor.Ops.Math
+                    , Synapse.Tensor.Ops.Convolution
+                    , Synapse.Tensor.Ops.Window
                     , Synapse.Tensor.Ops.Index
                     , Synapse.Tensor.Ops.Shape
                     , Synapse.Tensor.Ops.Reduction
@@ -94,21 +100,27 @@ library
                     , Synapse.Tensor.Shapes.Index
                     , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Shapes.Matmul
+                    , Synapse.Tensor.Shapes.Convolution
+                    , Synapse.Tensor.Shapes.Window
                     , Synapse.Tensor.Type
 
     other-modules:    Synapse.Tensor.Fields
-                    , Synapse.Tensor.Primitives.Construction
-                    , Synapse.Tensor.Primitives.Index
+                    , Synapse.Tensor.Ops.Primitives.Convolution
+                    , Synapse.Tensor.Ops.Primitives.Window
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Window
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Convolution
+                    , Synapse.Tensor.Ops.Primitives.Construction
+                    , Synapse.Tensor.Ops.Primitives.Index
                     , Synapse.Autograd.Execution.Variable
-                    , Synapse.Tensor.Primitives.Math
-                    , Synapse.Tensor.Primitives.Shape
-                    , Synapse.Tensor.Primitives.Reduction
-                    , Synapse.Autograd.Tensor.Primitives.Elementwise
-                    , Synapse.Autograd.Tensor.Primitives.Math
-                    , Synapse.Autograd.Tensor.Primitives.Index
-                    , Synapse.Autograd.Tensor.Primitives.Shape
-                    , Synapse.Autograd.Tensor.Primitives.Reduction
-                    , Synapse.Tensor.Primitives.Elementwise
+                    , Synapse.Tensor.Ops.Primitives.Math
+                    , Synapse.Tensor.Ops.Primitives.Shape
+                    , Synapse.Tensor.Ops.Primitives.Reduction
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Elementwise
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Math
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Index
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Shape
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Reduction
+                    , Synapse.Tensor.Ops.Primitives.Elementwise
                     , Synapse.Autograd.Variable
                     , Synapse.Autograd.Execution.Reverse
                     , Synapse.Autograd.Tensor.Type
@@ -174,12 +186,16 @@ test-suite synapse-test
                     , NNTest.Activation
                     , NNTest.Initialization
                     , NNTest.Metrics
-                    , NNTest.Dense
+                    , NNTest.Layers
+                    , NNTest.Layers.Convolution
+                    , NNTest.Layers.Dense
                     , NNTest.Network
                     , NNTest.Optimizer
                     , NNTest.Regression
                     , AutogradTest
                     , AutogradTest.Tensor
+                    , AutogradTest.Tensor.Convolution
+                    , AutogradTest.Tensor.Spatial
                     , AutogradTest.Tensor.Elementwise
                     , AutogradTest.Tensor.Lifting
                     , AutogradTest.Execution
@@ -194,6 +210,11 @@ test-suite synapse-test
                     , TensorTest.Ops
                     , TensorTest.Ops.Elementwise
                     , TensorTest.Ops.Math
+                    , TensorTest.Ops.Convolution
+                    , TensorTest.Ops.Convolution.Dilated
+                    , TensorTest.Ops.Spatial
+                    , TensorTest.Ops.Spatial.Reference
+                    , TensorTest.Ops.Convolution.Reference
                     , TensorTest.Ops.Math.Linear
                     , TensorTest.Ops.Index
                     , TensorTest.Ops.Index.Operations

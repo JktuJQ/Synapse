@@ -11,12 +11,12 @@ module Synapse.NN.Loss (mse, mae, huber, smoothL1, binaryCrossEntropy, binaryCro
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
-import qualified Synapse.Autograd.Tensor.Primitives.Index as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
 import Synapse.NN.Activation (softplus)
 import Synapse.Tensor.Ops (TensorOps (lift1, lift2))
 import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
-import qualified Synapse.Tensor.Primitives.Index as Raw
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduceNonEmpty, ReduceShape, RemoveAxis)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 import Synapse.Tensor.Type (Tensor, TensorElement, TensorLike)

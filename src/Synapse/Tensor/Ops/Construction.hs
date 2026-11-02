@@ -25,7 +25,7 @@ module Synapse.Tensor.Ops.Construction
 where
 
 import Synapse.Tensor.Ops (TensorOps (fromElement, literal))
-import qualified Synapse.Tensor.Primitives.Construction as Raw
+import qualified Synapse.Tensor.Ops.Primitives.Construction as Raw
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Element, FromIntegral, TensorElement, TensorIndex)
 

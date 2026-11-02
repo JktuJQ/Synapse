@@ -14,7 +14,7 @@ where
 
 import GHC.TypeLits (Nat)
 import Synapse.Autograd.Variable (Backpropagatable, Var)
-import Synapse.Tensor.Primitives.Math ()
+import Synapse.Tensor.Ops.Primitives.Math ()
 import qualified Synapse.Tensor.Type as T
 
 -- | A differentiable tensor with statically known dimensions.

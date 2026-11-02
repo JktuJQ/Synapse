@@ -122,6 +122,24 @@ module Synapse.Tensor
     argmin,
     dot,
     matmul,
+    conv1d,
+    conv2d,
+    conv3d,
+    convTranspose1d,
+    convTranspose2d,
+    convTranspose3d,
+    maxPool1d,
+    maxPool2d,
+    maxPool3d,
+    avgPool1d,
+    avgPool2d,
+    avgPool3d,
+    extractPatches1d,
+    extractPatches2d,
+    extractPatches3d,
+    combinePatches1d,
+    combinePatches2d,
+    combinePatches3d,
     transpose,
     permuteAxes,
     concat,
@@ -149,11 +167,13 @@ import Synapse.Tensor.Ops.Construction
     zeros,
     zerosLike,
   )
+import Synapse.Tensor.Ops.Convolution (avgPool1d, avgPool2d, avgPool3d, conv1d, conv2d, conv3d, convTranspose1d, convTranspose2d, convTranspose3d, maxPool1d, maxPool2d, maxPool3d)
 import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, isInfinite, isNaN, max, min, not, quot, rem, select, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, dynamicIndexOr, gatherOr, index, slice, unsafeDynamicIndex, unsafeGather, (!!))
 import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
+import Synapse.Tensor.Ops.Window (combinePatches1d, combinePatches2d, combinePatches3d, extractPatches1d, extractPatches2d, extractPatches3d)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (DType, Element, Float32, Float64, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, TensorLike, WithTensor, element, fromIntegral)

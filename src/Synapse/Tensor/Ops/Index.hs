@@ -14,9 +14,9 @@ module Synapse.Tensor.Ops.Index (Indexable (..), coordinate, index, unsafeDynami
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
-import qualified Synapse.Autograd.Tensor.Primitives.Index as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
 import Synapse.Tensor.Ops (TensorOps (..))
-import qualified Synapse.Tensor.Primitives.Index as Raw
+import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, Slice, SliceShape)

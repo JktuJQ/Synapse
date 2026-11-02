@@ -18,8 +18,7 @@ module Synapse.NN
     withBatch,
     batchSize,
     batchMask,
-    Dense (..),
-    dense,
+    module Synapse.NN.Layers,
     Optimizer (..),
     SGD (..),
     updateParameters,
@@ -67,8 +66,8 @@ where
 
 import Synapse.NN.Activation (leakyRelu, relu, sigmoid, sin, softplus, tanh)
 import Synapse.NN.Data (Batch (..), Dataset (..), LastBatch (..), SomeBatch (..), batchMask, batchSize, getSample, loadBatches, shuffle, withBatch)
-import Synapse.NN.Dense (Dense (..), dense)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
+import Synapse.NN.Layers
 import Synapse.NN.Loss (binaryCrossEntropy, binaryCrossEntropyWithLogits, crossEntropy, huber, mae, mse, negativeLogLikelihood, smoothL1, smoothLabels, unsafeCrossEntropy, unsafeCrossEntropySmoothed, unsafeNegativeLogLikelihood)
 import Synapse.NN.Metrics (Averaging (..), accuracy, binaryAccuracy, binaryF1, binaryPrecision, binaryRecall, confusionMatrix, f1, f1PerClass, precision, precisionPerClass, r2, recall, recallPerClass, rmse)
 import Synapse.NN.Optimizer (Optimizer (..), SGD (..), updateParameters)

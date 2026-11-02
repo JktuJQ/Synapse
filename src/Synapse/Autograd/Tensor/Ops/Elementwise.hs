@@ -13,8 +13,8 @@ module Synapse.Autograd.Tensor.Ops.Elementwise () where
 
 import qualified Numeric.Backprop.Explicit as BPE
 import Synapse.Autograd.Tensor.Ops ()
-import qualified Synapse.Autograd.Tensor.Primitives.Elementwise as Pullback
-import qualified Synapse.Autograd.Tensor.Primitives.Math as MathPullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Elementwise as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Primitives.Math as MathPullback
 import Synapse.Autograd.Tensor.Type (Tensor (..), TensorElement (..))
 import Synapse.Autograd.Variable (Backpropagatable, Context, Var (..), add, liftBinary, liftUnary, variableValue, zero)
 import Synapse.Tensor.Ops (TensorOps (..))

@@ -25,6 +25,18 @@ module Synapse.Tensor.Shapes
     CanSlice,
     SliceShape,
     MatmulShape,
+    Conv1dShape,
+    Conv2dShape,
+    Conv3dShape,
+    ConvTranspose1dShape,
+    ConvTranspose2dShape,
+    ConvTranspose3dShape,
+    Patches1dShape,
+    Patches2dShape,
+    Patches3dShape,
+    Pool1dShape,
+    Pool2dShape,
+    Pool3dShape,
     PermuteAxes,
     TransposeShape,
     ConcatShape,
@@ -49,7 +61,9 @@ import Synapse.Tensor.Shapes.Axes
     TransposeShape,
   )
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
+import Synapse.Tensor.Shapes.Convolution (Conv1dShape, Conv2dShape, Conv3dShape, ConvTranspose1dShape, ConvTranspose2dShape, ConvTranspose3dShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
 import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, Slice, SliceAxis (..), SliceShape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)
+import Synapse.Tensor.Shapes.Window (Patches1dShape, Patches2dShape, Patches3dShape, Pool1dShape, Pool2dShape, Pool3dShape)

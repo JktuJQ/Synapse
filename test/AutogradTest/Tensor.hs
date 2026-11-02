@@ -6,8 +6,10 @@
 
 module AutogradTest.Tensor (tests) where
 
+import qualified AutogradTest.Tensor.Convolution
 import qualified AutogradTest.Tensor.Elementwise
 import qualified AutogradTest.Tensor.Lifting
+import qualified AutogradTest.Tensor.Spatial
 import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
@@ -40,7 +42,9 @@ tests :: TestTree
 tests =
   testGroup
     "tensor operations"
-    [ AutogradTest.Tensor.Lifting.tests,
+    [ AutogradTest.Tensor.Spatial.tests,
+      AutogradTest.Tensor.Convolution.tests,
+      AutogradTest.Tensor.Lifting.tests,
       AutogradTest.Tensor.Elementwise.tests,
       testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
