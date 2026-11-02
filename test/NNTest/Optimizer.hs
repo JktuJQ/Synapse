@@ -14,7 +14,7 @@ import GHC.Generics (Generic)
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
-import qualified Synapse.NN.Optimizer as O
+import qualified Synapse.NN.Optimizers as O
 import qualified Synapse.Tensor as T
 import qualified TensorTest.Compiler as Compiler
 import TensorTest.Support (approxList)
@@ -40,7 +40,67 @@ tests :: TestTree
 tests =
   testGroup
     "optimizers"
-    [ testProperty "updateParameters passes parameters before gradients" $ H.withTests 1 $ H.property $ do
+    [ testProperty "momentum and Nesterov follow successive analytic updates" $ H.withTests 1 $ H.property $ do
+        let run nesterov =
+              let optimizer = NN.Momentum 0.1 0.9 nesterov
+                  p = T.full @'[] (5 :: Double)
+                  (p1, v1) = NN.optimizerStep optimizer p 2 (NN.initialState optimizer p)
+                  (p2, v2) = NN.optimizerStep optimizer p1 3 v1
+               in (values p1, values p2, values v2)
+            (first, second, velocity) = run False
+            (firstN, secondN, _) = run True
+        approxList first [4.8]
+        approxList second [4.32]
+        approxList velocity [4.8]
+        approxList firstN [4.62]
+        approxList secondN [3.888],
+      testProperty "Adam and AdamW correct both moments over multiple steps" $ H.withTests 1 $ H.property $ do
+        let adam = NN.Adam 0.1 0.9 0.99 1e-8
+            p = T.full @'[] (5 :: Double)
+            (p1, state1) = NN.optimizerStep adam p 2 (NN.initialState adam p)
+            (p2, (count, (m, v))) = NN.optimizerStep adam p1 3 state1
+            m2 = 0.9 * 0.2 + 0.1 * 3
+            v2 = 0.99 * 0.04 + 0.01 * 9
+            expected1 = 5 - 0.1 * 2 / (2 + 1e-8)
+            expected2 = expected1 - 0.1 * (m2 / (1 - 0.9 ** 2)) / (sqrt (v2 / (1 - 0.99 ** 2)) + 1e-8)
+            adamW = NN.AdamW adam 0.2
+            (decayed, _) = NN.optimizerStep adamW p 2 (NN.initialState adamW p)
+        T.toList (T.run T.CPU count) H.=== [2]
+        approxList (values p1) [expected1]
+        approxList (values p2) [expected2]
+        approxList (values m) [m2]
+        approxList (values v) [v2]
+        approxList (values decayed) [expected1 - 0.1],
+      testProperty "RMSprop accumulates squared gradients across prepared calls" $ H.withTests 1 $ H.property $ do
+        let optimizer = NN.RMSprop 0.1 0.9 1e-8
+            execute = T.run3 T.CPU $ \parameters gradient state -> NN.optimizerStep optimizer parameters gradient state
+            p0 = T.run T.CPU $ T.full @'[] (5 :: Double)
+            g = T.run T.CPU $ T.full @'[] (2 :: Double)
+            v0 = T.run T.CPU $ NN.initialState optimizer $ T.full @'[] (5 :: Double)
+            (p1, v1) = execute p0 g v0
+            (p2, v2) = execute p1 g v1
+        approxList (T.toList p2) [5 - 0.2 / (sqrt 0.4 + 1e-8) - 0.2 / (sqrt 0.76 + 1e-8)]
+        approxList (T.toList v2) [0.76],
+      testProperty "Adam state passes through repeated prepared backend calls" $ H.withTests 1 $ H.property $ do
+        let optimizer = NN.Adam 0.1 0.9 0.999 1e-8
+            execute = T.run3 T.CPU $ \parameters gradient state -> NN.optimizerStep optimizer parameters gradient state
+            p = T.full @'[] (5 :: Double)
+            p0 = T.run T.CPU p
+            g = T.run T.CPU $ T.full @'[] (2 :: Double)
+            state0 = T.run T.CPU $ NN.initialState optimizer p
+            (p1, state1) = execute p0 g state0
+            (p2, state2) = execute p1 g state1
+        approxList (T.toList p2) [5 - 0.4 / (2 + 1e-8)]
+        T.toList (fst state2) H.=== [2],
+      testProperty "Adam updates nested tensor records without numeric record instances" $ H.withTests 1 $ H.property $ do
+        let p = Parameters (NN.Dense 2 3) 4 :: Parameters T.Tensor Double
+            g = Parameters (NN.Dense 1 2) 3
+            optimizer = NN.Adam 0.1 0.9 0.999 1e-8
+            (updated, _) = NN.optimizerStep optimizer p g (NN.initialState optimizer p)
+        approxList (values $ NN.denseWeights $ projection updated) [2 - 0.1 / (1 + 1e-8)]
+        approxList (values $ NN.denseBias $ projection updated) [3 - 0.2 / (2 + 1e-8)]
+        approxList (values $ scale updated) [4 - 0.3 / (3 + 1e-8)],
+      testProperty "updateParameters passes parameters before gradients" $ H.withTests 1 $ H.property $ do
         let parameters :: Parameters T.Tensor Double
             parameters = Parameters (NN.Dense 6 12) 20
             gradients = Parameters (NN.Dense 2 4) 5

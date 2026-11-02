@@ -76,7 +76,11 @@ library
                     , Synapse.NN.Layers
                     , Synapse.NN.Layers.Convolution
                     , Synapse.NN.Layers.Dense
-                    , Synapse.NN.Optimizer
+                    , Synapse.NN.Optimizers
+                    , Synapse.NN.Optimizers.Type
+                    , Synapse.NN.Optimizers.SGD
+                    , Synapse.NN.Optimizers.Adam
+                    , Synapse.NN.Optimizers.RMSprop
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
                     , Synapse.Autograd.Type

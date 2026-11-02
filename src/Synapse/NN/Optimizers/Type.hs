@@ -13,9 +13,8 @@
 -- | Pure parameter updates with explicit optimizer state.
 -- Updates build tensor expressions without executing them.
 -- Parameters and gradients must have corresponding fields and tensor shapes.
-module Synapse.NN.Optimizer
+module Synapse.NN.Optimizers.Type
   ( Optimizer (..),
-    SGD (..),
     updateParameters,
   )
 where
@@ -72,18 +71,3 @@ updateParameters formula =
       applyUpdate (PairValues left right) = \(p1, p2) (g1, g2) ->
         (applyUpdate left p1 g1, applyUpdate right p2 g2)
    in \parameters gradients -> rebuild @T.Tensor (applyUpdate (values @(Leaves T.Tensor parameters) @c) (flatten @T.Tensor parameters) (flatten @T.Tensor gradients))
-
--- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
--- The caller supplies a finite, nonnegative learning rate.
--- Hyperparameters are used without runtime validation.
-newtype SGD = SGD
-  { -- | Step size applied to each gradient.
-    sgdLearningRate :: Double
-  }
-  deriving (Eq, Show)
-
-instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer SGD p where
-  type OptimizerState SGD p = ()
-  initialState _ _ = ()
-  optimizerStep (SGD lr) parameters gradients () =
-    (updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients, ())

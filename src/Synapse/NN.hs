@@ -19,9 +19,7 @@ module Synapse.NN
     batchSize,
     batchMask,
     module Synapse.NN.Layers,
-    Optimizer (..),
-    SGD (..),
-    updateParameters,
+    module Synapse.NN.Optimizers,
     mse,
     mae,
     huber,
@@ -70,6 +68,6 @@ import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform
 import Synapse.NN.Layers
 import Synapse.NN.Loss (binaryCrossEntropy, binaryCrossEntropyWithLogits, crossEntropy, huber, mae, mse, negativeLogLikelihood, smoothL1, smoothLabels, unsafeCrossEntropy, unsafeCrossEntropySmoothed, unsafeNegativeLogLikelihood)
 import Synapse.NN.Metrics (Averaging (..), accuracy, binaryAccuracy, binaryF1, binaryPrecision, binaryRecall, confusionMatrix, f1, f1PerClass, precision, precisionPerClass, r2, recall, recallPerClass, rmse)
-import Synapse.NN.Optimizer (Optimizer (..), SGD (..), updateParameters)
+import Synapse.NN.Optimizers
 import Synapse.NN.Weights (extractWeights, loadWeights)
 import Prelude hiding (sin, tanh)
