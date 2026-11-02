@@ -4,6 +4,7 @@ import qualified TensorTest.Backend
 import qualified TensorTest.Construction
 import qualified TensorTest.Conversion
 import qualified TensorTest.Ops
+import qualified TensorTest.Random
 import qualified TensorTest.Shapes
 import Test.Tasty (TestTree, testGroup)
 
@@ -15,5 +16,6 @@ tests =
       TensorTest.Construction.tests,
       TensorTest.Conversion.tests,
       TensorTest.Ops.tests,
+      TensorTest.Random.tests,
       TensorTest.Shapes.tests
     ]

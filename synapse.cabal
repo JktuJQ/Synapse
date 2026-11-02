@@ -107,6 +107,7 @@ library
                     , Synapse.Tensor.Shapes.Convolution
                     , Synapse.Tensor.Shapes.Window
                     , Synapse.Tensor.Type
+                    , Synapse.Tensor.Random
 
     other-modules:    Synapse.Tensor.Fields
                     , Synapse.Tensor.Ops.Primitives.Convolution
@@ -208,6 +209,7 @@ test-suite synapse-test
                     , TensorTest
                     , TensorTest.Backend
                     , TensorTest.Backend.Structure
+                    , TensorTest.Random
                     , TensorTest.Construction
                     , TensorTest.Conversion
                     , TensorTest.Compiler

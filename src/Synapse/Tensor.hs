@@ -14,7 +14,13 @@
 -- gramTotal x = T.sum (T.matmul x (T.transpose x))
 -- @
 module Synapse.Tensor
-  ( FieldPath,
+  ( Generator,
+    generatorFromSeed,
+    initializeGenerator,
+    randomWords,
+    uniform,
+    bernoulli,
+    FieldPath,
     TensorFields,
     traverseTensors,
     WithTensor,
@@ -174,6 +180,7 @@ import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
 import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Ops.Window (combinePatches1d, combinePatches2d, combinePatches3d, extractPatches1d, extractPatches2d, extractPatches3d)
+import Synapse.Tensor.Random (Generator, bernoulli, generatorFromSeed, initializeGenerator, randomWords, uniform)
 import Synapse.Tensor.Shapes (Shape, shape, shapeRank, shapeSize)
 import Synapse.Tensor.Shapes.Index (SliceAxis (..))
 import Synapse.Tensor.Type (DType, Element, Float32, Float64, FromIntegral, Tensor, TensorData, TensorElement, TensorIndex, TensorLike, WithTensor, element, fromIntegral)
