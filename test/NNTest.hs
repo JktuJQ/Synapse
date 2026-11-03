@@ -6,6 +6,7 @@ module NNTest (tests) where
 import Control.Exception (ErrorCall, evaluate, try)
 import qualified Hedgehog as H
 import qualified NNTest.Activation as Activation
+import qualified NNTest.Attention as Attention
 import qualified NNTest.Data as Data
 import qualified NNTest.Forward
 import qualified NNTest.Initialization as Initialization
@@ -13,6 +14,7 @@ import qualified NNTest.Layers as Layers
 import qualified NNTest.Metrics as Metrics
 import qualified NNTest.Network as Network
 import qualified NNTest.Optimizer as Optimizer
+import qualified NNTest.Position as Position
 import qualified NNTest.Regression as Regression
 import qualified NNTest.Weights as Weights
 import qualified Synapse.Autograd as AG
@@ -27,7 +29,7 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests = testGroup "nn" [lossTests, Weights.tests, Data.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, NNTest.Forward.tests, Optimizer.tests, Regression.tests]
+tests = testGroup "nn" [lossTests, Attention.tests, Position.tests, Weights.tests, Data.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, NNTest.Forward.tests, Optimizer.tests, Regression.tests]
 
 lossTests :: TestTree
 lossTests =
