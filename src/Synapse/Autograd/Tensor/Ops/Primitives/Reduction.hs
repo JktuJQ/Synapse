@@ -11,6 +11,8 @@ module Synapse.Autograd.Tensor.Ops.Primitives.Reduction
     sumAxes,
     mean,
     meanAxes,
+    normL1,
+    normL2,
     extremum,
     extremumAxes,
     softmax,
@@ -54,6 +56,17 @@ meanAxes :: forall xs sh a. (Axes xs, Shape sh, Shape (ReduceShape xs sh), DType
 meanAxes input output seed =
   let count = element (fromIntegral (Raw.reductionSize @xs @sh) :: a)
    in H.map (/ count) (sumAxes @xs input output seed)
+
+-- | Choose zero at the origin and otherwise multiply by the element's sign.
+normL1 :: (Shape sh, DType a, Num a, Num (TensorElement a)) => Tensor sh a -> Tensor '[] a -> Tensor '[] a -> Tensor sh a
+normL1 input _ seed = signum input * expandReduced (allAxes input) input seed
+
+-- | Normalize the input direction, choosing a zero cotangent at the origin.
+normL2 :: (Shape sh, DType a, Fractional a, Fractional (TensorElement a), E.Ord (TensorElement a)) => Tensor sh a -> Tensor '[] a -> Tensor '[] a -> Tensor sh a
+normL2 input output seed =
+  let safeNorm = E.select (output E.== 0) 1 output
+      selected = allAxes input
+   in (input / expandReduced selected input safeNorm) * expandReduced selected input seed
 
 -- | Divide an extremum's seed uniformly among all input positions tied at its value.
 extremum :: (Shape sh, DType a, Fractional a, Fractional (TensorElement a), E.Ord (TensorElement a)) => Tensor sh a -> Tensor '[] a -> Tensor '[] a -> Tensor sh a

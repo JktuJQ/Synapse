@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Backend reductions without differentiation registration.
-module Synapse.Tensor.Ops.Primitives.Reduction (sum, sumAxes, mean, meanAxes, minimum, minimumAxes, maximum, maximumAxes, argmax, argmin, all, any, allAxes, anyAxes, softmax, logSoftmax, logSumExp, logSumExpAxes, reductionSize) where
+module Synapse.Tensor.Ops.Primitives.Reduction (sum, sumAxes, mean, meanAxes, normL1, normL2, minimum, minimumAxes, maximum, maximumAxes, argmax, argmin, all, any, allAxes, anyAxes, softmax, logSoftmax, logSumExp, logSumExpAxes, reductionSize) where
 
 import qualified Data.Array.Accelerate as A
 import Data.List (foldl', partition)
@@ -145,6 +145,25 @@ mean input = map (/ element (fromIntegral (shapeSize @sh) :: a)) (sum input)
 -- | Compute selected-axis means without recording a pullback.
 meanAxes :: forall xs sh a. (Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, DType a, RealFloat a, Fractional (TensorElement a)) => Tensor sh a -> Tensor (ReduceShape xs sh) a
 meanAxes = map (/ element (fromIntegral (reductionSize @xs @sh) :: a)) . sumAxes @xs
+
+-- | Sum absolute values without recording a pullback.
+normL1 :: (Shape sh, DType a, Num (TensorElement a)) => Tensor sh a -> Tensor '[] a
+normL1 = sum . map abs
+
+-- | Scale by the largest magnitude before squaring, avoiding intermediate
+-- overflow and underflow for finite inputs. Empty inputs have a zero norm.
+normL2 ::
+  forall sh a.
+  (Shape sh, DType a, Floating (TensorElement a), Ord (TensorElement a), E.RealFloat (TensorElement a)) =>
+  Tensor sh a ->
+  Tensor '[] a
+normL2 input =
+  let peak = TensorElement $ A.the $ A.foldAll (elementOp max) (unTensorElement 0) $ unTensor $ map abs input
+      divisor = select ((peak E.== 0) || E.isInfinite peak) 1 peak
+      squares = map (\x -> let scaled = x / divisor in scaled * scaled) input
+      total = TensorElement $ A.the $ unTensor $ sum squares
+      result = select (E.isInfinite peak) peak (peak * sqrt total)
+   in Tensor $ A.unit $ unTensorElement result
 
 -- | Minimum of all elements of a statically nonempty tensor.
 -- Floating point NaN values propagate to the result.

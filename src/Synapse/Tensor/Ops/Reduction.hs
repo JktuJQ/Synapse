@@ -11,6 +11,8 @@ module Synapse.Tensor.Ops.Reduction
     sumAxes,
     mean,
     meanAxes,
+    normL1,
+    normL2,
     minimum,
     minimumAxes,
     maximum,
@@ -72,6 +74,29 @@ meanAxes ::
   t sh a ->
   t (ReduceShape xs sh) a
 meanAxes = customVJP Fractional (Raw.meanAxes @xs) (\primalInput -> let output = (Raw.meanAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.meanAxes @xs))
+
+-- | L1 vector norm over all elements: @sum (abs input)@.
+-- Returns a scalar tensor, or zero for an empty tensor.
+-- For matrix inputs this treats all entries as one vector, rather than
+-- computing an induced matrix norm.
+normL1 ::
+  forall {t} sh a.
+  (TensorOps t a, Num (TensorElement a), Shape sh) =>
+  t sh a ->
+  t '[] a
+normL1 = customVJP Numeric Raw.normL1 (\input -> let output = Raw.normL1 input in (output, (input, output))) (uncurry Pullback.normL1)
+
+-- | L2 vector norm over all elements: @sqrt (sum (input * input))@.
+-- Returns a scalar tensor, or zero for an empty tensor. For matrices this
+-- is the Frobenius norm. Finite inputs are scaled before squaring to avoid
+-- intermediate overflow and underflow. NaN values propagate.
+-- Differentiation chooses the zero subgradient at the all-zero input.
+normL2 ::
+  forall {t} sh a.
+  (TensorOps t a, Floating (TensorElement a), E.Ord (TensorElement a), E.RealFloat (TensorElement a), Shape sh) =>
+  t sh a ->
+  t '[] a
+normL2 = customVJP Fractional Raw.normL2 (\input -> let output = Raw.normL2 input in (output, (input, output))) (uncurry Pullback.normL2)
 
 -- | Minimum of all elements of a statically nonempty tensor.
 -- Floating point NaN values propagate to the result.

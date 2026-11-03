@@ -10,6 +10,7 @@ import qualified NNTest.Attention as Attention
 import qualified NNTest.Data as Data
 import qualified NNTest.Data.Execution as Execution
 import qualified NNTest.Forward
+import qualified NNTest.Gradient as Gradient
 import qualified NNTest.Initialization as Initialization
 import qualified NNTest.Layers as Layers
 import qualified NNTest.Metrics as Metrics
@@ -30,7 +31,7 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests = testGroup "nn" [lossTests, Attention.tests, Position.tests, Weights.tests, Data.tests, Execution.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, NNTest.Forward.tests, Optimizer.tests, Regression.tests]
+tests = testGroup "nn" [lossTests, Attention.tests, Position.tests, Weights.tests, Data.tests, Execution.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, NNTest.Forward.tests, Gradient.tests, Optimizer.tests, Regression.tests]
 
 lossTests :: TestTree
 lossTests =

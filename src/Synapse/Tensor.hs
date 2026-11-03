@@ -122,6 +122,8 @@ module Synapse.Tensor
     sumAxes,
     mean,
     meanAxes,
+    normL1,
+    normL2,
     minimum,
     minimumAxes,
     maximum,
@@ -179,7 +181,7 @@ import Synapse.Tensor.Ops.Convolution (avgPool1d, avgPool2d, avgPool3d, conv1d, 
 import Synapse.Tensor.Ops.Elementwise (Boolean, Conditional, Eq, Integral, Ord, RealFloat, cond, isInfinite, isNaN, max, min, not, quot, rem, select, (&&), (/=), (<), (<=), (==), (>), (>=), (||))
 import Synapse.Tensor.Ops.Index (Indexable, coordinate, dynamicIndexOr, gatherOr, index, slice, unsafeDynamicIndex, unsafeGather, unsafeLookupRows, (!!))
 import Synapse.Tensor.Ops.Math (dot, matmul)
-import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, softmax, sum, sumAxes)
+import Synapse.Tensor.Ops.Reduction (all, allAxes, any, anyAxes, argmax, argmin, logSoftmax, logSumExp, logSumExpAxes, maximum, maximumAxes, mean, meanAxes, minimum, minimumAxes, normL1, normL2, softmax, sum, sumAxes)
 import Synapse.Tensor.Ops.Sequence (mapAccum)
 import Synapse.Tensor.Ops.Shape (broadcast, concat, permuteAxes, reshape, squeeze, stack, transpose, unsqueeze)
 import Synapse.Tensor.Ops.Window (combinePatches1d, combinePatches2d, combinePatches3d, extractPatches1d, extractPatches2d, extractPatches3d)

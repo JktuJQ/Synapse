@@ -81,7 +81,8 @@ trainingStep parameters optimizerState features targets =
                in NN.mse T.mean predictions $ AG.constant targets
           )
           parameters
-      (updated, nextOptimizer) = NN.runState (NN.optimizerStep optimizer parameters gradients) optimizerState
+      clipped = NN.clipGradNormL2 1 gradients
+      (updated, nextOptimizer) = NN.runState (NN.optimizerStep optimizer parameters clipped) optimizerState
    in (loss, (updated, nextOptimizer))
 
 main :: IO ()

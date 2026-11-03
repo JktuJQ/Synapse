@@ -35,6 +35,10 @@ module Synapse.NN
     batchMask,
     module Synapse.NN.Layers,
     module Synapse.NN.Optimizers,
+    gradientNormL1,
+    gradientNormL2,
+    clipGradNormL1,
+    clipGradNormL2,
     mse,
     mae,
     huber,
@@ -81,6 +85,7 @@ import Synapse.NN.Activation (leakyRelu, relu, sigmoid, sin, softplus, tanh)
 import Synapse.NN.Data (Batch (..), BatchPlan, Dataset (..), LastBatch (..), SomeBatch (..), batchLoads, batchMask, batchPlan, batchSize, batchSizes, getSample, loadBatches, planBatches, shuffle, withBatch)
 import Synapse.NN.Data.Execution (PreparedStep, UnexpectedSize (..), prepareBatchStep, runBatch)
 import Synapse.NN.Forward (Forward (..), ForwardMode (..), State, evalState, runState, stateful)
+import Synapse.NN.Gradient (clipGradNormL1, clipGradNormL2, gradientNormL1, gradientNormL2)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Layers
 import Synapse.NN.Loss (binaryCrossEntropy, binaryCrossEntropyWithLogits, crossEntropy, huber, mae, mse, negativeLogLikelihood, smoothL1, smoothLabels, unsafeCrossEntropy, unsafeCrossEntropySmoothed, unsafeNegativeLogLikelihood)

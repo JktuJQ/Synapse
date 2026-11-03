@@ -71,6 +71,7 @@ library
                     , Synapse.NN.Weights
                     , Synapse.NN.Data
                     , Synapse.NN.Data.Execution
+                    , Synapse.NN.Gradient
                     , Synapse.NN.Loss
                     , Synapse.NN.Activation
                     , Synapse.NN.Layers.Position
@@ -247,6 +248,7 @@ test-suite synapse-test
                     , NNTest.Weights.Public
                     , NNTest.Data
                     , NNTest.Data.Execution
+                    , NNTest.Gradient
                     , NNTest.Activation
                     , NNTest.Attention
                     , NNTest.Position
