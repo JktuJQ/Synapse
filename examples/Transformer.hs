@@ -48,14 +48,12 @@ rotaryAttention parameters = proc input -> do
   projectedQ <- NN.dense (NN.attentionQuery parameters) -< input
   projectedK <- NN.dense (NN.attentionKey parameters) -< input
   projectedV <- NN.dense (NN.attentionValue parameters) -< input
-  let splitHeads = T.permuteAxes @'[0, 2, 1, 3] . T.reshape @'[batch_size, 6, 2, 4]
-      query = NN.rope 10000 0 $ splitHeads projectedQ
-      key = NN.rope 10000 0 $ splitHeads projectedK
-      value = splitHeads projectedV
+  let query = NN.rope 10000 0 $ NN.splitHeads @2 projectedQ
+      key = NN.rope 10000 0 $ NN.splitHeads @2 projectedK
+      value = NN.splitHeads @2 projectedV
       mask = T.broadcast $ NN.causalMask @6 @6
       attended = NN.attention (Just mask) query key value
-      joined = T.reshape @'[batch_size, 6, 8] $ T.permuteAxes @'[0, 2, 1, 3] attended
-  NN.dense (NN.attentionOutput parameters) -< joined
+  NN.dense (NN.attentionOutput parameters) -< NN.mergeHeads attended
 
 predict ::
   ( KnownNat batch_size,

@@ -8,7 +8,7 @@
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Scaled dot-product and multi-head attention, with boolean attention masks.
-module Synapse.NN.Layers.Attention (attention, causalMask, paddingMask, MultiHeadAttention (..), multiHeadAttention) where
+module Synapse.NN.Layers.Attention (attention, causalMask, paddingMask, splitHeads, mergeHeads, MultiHeadAttention (..), multiHeadAttention) where
 
 import Control.Arrow (Arrow, arr)
 import Data.Proxy (Proxy (..))
@@ -32,6 +32,48 @@ causalMask = T.fromGen $ \ix -> T.coordinate @1 ix T.<= T.coordinate @0 ix
 -- using @T.&&@ when both restrictions apply.
 paddingMask :: (KnownNat batch, KnownNat keys) => T.Tensor '[batch, keys] Bool -> T.Tensor '[batch, 1, 1, keys] Bool
 paddingMask = T.reshape
+
+-- | Split batch-first feature vectors into attention heads.
+-- Maps @'[batch, time, features]@ to
+-- @'[batch, heads, time, Div features heads]@, preserving feature order
+-- within each head. The number of heads must be positive and divide the
+-- feature width exactly; both conditions are checked at compile time.
+--
+-- @
+-- let query = NN.splitHeads \@2 $ NN.dense queryProjection input
+-- @
+splitHeads ::
+  forall heads {t} batch time features a.
+  ( KnownNat batch,
+    KnownNat heads,
+    KnownNat time,
+    KnownNat features,
+    KnownNat (Div features heads),
+    1 <= heads,
+    features ~ (heads * Div features heads),
+    T.TensorOps t a
+  ) =>
+  t '[batch, time, features] a ->
+  t '[batch, heads, time, Div features heads] a
+splitHeads = T.permuteAxes @'[0, 2, 1, 3] . T.reshape @'[batch, time, heads, Div features heads]
+
+-- | Concatenate attention heads back into batch-first feature vectors.
+-- Maps @'[batch, heads, time, depth]@ to @'[batch, time, heads * depth]@.
+-- This is the inverse of 'splitHeads'; no type arguments are needed when
+-- the input shape is known. Both operations support tensor differentiation.
+mergeHeads ::
+  forall {t} batch heads time depth a.
+  ( KnownNat batch,
+    KnownNat heads,
+    KnownNat time,
+    KnownNat depth,
+    KnownNat (heads * depth),
+    1 <= heads,
+    T.TensorOps t a
+  ) =>
+  t '[batch, heads, time, depth] a ->
+  t '[batch, time, heads * depth] a
+mergeHeads = T.reshape @'[batch, time, heads * depth] . T.permuteAxes @'[0, 2, 1, 3]
 
 -- | Normalize finite scores over allowed keys. Empty rows have zero weights
 -- and zero cotangents, without introducing an undefined softmax intermediate.
@@ -163,9 +205,8 @@ multiHeadAttention ::
     (t '[batch, queries, features] a, t '[batch, keys, features] a, t '[batch, keys, features] a)
     (t '[batch, queries, features] a)
 multiHeadAttention parameters mask = arr $ \(query, key, value) ->
-  let q = T.permuteAxes @'[0, 2, 1, 3] $ T.reshape @'[batch, queries, heads, Div features heads] $ dense (attentionQuery parameters) query
-      k = T.permuteAxes @'[0, 2, 1, 3] $ T.reshape @'[batch, keys, heads, Div features heads] $ dense (attentionKey parameters) key
-      v = T.permuteAxes @'[0, 2, 1, 3] $ T.reshape @'[batch, keys, heads, Div features heads] $ dense (attentionValue parameters) value
+  let q = splitHeads @heads $ dense (attentionQuery parameters) query
+      k = splitHeads @heads $ dense (attentionKey parameters) key
+      v = splitHeads @heads $ dense (attentionValue parameters) value
       attended = attention mask q k v
-      combined = T.reshape @'[batch, queries, features] $ T.permuteAxes @'[0, 2, 1, 3] attended
-   in dense (attentionOutput parameters) combined
+   in dense (attentionOutput parameters) $ mergeHeads attended

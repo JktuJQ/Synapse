@@ -80,7 +80,25 @@ tests :: TestTree
 tests =
   testGroup
     "attention"
-    [ testProperty "scaled dot product agrees with an independent rectangular reference" $ H.withTests 1 $ H.property $ do
+    [ testProperty "head splitting and merging preserve batch, token and feature order" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[2, 3, 4] [1 .. 24 :: Double]
+            grouped = NN.splitHeads @2 input
+        values grouped H.=== [1, 2, 5, 6, 9, 10, 3, 4, 7, 8, 11, 12, 13, 14, 17, 18, 21, 22, 15, 16, 19, 20, 23, 24]
+        values (NN.mergeHeads grouped) H.=== values input
+        values (NN.splitHeads @2 $ NN.mergeHeads grouped) H.=== values grouped,
+      testProperty "split and merge pullbacks reorder nonuniform seeds correctly" $ H.withTests 1 $ H.property $ do
+        let (_, splitBackward) = AG.pullback (NN.splitHeads @2) $ T.zeros @'[2, 3, 4] @Double
+            (_, mergeBackward) = AG.pullback NN.mergeHeads $ T.zeros @'[2, 2, 3, 2] @Double
+        values (splitBackward $ T.fromList [1 .. 24]) H.=== [1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12, 13, 14, 19, 20, 15, 16, 21, 22, 17, 18, 23, 24]
+        values (mergeBackward $ T.fromList [1 .. 24]) H.=== [1, 2, 5, 6, 9, 10, 3, 4, 7, 8, 11, 12, 13, 14, 17, 18, 21, 22, 15, 16, 19, 20, 23, 24],
+      testProperty "head reshaping supports single heads, empty axes and integral elements" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[1, 2, 3] [1 .. 6 :: Int]
+        T.toList (T.run T.CPU $ NN.splitHeads @1 input) H.=== [1 .. 6]
+        T.toList (T.run T.CPU $ NN.mergeHeads $ NN.splitHeads @3 input) H.=== [1 .. 6]
+        values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[0, 3, 4] @Double) H.=== []
+        values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[2, 0, 4] @Double) H.=== []
+        values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[2, 3, 0] @Double) H.=== [],
+      testProperty "scaled dot product agrees with an independent rectangular reference" $ H.withTests 1 $ H.property $ do
         let q = [0.2, -0.4, 0.7, 0.3]
             k = [0.5, 0.6, -0.2, 0.1, 0.3, -0.7]
             v = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -201,7 +219,14 @@ tests =
         H.assert $ sum (T.toList lastLoss) < sum (T.toList firstLoss) / 10,
       testGroup
         "shape checks"
-        [ testProperty name $ H.withTests 1 $ Compiler.rejects ("test/NNTest/Fixtures/Rejected/" ++ name ++ ".hs") "Couldn't match type"
-          | name <- ["AttentionHeads", "AttentionDepth", "AttentionKeys"]
+        [ testProperty name $ H.withTests 1 $ Compiler.rejects ("test/NNTest/Fixtures/Rejected/" ++ name ++ ".hs") diagnostic
+          | (name, diagnostic) <-
+              [ ("AttentionHeads", "Couldn't match type"),
+                ("AttentionDepth", "Couldn't match type"),
+                ("AttentionKeys", "Couldn't match type"),
+                ("SplitHeadsUneven", "Couldn't match type"),
+                ("SplitHeadsZero", "1 <= 0"),
+                ("MergeHeadsShape", "Couldn't match type")
+              ]
         ]
     ]
