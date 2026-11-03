@@ -41,7 +41,7 @@ tests =
         values (AG.gradient (NN.dropoutWithMask NN.Train 1 undefined) x) H.=== [0, 0],
       testProperty "prepared dropout samples a fresh mask from each returned state" $ H.withTests 1 $ H.property $ do
         let (initial, _) = NN.initializeDropout $ mkStdGen 42
-            execute = T.run2 T.CPU $ \running features -> NN.dropout NN.Train 0.5 running (features :: T.Tensor '[64] Double)
+            execute = T.run2 T.CPU $ \running features -> NN.runState (NN.dropout NN.Train 0.5 (features :: T.Tensor '[64] Double)) running
             input = T.fromListData @'[64] $ replicate 64 1
             state = T.run T.CPU initial
             (first, next) = execute state input
@@ -54,7 +54,7 @@ tests =
         let state = NN.DropoutState $ T.generatorFromSeed 123
             ((output, next), gradients) =
               AG.backprop
-                (\input -> let (result, updated) = NN.dropout NN.Train 0.5 state input in (result, AG.constant updated))
+                (\input -> let (result, updated) = NN.runState (NN.dropout NN.Train 0.5 input) state in (result, AG.constant updated))
                 (T.fromList @'[4] [1, 2, 3, 4 :: Double])
             (mask, expectedState) = T.bernoulli @'[4] 0.5 $ NN.dropoutGenerator state
             (actualNext, _) = T.randomWords @'[4] $ NN.dropoutGenerator next
@@ -67,22 +67,22 @@ tests =
         let state = NN.DropoutState $ T.generatorFromSeed 42
             input = T.fromList @'[2] [2, 4 :: Double]
             (expected, _) = T.randomWords @'[4] $ NN.dropoutGenerator state
-        values (fst $ NN.dropout NN.Eval undefined undefined input) H.=== [2, 4]
-        values (fst $ NN.dropout NN.Train 0 undefined input) H.=== [2, 4]
-        values (fst $ NN.dropout NN.Train 1 undefined input) H.=== [0, 0]
+        values (NN.evalState (NN.dropout NN.Eval undefined input) undefined) H.=== [2, 4]
+        values (NN.evalState (NN.dropout NN.Train 0 input) undefined) H.=== [2, 4]
+        values (NN.evalState (NN.dropout NN.Train 1 input) undefined) H.=== [0, 0]
         mapM_
           ( \(mode, probability) -> do
-              let (_, next) = NN.dropout mode probability state input
+              let (_, next) = NN.runState (NN.dropout mode probability input) state
                   (actual, _) = T.randomWords @'[4] $ NN.dropoutGenerator next
               T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
           )
           [(NN.Eval, 0.5), (NN.Train, 0), (NN.Train, 1)],
       testProperty "empty dropout does not advance the generator and supports Float" $ H.withTests 1 $ H.property $ do
         let state = NN.DropoutState $ T.generatorFromSeed 42
-            (empty, next) = NN.dropout NN.Train 0.5 state (T.zeros @'[0, 2] @Float)
+            (empty, next) = NN.runState (NN.dropout NN.Train 0.5 $ T.zeros @'[0, 2] @Float) state
             (actual, _) = T.randomWords @'[4] $ NN.dropoutGenerator next
             (expected, _) = T.randomWords @'[4] $ NN.dropoutGenerator state
-            (output, _) = NN.dropout NN.Train 0.5 state (T.ones @'[16] @Float)
+            (output, _) = NN.runState (NN.dropout NN.Train 0.5 $ T.ones @'[16] @Float) state
         T.toList (T.run T.CPU empty) H.=== []
         T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
         H.assert $ all (`elem` [0, 2]) $ T.toList $ T.run T.CPU output

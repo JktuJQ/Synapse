@@ -13,7 +13,7 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
 import Synapse.NN.Activation (softplus)
-import Synapse.Tensor.Ops (TensorOps (lift1, lift2))
+import Synapse.Tensor.Ops (Needs (Fractional), TensorOps (customVJP))
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
@@ -125,7 +125,7 @@ binaryCrossEntropy ::
   t sh a ->
   t sh a ->
   t out_sh a
-binaryCrossEntropy reduce probabilities targets = reduce $ lift2 forward backward probabilities targets
+binaryCrossEntropy reduce probabilities targets = reduce $ (curry $ customVJP Fractional (uncurry forward) (\(left, right) -> let output = forward left right in (output, ((left, right), output))) (\((left, right), output) -> backward left right output)) probabilities targets
   where
     forward :: Tensor sh a -> Tensor sh a -> Tensor sh a
     forward p y = negate (y * E.max (log p) (-100) + (1 - y) * E.max (log (1 - p)) (-100))
@@ -206,7 +206,7 @@ unsafeNegativeLogLikelihood ::
   Tensor (RemoveAxis axis sh) Int ->
   t out_sh a
 unsafeNegativeLogLikelihood reduce logProbabilities targets =
-  reduce (negate (lift1 (\input -> Raw.unsafeGatherReduced @axis input targets) (Pullback.gatherReduced @axis targets) logProbabilities))
+  reduce (negate (customVJP Fractional (\input -> Raw.unsafeGatherReduced @axis input targets) (\primalInput -> let output = (\input -> Raw.unsafeGatherReduced @axis input targets) primalInput in (output, (primalInput, output))) (uncurry (Pullback.gatherReduced @axis targets)) logProbabilities))
 
 -- | Multiclass cross entropy from logits and unchecked integer class labels.
 -- For logits @'[batch, classes]@, targets have shape @'[batch]@ and the class axis is @1@.

@@ -1,27 +1,55 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
--- | Lift tensor computations while preserving the behavior of their representation.
--- Ordinary tensors evaluate only the forward function.
--- Differentiable tensors register the supplied pullback without executing it during the forward pass.
-module Synapse.Tensor.Ops (TensorOps (..)) where
+-- | Primitive tensor computations with custom reverse-mode derivatives.
+module Synapse.Tensor.Ops (TensorOps (..), Needs (..), Compatible, CompatibleInput) where
 
 import qualified Data.Array.Accelerate as A
-import Synapse.Tensor.Shapes.Dimensions (Shape)
+import Data.Kind (Constraint)
+import Synapse.Tensor.Fields (Flatten (..), Leaves)
+import Synapse.Tensor.Ops.Structure
 import Synapse.Tensor.Type (DType)
 import qualified Synapse.Tensor.Type as T
 
--- | Tensor representations supporting primitive computations and gradient rules.
--- The first function computes the result; the second receives the original inputs, the forward result, and an output gradient.
--- Its result contains one input gradient per argument, in argument order and with the original input shapes.
--- Fractional dictionaries are supplied to pullbacks only when gradients are recorded.
--- Ordinary tensors also support integral and boolean elements; recording gradients requires fractional elements.
--- Inputs share an element type; the result may use a different element type.
--- Shape evidence is required only for the inputs whose gradient contributions may be accumulated.
+-- | Capabilities required by a primitive's reverse rule.
+-- Requests do not impose these constraints on ordinary tensor evaluation.
+-- Differentiable tensor representations supply numeric and fractional dictionaries;
+-- 'Given' carries additional evidence already available at the definition site.
+data Needs a (c :: Constraint) where
+  -- | Numeric tensor arithmetic.
+  Numeric :: Needs a (Num a, Num (T.TensorElement a))
+  -- | Tensor arithmetic including division.
+  Fractional :: Needs a (Fractional a, Fractional (T.TensorElement a))
+  -- | An additional constraint supplied by the operation author.
+  Given :: (c) => Needs a c
+  -- | Combine two capability requests.
+  And :: Needs a c -> Needs a d -> Needs a (c, d)
+
+-- | Tensor-only input and output structures accepted by 'customVJP'.
+-- Resolved automatically for individual tensors, tuples, and generic records
+-- with a 'T.WithTensor' correspondence. Inputs share the operation's element
+-- type. Multiple outputs use that same element type; a single tensor result
+-- may use another element type.
+type Compatible t a input output = (CompatibleInput t a input, View t output, ResultType a (Leaves T.Tensor output))
+
+-- | Tensor input structures accepted by primitive computations.
+-- Resolved automatically for tensors, tuples, and generic tensor records.
+type CompatibleInput t a input = (View t input, InputType a (Leaves T.Tensor input))
+
+-- | Representations supporting tensor primitives. Ordinary tensors evaluate only
+-- the ordinary forward function. Differentiable representations use the cached
+-- forward function and register its pullback.
 class (DType a) => TensorOps (t :: T.TensorLike) a where
   -- | Embed a staged value without recording any incoming gradient edges.
   literal :: T.Tensor sh a -> t sh a
@@ -32,134 +60,55 @@ class (DType a) => TensorOps (t :: T.TensorLike) a where
   -- | Convert an element expression into a scalar tensor, preserving its history.
   fromElement :: T.Element t a -> t '[] a
 
-  -- | Lift an element-valued computation without introducing an intermediate scalar tensor.
-  -- Element expressions can depend on coordinates local to a generator.
-  liftElement ::
-    (Shape sh) =>
-    (T.Tensor sh a -> T.TensorElement b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh a -> T.TensorElement b -> T.TensorElement b -> T.Tensor sh a) ->
-    t sh a ->
+  -- | Define an element-valued primitive with a private cache and custom pullback.
+  -- Input registration and capability requests follow 'customVJP'. The result
+  -- remains an element expression, so it may depend on coordinates local to a
+  -- generator without introducing an intermediate scalar tensor.
+  -- The pullback receives an element cotangent and returns one tensor cotangent
+  -- per input leaf. The cache is used only during differentiation, and the two
+  -- forward functions must compute equivalent element expressions.
+  customElementVJP ::
+    (CompatibleInput t a input) =>
+    Needs a c ->
+    (input -> T.TensorElement b) ->
+    (input -> (T.TensorElement b, cache)) ->
+    ((c) => cache -> T.TensorElement b -> input) ->
+    T.WithTensor t input ->
     T.Element t b
 
-  -- | Lift a unary computation and its pullback.
-  lift1 ::
-    (Shape sh1) =>
-    (T.Tensor sh1 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor out b -> T.Tensor out b -> T.Tensor sh1 a) ->
-    t sh1 a ->
-    t out b
+  -- | Define a primitive over tensor products or generic tensor records.
+  -- The two forward functions must return equivalent results. The cached path
+  -- may retain arbitrary private values for the pullback; these are not inputs
+  -- to differentiation. The pullback receives output cotangents and returns
+  -- input cotangents with the same structure and shapes as the original inputs.
+  -- All differentiable dependencies must be explicit inputs, not captured variables.
+  -- 'Needs' requests dictionaries available during the reverse pass without
+  -- imposing them on ordinary tensor callers. Input leaves share the class's
+  -- element type. Multiple output leaves use that same element type; a single
+  -- tensor output may have another element type.
+  --
+  -- @
+  -- square :: TensorOps t Double => t '[3] Double -> t '[3] Double
+  -- square = customVJP Numeric (\x -> x * x)
+  --   (\x -> (x * x, x))
+  --   (\x seed -> 2 * x * seed)
+  -- @
+  customVJP ::
+    forall input output cache c.
+    (Compatible t a input output) =>
+    Needs a c ->
+    (input -> output) ->
+    (input -> (output, cache)) ->
+    ((c) => cache -> output -> input) ->
+    T.WithTensor t input ->
+    T.WithTensor t output
 
-  -- | Lift a 2-input computation and its pullback.
-  lift2 ::
-    (Shape sh1, Shape sh2) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t out b
-
-  -- | Lift a 3-input computation and its pullback.
-  lift3 ::
-    (Shape sh1, Shape sh2, Shape sh3) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t out b
-
-  -- | Lift a 4-input computation and its pullback.
-  lift4 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t out b
-
-  -- | Lift a 5-input computation and its pullback.
-  lift5 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a, T.Tensor sh5 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t sh5 a ->
-    t out b
-
-  -- | Lift a 6-input computation and its pullback.
-  lift6 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a, T.Tensor sh5 a, T.Tensor sh6 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t sh5 a ->
-    t sh6 a ->
-    t out b
-
-  -- | Lift a 7-input computation and its pullback.
-  lift7 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a, T.Tensor sh5 a, T.Tensor sh6 a, T.Tensor sh7 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t sh5 a ->
-    t sh6 a ->
-    t sh7 a ->
-    t out b
-
-  -- | Lift a 8-input computation and its pullback.
-  lift8 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7, Shape sh8) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor sh8 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor sh8 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a, T.Tensor sh5 a, T.Tensor sh6 a, T.Tensor sh7 a, T.Tensor sh8 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t sh5 a ->
-    t sh6 a ->
-    t sh7 a ->
-    t sh8 a ->
-    t out b
-
-  -- | Lift a 9-input computation and its pullback.
-  lift9 ::
-    (Shape sh1, Shape sh2, Shape sh3, Shape sh4, Shape sh5, Shape sh6, Shape sh7, Shape sh8, Shape sh9) =>
-    (T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor sh8 a -> T.Tensor sh9 a -> T.Tensor out b) ->
-    ((Fractional a, Fractional (T.TensorElement a)) => T.Tensor sh1 a -> T.Tensor sh2 a -> T.Tensor sh3 a -> T.Tensor sh4 a -> T.Tensor sh5 a -> T.Tensor sh6 a -> T.Tensor sh7 a -> T.Tensor sh8 a -> T.Tensor sh9 a -> T.Tensor out b -> T.Tensor out b -> (T.Tensor sh1 a, T.Tensor sh2 a, T.Tensor sh3 a, T.Tensor sh4 a, T.Tensor sh5 a, T.Tensor sh6 a, T.Tensor sh7 a, T.Tensor sh8 a, T.Tensor sh9 a)) ->
-    t sh1 a ->
-    t sh2 a ->
-    t sh3 a ->
-    t sh4 a ->
-    t sh5 a ->
-    t sh6 a ->
-    t sh7 a ->
-    t sh8 a ->
-    t sh9 a ->
-    t out b
-
-instance (DType a) => TensorOps T.Tensor a where
+instance (T.DType a) => TensorOps T.Tensor a where
   literal = id
   primal = id
   fromElement (T.TensorElement x) = T.Tensor (A.unit x)
-  liftElement forward _ = forward
-  lift1 forward _ = forward
-  lift2 forward _ = forward
-  lift3 forward _ = forward
-  lift4 forward _ = forward
-  lift5 forward _ = forward
-  lift6 forward _ = forward
-  lift7 forward _ = forward
-  lift8 forward _ = forward
-  lift9 forward _ = forward
+  customElementVJP _ forward _ _ input =
+    forward $ rebuild @T.Tensor $ readInputs (inputTree @a) $ flatten @T.Tensor input
+  customVJP _ forward _ _ input =
+    let original = rebuild @T.Tensor $ readInputs (inputTree @a) $ flatten @T.Tensor input
+     in rebuild @T.Tensor $ writeResults (resultTree @a) $ flatten @T.Tensor $ forward original

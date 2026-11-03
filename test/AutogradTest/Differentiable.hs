@@ -60,6 +60,7 @@ tests =
         map T.toList (components output) H.=== map (: []) [1 .. 12],
       testProperty "ordinary numbers are not differentiable leaves" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "Number.hs") "Double",
       testProperty "element expressions are not differentiable leaves" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "Element.hs") "TensorElement",
+      testProperty "numeric pullbacks cannot request division implicitly" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "NumericPullbackDivision.hs") "Fractional",
       testProperty "integer tensor arithmetic requires fractional gradient elements" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "IntegerArithmetic.hs") "Fractional",
       testProperty "integer tensor reshaping requires fractional gradient elements" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "IntegerReshape.hs") "Fractional",
       testProperty "argmax has no differentiable result" $ H.withTests 1 $ Compiler.rejects (fixtures ++ "ArgmaxGradient.hs") "Couldn't match type",

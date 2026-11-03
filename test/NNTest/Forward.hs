@@ -11,6 +11,7 @@
 module NNTest.Forward (tests) where
 
 import Control.Arrow (Arrow, arr, left, (&&&), (>>>))
+import Control.Monad.Trans.State.Strict (get, modify', put, state)
 import GHC.Generics (Generic)
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
@@ -56,7 +57,7 @@ predict ::
     E.Conditional (t '[2, 2] Double),
     E.Condition (t '[2, 2] Double) ~ T.Tensor '[2, 2] Bool
   ) =>
-  NN.ExecutionMode ->
+  NN.ForwardMode ->
   Parameters t ->
   NN.Forward (NetworkState T.Tensor) (t '[2, 2] Double) (t '[2, 1] Double)
 predict mode parameters = proc input -> do
@@ -84,30 +85,58 @@ tests =
     "forward"
     [ testProperty "ordinary arrows preserve state and compose without adapters" $ H.withTests 1 $ H.property $ do
         let pipeline = arr (+ 1) >>> arr (* 2) :: NN.Forward Int Int Int
-        NN.forward pipeline 3 17 H.=== (8, 17),
+        NN.runState (NN.forward pipeline 3) 17 H.=== (8, 17),
+      testProperty "Forward lifts State actions and composes with ordinary do notation" $ H.withTests 1 $ H.property $ do
+        let operation input = do
+              previous <- get
+              put $ previous + input
+              pure $ previous * input
+            pipeline = NN.Forward operation >>> arr (+ 1)
+            action = do
+              first <- NN.forward pipeline (3 :: Int)
+              modify' (+ 10)
+              second <- NN.forward pipeline 2
+              pure (first, second)
+        NN.runState action 2 H.=== ((7, 31), 17)
+        NN.evalState action 2 H.=== (7, 31),
+      testProperty "State carried through Forward preserves differentiation across repeated steps" $ H.withTests 1 $ H.property $ do
+        let input = T.full @'[] (2 :: Double)
+            result =
+              AG.gradient
+                ( \weight ->
+                    let step x = do
+                          previous <- get
+                          let next = previous * weight + x
+                          put next
+                          pure next
+                        pipeline = NN.Forward step
+                     in NN.evalState (NN.forward pipeline 1 >> NN.forward pipeline 1) 1
+                )
+                input
+        approxList (T.toList $ T.run T.CPU result) [5],
       testProperty "stateful lenses update only the selected field" $ H.withTests 1 $ H.property $ do
-        let operation previous input = (previous + input, previous + 1)
+        let operation input = state $ \previous -> (previous + input, previous + 1)
             pipeline = NN.stateful firstLens operation
-        NN.forward pipeline (3 :: Int) (2, True) H.=== (5, (3, True)),
+        NN.runState (NN.forward pipeline (3 :: Int)) (2, True) H.=== (5, (3, True)),
       testProperty "branches share updated state in left-to-right order" $ H.withTests 1 $ H.property $ do
-        let operation previous input = (previous + input, previous + 1)
+        let operation input = state $ \previous -> (previous + input, previous + 1)
             branch = NN.stateful firstLens operation
-        NN.forward (branch &&& branch) (10 :: Int) (0, True) H.=== ((10, 11), (2, True)),
+        NN.runState (NN.forward (branch &&& branch) (10 :: Int)) (0, True) H.=== ((10, 11), (2, True)),
       testProperty "ArrowChoice updates only the selected branch" $ H.withTests 1 $ H.property $ do
-        let operation previous input = (previous + input, previous + 1)
+        let operation input = state $ \previous -> (previous + input, previous + 1)
             pipeline = left (NN.stateful firstLens operation) :: NN.Forward (Int, Bool) (Either Int Int) (Either Int Int)
-        NN.forward pipeline (Right 7) (0, True) H.=== (Right 7, (0, True))
-        NN.forward pipeline (Left 7) (0, True) H.=== (Left 7, (1, True)),
+        NN.runState (NN.forward pipeline (Right 7)) (0, True) H.=== (Right 7, (0, True))
+        NN.runState (NN.forward pipeline (Left 7)) (0, True) H.=== (Left 7, (1, True)),
       testProperty "one stateless definition works as a function and a stateful arrow" $ H.withTests 1 $ H.property $ do
         let parameters = NN.Dense (T.fromList @'[2, 1] [1, 2 :: Double]) 0
             input = T.fromList @'[2] [1, 2 :: Double]
             ordinary = stateless parameters input
-            (statefulOutput, state) = NN.forward (stateless parameters) input True
-        state H.=== True
+            (statefulOutput, nextState) = NN.runState (NN.forward (stateless parameters) input) True
+        nextState H.=== True
         T.toList (T.run T.CPU ordinary) H.=== T.toList (T.run T.CPU statefulOutput),
       testProperty "prepared training threads model state outside the differentiation tape" $ H.withTests 1 $ H.property $ do
         let execute = T.run3 T.CPU $ \parametersInput runningInput featuresInput ->
-              AG.backprop (\p -> let (result, next) = NN.forward (predict NN.Train p) (AG.constant featuresInput) runningInput in (T.sum $ result * result, AG.constant next)) parametersInput
+              AG.backprop (\p -> let (result, next) = NN.runState (NN.forward (predict NN.Train p) $ AG.constant featuresInput) runningInput in (T.sum $ result * result, AG.constant next)) parametersInput
             parameters = T.run T.CPU initialParameters
             running = T.run T.CPU initialNetworkState
             features = T.fromListData @'[2, 2] [1, 2, 3, 5 :: Double]
@@ -120,7 +149,7 @@ tests =
         H.assert $ any (/= 0) $ T.toList $ NN.denseWeights $ output gradients,
       testProperty "evaluation preserves all state while accepting the same model" $ H.withTests 1 $ H.property $ do
         let input = T.fromList @'[2, 2] [1, 2, 3, 5 :: Double]
-            (_, next) = NN.forward (predict NN.Eval initialParameters) input initialNetworkState
+            (_, next) = NN.runState (NN.forward (predict NN.Eval initialParameters) input) initialNetworkState
             (actual, _) = T.randomWords @'[4] $ NN.dropoutGenerator $ randomness next
             (expected, _) = T.randomWords @'[4] $ NN.dropoutGenerator $ randomness initialNetworkState
         T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
@@ -130,7 +159,7 @@ tests =
             execute = T.run4 T.CPU $ \parametersInput runningInput optimizerInput featuresInput ->
               let ((loss, nextModel), gradients) =
                     AG.backprop
-                      (\p -> let (result, next) = NN.forward (predict NN.Train p) (AG.constant featuresInput) runningInput in (T.sum $ result * result, AG.constant next))
+                      (\p -> let (result, next) = NN.runState (NN.forward (predict NN.Train p) $ AG.constant featuresInput) runningInput in (T.sum $ result * result, AG.constant next))
                       parametersInput
                   (updated, nextOptimizer) = NN.runState (NN.optimizerStep optimizer parametersInput gradients) optimizerInput
                in (loss, (updated, (nextModel, nextOptimizer)))
@@ -144,9 +173,9 @@ tests =
         T.toList (marker secondModel) H.=== [17]
         H.assert $ T.toList (NN.denseWeights $ output firstParameters) /= T.toList (NN.denseWeights $ output parameters),
       testProperty "composed lenses focus nested state using ordinary composition" $ H.withTests 1 $ H.property $ do
-        let operation previous input = (previous + input, previous + 1)
+        let operation input = state $ \previous -> (previous + input, previous + 1)
             pipeline = NN.stateful (firstLens . firstLens) operation
-        NN.forward pipeline (3 :: Int) ((2, True), 'x') H.=== (5, ((3, True), 'x')),
+        NN.runState (NN.forward pipeline (3 :: Int)) ((2, True), 'x') H.=== (5, ((3, True), 'x')),
       testProperty "optimizer State actions compose multiple updates in do notation" $ H.withTests 1 $ H.property $ do
         let optimizer = NN.Adam 0.1 0.9 0.999 1e-8
             parameters = T.full @'[] (5 :: Double)

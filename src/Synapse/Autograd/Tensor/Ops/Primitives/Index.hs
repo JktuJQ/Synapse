@@ -20,22 +20,22 @@ import Synapse.Tensor.Type (DType)
 import qualified Synapse.Tensor.Type as T
 
 -- | Scatter a scalar seed to one statically selected input element.
-index :: forall ix sh a proxy. (Index ix, Shape sh, DType a, Num (T.TensorElement a)) => proxy ix -> T.Tensor sh a -> T.TensorElement a -> T.TensorElement a -> T.Tensor sh a
-index _ reference@(T.Tensor input) _ (T.TensorElement gradient) =
+index :: forall ix sh a proxy. (Index ix, Shape sh, DType a, Num (T.TensorElement a)) => proxy ix -> T.Tensor sh a -> T.TensorElement a -> T.Tensor sh a
+index _ reference@(T.Tensor input) (T.TensorElement gradient) =
   let offset = sum (zipWith (*) (coordinates @ix) (strides (shapeOf reference)))
    in T.Tensor $ A.generate (A.shape input) $ \ix ->
         A.cond (A.toIndex (A.shape input) ix A.== A.constant offset) gradient (T.unTensorElement 0)
 
 -- | Scatter a scalar seed to an element selected by a complete index expression.
-indexAt :: (Shape sh, DType a, Num (T.TensorElement a)) => T.TensorIndex sh -> T.Tensor sh a -> T.TensorElement a -> T.TensorElement a -> T.Tensor sh a
-indexAt (T.TensorIndex selected) (T.Tensor input) _ (T.TensorElement gradient) =
+indexAt :: (Shape sh, DType a, Num (T.TensorElement a)) => T.TensorIndex sh -> T.Tensor sh a -> T.TensorElement a -> T.Tensor sh a
+indexAt (T.TensorIndex selected) (T.Tensor input) (T.TensorElement gradient) =
   T.Tensor $ A.generate (A.shape input) $ \ix ->
     A.cond (A.toIndex (A.shape input) ix A.== A.toIndex (A.shape input) selected) gradient (T.unTensorElement 0)
 
 -- | Return a zero gradient for an invalid dynamic index.
-dynamicIndexOr :: (Shape sh, DType a, Num (T.TensorElement a)) => T.TensorIndex sh -> T.Tensor sh a -> T.TensorElement a -> T.TensorElement a -> T.Tensor sh a
-dynamicIndexOr selected input output (T.TensorElement gradient) =
-  indexAt selected input output (T.TensorElement (A.cond (Raw.indexInBounds selected) gradient (T.unTensorElement 0)))
+dynamicIndexOr :: (Shape sh, DType a, Num (T.TensorElement a)) => T.TensorIndex sh -> T.Tensor sh a -> T.TensorElement a -> T.Tensor sh a
+dynamicIndexOr selected input (T.TensorElement gradient) =
+  indexAt selected input (T.TensorElement (A.cond (Raw.indexInBounds selected) gradient (T.unTensorElement 0)))
 
 -- | Accumulate contributions at their selected source coordinates.
 -- Checked gathers discard invalid selections before scattering.

@@ -7,7 +7,7 @@
 module Synapse.Tensor.Ops.Math (dot, matmul) where
 
 import qualified Synapse.Autograd.Tensor.Ops.Primitives.Math as Pullback
-import Synapse.Tensor.Ops (TensorOps (..))
+import Synapse.Tensor.Ops (Needs (Numeric), TensorOps (..))
 import qualified Synapse.Tensor.Ops.Primitives.Math as Raw
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
@@ -20,7 +20,16 @@ dot ::
   t '[n] a ->
   t '[n] a ->
   t '[] a
-dot = lift2 Raw.dot Pullback.dot
+dot =
+  curry $
+    customVJP
+      Numeric
+      (uncurry Raw.dot)
+      ( \(left, right) ->
+          let output = Raw.dot left right
+           in (output, ((left, right), output))
+      )
+      (\((left, right), output) -> Pullback.dot left right output)
 
 -- | Multiply vectors and matrices, broadcasting leading batch dimensions.
 -- Vector operands omit their promoted matrix axis from the result; two vectors produce a scalar.
@@ -34,4 +43,13 @@ matmul ::
   t lhs a ->
   t rhs a ->
   t (MatmulShape lhs rhs) a
-matmul = lift2 Raw.matmul Pullback.matmul
+matmul =
+  curry $
+    customVJP
+      Numeric
+      (uncurry Raw.matmul)
+      ( \(left, right) ->
+          let output = Raw.matmul left right
+           in (output, ((left, right), output))
+      )
+      (\((left, right), output) -> Pullback.matmul left right output)

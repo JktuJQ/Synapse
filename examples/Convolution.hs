@@ -61,7 +61,7 @@ predict ::
     Condition (t '[batch_size, 8] Double) ~ T.Tensor '[batch_size, 8] Bool,
     Num (t '[batch_size, 2] Double)
   ) =>
-  NN.ExecutionMode ->
+  NN.ForwardMode ->
   Parameters t ->
   NN.Forward (ModelState T.Tensor) (t '[batch_size, 1, 8, 8] Double) (t '[batch_size, 2] Double)
 predict mode parameters = proc input -> do
@@ -116,7 +116,7 @@ trainingStep parameters state optimizerState features targets =
   let ((loss, nextModel), gradients) =
         AG.backprop
           ( \p ->
-              let (logits, next) = NN.forward (predict NN.Train p) (AG.constant features) state
+              let (logits, next) = NN.runState (NN.forward (predict NN.Train p) $ AG.constant features) state
                in (NN.unsafeCrossEntropy @1 T.mean logits targets, AG.constant next)
           )
           parameters
@@ -131,7 +131,7 @@ validationStep ::
   T.Tensor '[batch_size] Int ->
   (T.Tensor '[] Double, T.Tensor '[] Double)
 validationStep parameters state features targets =
-  let (logits, _) = NN.forward (predict NN.Eval parameters) features state
+  let logits = NN.evalState (NN.forward (predict NN.Eval parameters) features) state
    in (NN.unsafeCrossEntropy @1 T.mean logits targets, NN.accuracy @1 logits targets)
 
 main :: IO ()

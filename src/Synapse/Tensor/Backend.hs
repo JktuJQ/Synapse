@@ -13,44 +13,17 @@
 -- Records derive @Generic@ and define 'WithTensor' once for both differentiation and execution.
 module Synapse.Tensor.Backend (Backend (..), Computation, run, run1, run2, run3, run4, run5, run6, run7, run8, run9) where
 
-import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.LLVM.Native as CPU
 #ifdef SYNAPSE_GPU
 import qualified Data.Array.Accelerate.LLVM.PTX as GPU
 #endif
+import Synapse.Tensor.Backend.Structure
 import Synapse.Tensor.Fields (Flatten (..), Leaves)
-import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
-import Synapse.Tensor.Type (DType, Tensor, TensorData, WithTensor)
-import qualified Synapse.Tensor.Type as Raw
+import Synapse.Tensor.Type (Tensor, TensorData, WithTensor)
 import qualified Synapse.Tensor.Type as T
 
 -- | Execution backend.
 data Backend = CPU | GPU deriving (Eq, Show)
-
--- | Backend array products preserving tensor shapes and element types.
-class (A.Arrays (BackendLeaves a)) => BackendTree a where
-  type BackendLeaves a
-  type MaterialLeaves a
-  pack :: a -> A.Acc (BackendLeaves a)
-  unpack :: A.Acc (BackendLeaves a) -> a
-  upload :: MaterialLeaves a -> BackendLeaves a
-  download :: BackendLeaves a -> MaterialLeaves a
-
-instance (Shape sh, DType a) => BackendTree (T.Tensor sh a) where
-  type BackendLeaves (T.Tensor sh a) = A.Array (ShapeToDIM sh) a
-  type MaterialLeaves (T.Tensor sh a) = T.TensorData sh a
-  pack = Raw.unTensor
-  unpack = Raw.Tensor
-  upload = Raw.unTensorData
-  download = Raw.TensorData
-
-instance (BackendTree a, BackendTree b) => BackendTree (a, b) where
-  type BackendLeaves (a, b) = (BackendLeaves a, BackendLeaves b)
-  type MaterialLeaves (a, b) = (MaterialLeaves a, MaterialLeaves b)
-  pack (a, b) = A.lift (pack a, pack b)
-  unpack value = let (a, b) = A.unlift value in (unpack a, unpack b)
-  upload (a, b) = (upload @a a, upload @b b)
-  download (a, b) = (download @a a, download @b b)
 
 -- | Tensor structures accepted by prepared backend computations.
 -- Each invocation packs and reconstructs the record without executing its fields separately.

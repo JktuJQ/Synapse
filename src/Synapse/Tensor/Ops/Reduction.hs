@@ -30,7 +30,7 @@ where
 
 import Data.Proxy (Proxy (..))
 import qualified Synapse.Autograd.Tensor.Ops.Primitives.Reduction as Pullback
-import Synapse.Tensor.Ops (TensorOps (..))
+import Synapse.Tensor.Ops (Needs (Fractional, Numeric), TensorOps (..))
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Primitives.Reduction as Raw
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, CanReduceNonEmpty, NonEmpty, ReduceShape)
@@ -44,7 +44,7 @@ sum ::
   (TensorOps t a, Num (TensorElement a), Shape sh) =>
   t sh a ->
   t '[] a
-sum = lift1 Raw.sum Pullback.sum
+sum = customVJP Numeric Raw.sum (\primalInput -> let output = Raw.sum primalInput in (output, (primalInput, output))) (uncurry Pullback.sum)
 
 -- | Sum over selected axes and remove them from the output shape.
 -- Axis order does not affect the result and an empty axis list preserves the input.
@@ -54,7 +54,7 @@ sumAxes ::
   (TensorOps t a, Num (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
   t sh a ->
   t (ReduceShape xs sh) a
-sumAxes = lift1 (Raw.sumAxes @xs) (Pullback.sumAxes @xs)
+sumAxes = customVJP Numeric (Raw.sumAxes @xs) (\primalInput -> let output = (Raw.sumAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.sumAxes @xs))
 
 -- | Mean of all floating point elements, returning NaN for an empty tensor.
 mean ::
@@ -62,7 +62,7 @@ mean ::
   (TensorOps t a, RealFloat a, Fractional (TensorElement a), Shape sh) =>
   t sh a ->
   t '[] a
-mean = lift1 Raw.mean Pullback.mean
+mean = customVJP Fractional Raw.mean (\primalInput -> let output = Raw.mean primalInput in (output, (primalInput, output))) (uncurry Pullback.mean)
 
 -- | Mean over selected axes, removing them from the output shape.
 -- Empty reduction regions produce NaN and an empty axis list preserves the input.
@@ -71,7 +71,7 @@ meanAxes ::
   (TensorOps t a, RealFloat a, Fractional (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
   t sh a ->
   t (ReduceShape xs sh) a
-meanAxes = lift1 (Raw.meanAxes @xs) (Pullback.meanAxes @xs)
+meanAxes = customVJP Fractional (Raw.meanAxes @xs) (\primalInput -> let output = (Raw.meanAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.meanAxes @xs))
 
 -- | Minimum of all elements of a statically nonempty tensor.
 -- Floating point NaN values propagate to the result.
@@ -80,7 +80,7 @@ minimum ::
   (TensorOps t a, E.Ord (TensorElement a), Shape sh, NonEmpty sh) =>
   t sh a ->
   t '[] a
-minimum = lift1 Raw.minimum Pullback.extremum
+minimum = customVJP Fractional Raw.minimum (\primalInput -> let output = Raw.minimum primalInput in (output, (primalInput, output))) (uncurry Pullback.extremum)
 
 -- | Minimum over selected axes, removing them from the output shape.
 -- Selected dimensions must be nonzero, while unselected dimensions may be empty.
@@ -90,7 +90,7 @@ minimumAxes ::
   (TensorOps t a, E.Ord (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
   t sh a ->
   t (ReduceShape xs sh) a
-minimumAxes = lift1 (Raw.minimumAxes @xs) (Pullback.extremumAxes @xs)
+minimumAxes = customVJP Fractional (Raw.minimumAxes @xs) (\primalInput -> let output = (Raw.minimumAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.extremumAxes @xs))
 
 -- | Maximum of all elements of a statically nonempty tensor.
 -- Floating point NaN values propagate to the result.
@@ -99,7 +99,7 @@ maximum ::
   (TensorOps t a, E.Ord (TensorElement a), Shape sh, NonEmpty sh) =>
   t sh a ->
   t '[] a
-maximum = lift1 Raw.maximum Pullback.extremum
+maximum = customVJP Fractional Raw.maximum (\primalInput -> let output = Raw.maximum primalInput in (output, (primalInput, output))) (uncurry Pullback.extremum)
 
 -- | Maximum over selected axes, removing them from the output shape.
 -- Selected dimensions must be nonzero, while unselected dimensions may be empty.
@@ -109,7 +109,7 @@ maximumAxes ::
   (TensorOps t a, E.Ord (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh) =>
   t sh a ->
   t (ReduceShape xs sh) a
-maximumAxes = lift1 (Raw.maximumAxes @xs) (Pullback.extremumAxes @xs)
+maximumAxes = customVJP Fractional (Raw.maximumAxes @xs) (\primalInput -> let output = (Raw.maximumAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.extremumAxes @xs))
 
 -- | Test whether every element is true, returning True for an empty tensor.
 all ::
@@ -152,7 +152,7 @@ softmax ::
   (TensorOps t a, Floating a, Floating (TensorElement a), E.Ord (TensorElement a), Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
   t sh a ->
   t sh a
-softmax = lift1 (Raw.softmax @axis) (Pullback.softmax (Proxy @axis))
+softmax = customVJP Fractional (Raw.softmax @axis) (\primalInput -> let output = (Raw.softmax @axis) primalInput in (output, (primalInput, output))) (uncurry (Pullback.softmax (Proxy @axis)))
 
 -- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
 logSoftmax ::
@@ -160,7 +160,7 @@ logSoftmax ::
   (TensorOps t a, Floating a, Floating (TensorElement a), E.Ord (TensorElement a), Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], CanReduceNonEmpty '[axis] sh) =>
   t sh a ->
   t sh a
-logSoftmax = lift1 (Raw.logSoftmax @axis) (Pullback.logSoftmax (Proxy @axis))
+logSoftmax = customVJP Fractional (Raw.logSoftmax @axis) (\primalInput -> let output = (Raw.logSoftmax @axis) primalInput in (output, (primalInput, output))) (uncurry (Pullback.logSoftmax (Proxy @axis)))
 
 -- | Logarithm of the sum of exponentials, using maximum subtraction for finite inputs.
 -- Empty tensors produce negative infinity and NaN values propagate.
@@ -169,7 +169,7 @@ logSumExp ::
   (TensorOps t a, RealFloat a, Floating (TensorElement a), E.Ord (TensorElement a), E.RealFloat (TensorElement a), Shape sh) =>
   t sh a ->
   t '[] a
-logSumExp = lift1 Raw.logSumExp Pullback.logSumExp
+logSumExp = customVJP Fractional Raw.logSumExp (\primalInput -> let output = Raw.logSumExp primalInput in (output, (primalInput, output))) (uncurry Pullback.logSumExp)
 
 -- | Logarithm of summed exponentials over selected axes, removing those axes.
 -- Empty regions produce negative infinity; infinite extrema are preserved and NaN values propagate.
@@ -178,7 +178,7 @@ logSumExpAxes ::
   (TensorOps t a, RealFloat a, Floating (TensorElement a), E.Ord (TensorElement a), E.RealFloat (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) =>
   t sh a ->
   t (ReduceShape xs sh) a
-logSumExpAxes = lift1 (Raw.logSumExpAxes @xs) (Pullback.logSumExpAxes @xs)
+logSumExpAxes = customVJP Fractional (Raw.logSumExpAxes @xs) (\primalInput -> let output = (Raw.logSumExpAxes @xs) primalInput in (output, (primalInput, output))) (uncurry (Pullback.logSumExpAxes @xs))
 
 -- | Position of the maximum along one nonempty axis, removing that axis.
 -- Positions start at zero; ties select the first occurrence and NaN selects the first NaN.

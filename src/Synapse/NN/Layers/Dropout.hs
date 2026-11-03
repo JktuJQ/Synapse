@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -17,8 +16,9 @@ module Synapse.NN.Layers.Dropout
 where
 
 import Control.Arrow (Arrow, arr)
+import Control.Monad.Trans.State.Strict (State, state)
 import GHC.Generics (Generic)
-import Synapse.NN.Execution (ExecutionMode (..))
+import Synapse.NN.Forward (ForwardMode (..))
 import Synapse.Tensor.Ops.Elementwise (Conditional (..))
 import Synapse.Tensor.Random (Generator, bernoulli, initializeGenerator)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
@@ -46,7 +46,7 @@ initializeDropout generator =
 -- The caller supplies a probability in @[0, 1]@ and a mask whose entries are independently true with probability @1 - probability@.
 -- Evaluation returns the input without inspecting the probability or mask.
 -- Probabilities zero and one return the input and zeros respectively without inspecting the mask.
-dropoutWithMask :: forall {arrow} a. (Arrow arrow, Fractional a, Conditional a) => ExecutionMode -> Double -> Condition a -> arrow a a
+dropoutWithMask :: forall {arrow} a. (Arrow arrow, Fractional a, Conditional a) => ForwardMode -> Double -> Condition a -> arrow a a
 dropoutWithMask Eval _ _ = arr id
 dropoutWithMask Train probability mask
   | probability == 0 = arr id
@@ -56,15 +56,15 @@ dropoutWithMask Train probability mask
 -- | Independently zero each element with the given probability during training.
 -- Retained elements are scaled by @1 / (1 - probability)@ to preserve their expected value.
 -- The caller supplies a finite probability in @[0, 1]@.
--- Returns the output and the random state for the next call.
+-- Updates the random state and returns the output.
 -- Gradients flow through retained input elements; the random mask has no differentiation history.
--- Evaluation returns the input and unchanged state without inspecting the probability or state.
+-- Evaluation returns the input without inspecting the probability or changing the state.
 -- Probabilities zero and one return the input and zeros respectively without advancing the state.
-dropout :: forall sh t a {arrow}. (Arrow arrow, Shape sh, Fractional (t sh a), Conditional (t sh a), Condition (t sh a) ~ Tensor sh Bool) => ExecutionMode -> Double -> DropoutState Tensor -> arrow (t sh a) (t sh a, DropoutState Tensor)
-dropout Eval _ state = arr (,state)
-dropout Train probability state
-  | probability == 0 = arr (,state)
-  | probability == 1 = arr $ const (0, state)
-  | otherwise = arr $ \input ->
-      let (mask, next) = bernoulli @sh (1 - probability) $ dropoutGenerator state
+dropout :: forall sh t a. (Shape sh, Fractional (t sh a), Conditional (t sh a), Condition (t sh a) ~ Tensor sh Bool) => ForwardMode -> Double -> t sh a -> State (DropoutState Tensor) (t sh a)
+dropout Eval _ input = pure input
+dropout Train probability input
+  | probability == 0 = pure input
+  | probability == 1 = pure 0
+  | otherwise = state $ \running ->
+      let (mask, next) = bernoulli @sh (1 - probability) $ dropoutGenerator running
        in (dropoutWithMask Train probability mask input, DropoutState next)

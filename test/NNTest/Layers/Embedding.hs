@@ -95,7 +95,7 @@ tests =
         T.toList (T.run T.CPU $ NN.embeddingWeights gradient) H.=== [1, 1, 1, 1, 2, 2],
       testProperty "embedding composes as an arrow without changing model state" $ H.withTests 1 $ H.property $ do
         let indices = T.fromList @'[2] [1, 3]
-            (output, state) = NN.forward (NN.embedding parameters) indices True
+            (output, state) = NN.runState (NN.forward (NN.embedding parameters) indices) True
         state H.=== True
         values output H.=== [3, 4, 7, 8],
       testProperty "materialized embedding weights round-trip through named weight storage" $ H.withTests 1 $ H.property $ do

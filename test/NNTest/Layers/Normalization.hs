@@ -56,7 +56,7 @@ tests =
       testProperty "BatchNorm training uses population variance and updates unbiased running variance" $ H.withTests 1 $ H.property $ do
         let p = NN.BatchNorm (T.full @'[2] (1 :: Double)) 0
             x = T.fromList @'[2, 2] [1, 2, 3, 4 :: Double]
-            (output, state) = NN.batchNorm @1 NN.Train 1 0.1 p NN.initialBatchNormState x
+            (output, state) = NN.runState (NN.batchNorm @1 NN.Train 1 0.1 p x) NN.initialBatchNormState
         approxList (values output) (map (/ sqrt 2) [-1, -1, 1, 1])
         approxList (values $ NN.batchNormMean state) [0.2, 0.3]
         approxList (values $ NN.batchNormVariance state) [1.1, 1.1],
@@ -64,7 +64,7 @@ tests =
         let p = NN.BatchNorm (T.fromList @'[2] [2, 3 :: Double]) (T.fromList @'[2] [0.5, -0.5])
             state = NN.BatchNormState (T.fromList @'[2] [2, 3]) (T.fromList @'[2] [3, 8])
             x = T.fromList @'[1, 2] [1, 2]
-            (output, next) = NN.batchNorm @1 NN.Eval 1 undefined p state x
+            (output, next) = NN.runState (NN.batchNorm @1 NN.Eval 1 undefined p x) state
         approxList (values output) [-0.5, -1.5]
         values (NN.batchNormMean next) H.=== [2, 3]
         values (NN.batchNormVariance next) H.=== [3, 8],
@@ -72,7 +72,7 @@ tests =
         let xs = [1, 2, 3, 5 :: Double]
             x = T.fromList @'[2, 2] xs
             p = NN.BatchNorm (T.full @'[2] 1) 0
-            (_, backward) = AG.pullback (\(input, parameters) -> fst $ NN.batchNorm @1 NN.Train 0.1 0.1 parameters NN.initialBatchNormState input) (x, p)
+            (_, backward) = AG.pullback (\(input, parameters) -> NN.evalState (NN.batchNorm @1 NN.Train 0.1 0.1 parameters input) NN.initialBatchNormState) (x, p)
             (dx, dp) = backward (T.fromList @'[2, 2] [1, 2, 4, 8])
             reference [a, b, c, d] =
               let first = (a - c) / 2 / sqrt (((a - c) / 2) ^ (2 :: Int) + 0.1)
@@ -86,7 +86,7 @@ tests =
         let execute = T.run3 T.CPU $ \parametersInput running features ->
               AG.backprop
                 ( \parameters ->
-                    let (output, next) = NN.batchNorm @1 NN.Train 1 0.5 parameters running (AG.constant features)
+                    let (output, next) = NN.runState (NN.batchNorm @1 NN.Train 1 0.5 parameters $ AG.constant features) running
                      in (T.sum (output * output), AG.constant next)
                 )
                 parametersInput
@@ -104,9 +104,9 @@ tests =
       testProperty "BatchNorm handles spatial axes and empty training batches" $ H.withTests 1 $ H.property $ do
         let p = NN.BatchNorm (T.full @'[2] (1 :: Double)) 0
             x = T.fromList @'[2, 1, 2] [1, 3, 10, 14 :: Double]
-            (output, _) = NN.batchNorm @0 NN.Train 1 0.1 p NN.initialBatchNormState x
+            (output, _) = NN.runState (NN.batchNorm @0 NN.Train 1 0.1 p x) NN.initialBatchNormState
             empty = T.zeros @'[0, 2] @Double
-            (result, state) = NN.batchNorm @1 NN.Train 1 undefined p NN.initialBatchNormState empty
+            (result, state) = NN.runState (NN.batchNorm @1 NN.Train 1 undefined p empty) NN.initialBatchNormState
         approxList (values output) [-(1 / sqrt 2), 1 / sqrt 2, -(2 / sqrt 5), 2 / sqrt 5]
         values result H.=== []
         values (NN.batchNormMean state) H.=== [0, 0]

@@ -76,7 +76,6 @@ library
                     , Synapse.NN.Metrics
                     , Synapse.NN.Layers
                     , Synapse.NN.Layers.Convolution
-                    , Synapse.NN.Execution
                     , Synapse.NN.Forward
                     , Synapse.NN.Layers.Normalization
                     , Synapse.NN.Layers.Normalization.LayerNorm
@@ -103,6 +102,7 @@ library
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Convolution
                     , Synapse.Tensor.Ops.Window
+                    , Synapse.Tensor.Ops.Sequence
                     , Synapse.Tensor.Ops.Index
                     , Synapse.Tensor.Ops.Shape
                     , Synapse.Tensor.Ops.Reduction
@@ -118,7 +118,11 @@ library
                     , Synapse.Tensor.Type
                     , Synapse.Tensor.Random
 
-    other-modules:    Synapse.NN.Layers.Normalization.Statistics
+    other-modules:    Synapse.Tensor.Backend.Structure
+                    , Synapse.Tensor.Ops.Primitives.Sequence
+                    , Synapse.Autograd.Tensor.Ops.Primitives.Sequence
+                    , Synapse.Tensor.Ops.Structure
+                    , Synapse.NN.Layers.Normalization.Statistics
                     , Synapse.Tensor.Fields
                     , Synapse.Tensor.Ops.Primitives.Convolution
                     , Synapse.Tensor.Ops.Primitives.Window
@@ -227,7 +231,9 @@ test-suite synapse-test
                     , AutogradTest.Tensor.Convolution
                     , AutogradTest.Tensor.Spatial
                     , AutogradTest.Tensor.Elementwise
+                    , AutogradTest.Tensor.ElementLifting
                     , AutogradTest.Tensor.Lifting
+                    , AutogradTest.Tensor.Sequence
                     , AutogradTest.Execution
                     , AutogradTest.Execution.Public
                     , AutogradTest.Differentiable

@@ -1,15 +1,18 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module AutogradTest.Tensor.Lifting (tests) where
 
+import GHC.Generics (Generic)
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Ops as Ops
+import Synapse.Tensor.Ops (Needs (..), TensorOps (..))
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -17,259 +20,125 @@ import Test.Tasty.Hedgehog (testProperty)
 values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
-weighted1 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted1 =
-  Ops.lift1
-    id
-    (\_ _ gradient -> gradient)
+-- Ordinary cache metadata is not part of the differentiable tensor structure.
+data Metadata = Metadata Int String
 
-weighted2 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted2 input =
-  Ops.lift2
-    (\x1 x2 -> x1 + 2 * x2)
-    (\_ _ _ gradient -> (gradient, 2 * gradient))
-    input
-    input
+cachedSquare :: forall t sh a. (TensorOps t a, T.Shape sh, Num a, Num (T.TensorElement a)) => t sh a -> t sh a
+cachedSquare =
+  customVJP
+    Numeric
+    (\x -> x * x)
+    (\x -> (x * x, (x, Metadata 2 "derivative multiplier")))
+    (\(x, Metadata multiplier _) seed -> fromIntegral multiplier * x * seed)
 
-weighted3 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted3 input =
-  Ops.lift3
-    (\x1 x2 x3 -> x1 + 2 * x2 + 3 * x3)
-    (\_ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient))
-    input
-    input
-    input
+data Parameters t = Parameters (t '[3] Double) (t '[3] Double) deriving (Generic)
 
-weighted4 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted4 input =
-  Ops.lift4
-    (\x1 x2 x3 x4 -> x1 + 2 * x2 + 3 * x3 + 4 * x4)
-    (\_ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient))
-    input
-    input
-    input
-    input
+type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
 
-weighted5 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted5 input =
-  Ops.lift5
-    (\x1 x2 x3 x4 x5 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5)
-    (\_ _ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient, 5 * gradient))
-    input
-    input
-    input
-    input
-    input
+recordOperation :: forall t. (TensorOps t Double) => Parameters t -> (t '[] Double, t '[3] Double)
+recordOperation =
+  customVJP
+    Numeric
+    (\(Parameters x y) -> (T.sum (x * y), x + y))
+    (\p@(Parameters x y) -> ((T.sum (x * y), x + y), p))
+    ( \(Parameters x y) (ds, dp) ->
+        let common = T.broadcast ds
+         in Parameters (common * y + dp) (common * x + dp)
+    )
 
-weighted6 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted6 input =
-  Ops.lift6
-    (\x1 x2 x3 x4 x5 x6 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6)
-    (\_ _ _ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient, 5 * gradient, 6 * gradient))
-    input
-    input
-    input
-    input
-    input
-    input
+data OutputRecord t = OutputRecord (t '[] Double) (t '[3] Double) deriving (Generic)
 
-weighted7 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted7 input =
-  Ops.lift7
-    (\x1 x2 x3 x4 x5 x6 x7 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7)
-    (\_ _ _ _ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient, 5 * gradient, 6 * gradient, 7 * gradient))
-    input
-    input
-    input
-    input
-    input
-    input
-    input
+type instance T.WithTensor t (OutputRecord T.Tensor) = OutputRecord t
 
-weighted8 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted8 input =
-  Ops.lift8
-    (\x1 x2 x3 x4 x5 x6 x7 x8 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7 + 8 * x8)
-    (\_ _ _ _ _ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient, 5 * gradient, 6 * gradient, 7 * gradient, 8 * gradient))
-    input
-    input
-    input
-    input
-    input
-    input
-    input
-    input
+recordBoth :: forall t. (TensorOps t Double) => Parameters t -> OutputRecord t
+recordBoth =
+  customVJP
+    Numeric
+    (\(Parameters x y) -> OutputRecord (T.sum $ x * y) (x + y))
+    (\p@(Parameters x y) -> (OutputRecord (T.sum $ x * y) (x + y), p))
+    ( \(Parameters x y) (OutputRecord ds dp) ->
+        let common = T.broadcast ds
+         in Parameters (common * y + dp) (common * x + dp)
+    )
 
-weighted9 :: (T.TensorOps t Double) => t '[] Double -> t '[] Double
-weighted9 input =
-  Ops.lift9
-    (\x1 x2 x3 x4 x5 x6 x7 x8 x9 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7 + 8 * x8 + 9 * x9)
-    (\_ _ _ _ _ _ _ _ _ _ gradient -> (gradient, 2 * gradient, 3 * gradient, 4 * gradient, 5 * gradient, 6 * gradient, 7 * gradient, 8 * gradient, 9 * gradient))
-    input
-    input
-    input
-    input
-    input
-    input
-    input
-    input
-    input
+data Ten t = Ten (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) (t '[1] Double) deriving (Generic)
 
-mixedShapes :: (T.TensorOps t Double) => t '[2] Double -> t '[1, 1] Double -> t '[] Double -> t '[] Double
-mixedShapes =
-  Ops.lift3
-    (\x y z -> T.sum x + 2 * T.sum y + 3 * z)
-    (\_ _ _ _ gradient -> (T.broadcast gradient, T.broadcast (2 * gradient), 3 * gradient))
+type instance T.WithTensor t (Ten T.Tensor) = Ten t
 
-expWithOutput :: (T.TensorOps t Double) => t '[2] Double -> t '[2] Double
-expWithOutput = Ops.lift1 exp (\_ output gradient -> output * gradient)
+tenOperation :: forall t. (TensorOps t Double) => Ten t -> t '[1] Double
+tenOperation =
+  customVJP
+    Numeric
+    (\(Ten a b c d e f g h i j) -> a + b + c + d + e + f + g + h + i + j)
+    (\(Ten a b c d e f g h i j) -> (a + b + c + d + e + f + g + h + i + j, ()))
+    (\() g -> Ten g g g g g g g g g g)
 
-type ScalarInputs (t :: T.TensorLike) = (t '[] Double, t '[] Double, t '[] Double, t '[] Double, t '[] Double, t '[] Double, t '[] Double, t '[] Double, t '[] Double)
+tenIdentity :: forall t. (TensorOps t Double) => Ten t -> Ten t
+tenIdentity = customVJP Numeric id (,()) (\() gradient -> gradient)
 
-weightedInputs9 ::
-  (T.TensorOps t Double) =>
-  ScalarInputs t ->
-  t '[] Double
-weightedInputs9 (a, b, c, d, e, f, g, h, i) =
-  Ops.lift9
-    (\u v w x y z p q r -> u + 2 * v + 3 * w + 4 * x + 5 * y + 6 * z + 7 * p + 8 * q + 9 * r)
-    (\_ _ _ _ _ _ _ _ _ _ dy -> (dy, 2 * dy, 3 * dy, 4 * dy, 5 * dy, 6 * dy, 7 * dy, 8 * dy, 9 * dy))
-    a
-    b
-    c
-    d
-    e
-    f
-    g
-    h
-    i
+threeOutputs :: (TensorOps t Double) => (t '[3] Double, t '[3] Double) -> (t '[] Double, (t '[3] Double, t '[3] Double))
+threeOutputs =
+  customVJP
+    Numeric
+    (\(x, y) -> (T.sum $ x * y, (x + y, x - y)))
+    (\(x, y) -> ((T.sum $ x * y, (x + y, x - y)), (x, y)))
+    (\(x, y) (ds, (dp, dm)) -> (T.broadcast ds * y + dp + dm, T.broadcast ds * x + dp - dm))
 
 tests :: TestTree
 tests =
   testGroup
-    "tensor primitive lifting"
-    [ testProperty "lift1 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted1 input
-        values (weighted1 input) H.=== [2]
-        values output H.=== [2]
-        values (backward (T.full @'[] 7)) H.=== [7],
-      testProperty "ordinary lift1 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift1 id (error "inference forced a pullback") input
-        values output H.=== [2],
-      testProperty "lift2 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted2 input
-        values (weighted2 input) H.=== [6]
-        values output H.=== [6]
-        values (backward (T.full @'[] 7)) H.=== [21],
-      testProperty "ordinary lift2 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift2 (\x1 x2 -> x1 + 2 * x2) (error "inference forced a pullback") input input
-        values output H.=== [6],
-      testProperty "lift3 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted3 input
-        values (weighted3 input) H.=== [12]
-        values output H.=== [12]
-        values (backward (T.full @'[] 7)) H.=== [42],
-      testProperty "ordinary lift3 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift3 (\x1 x2 x3 -> x1 + 2 * x2 + 3 * x3) (error "inference forced a pullback") input input input
-        values output H.=== [12],
-      testProperty "lift4 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted4 input
-        values (weighted4 input) H.=== [20]
-        values output H.=== [20]
-        values (backward (T.full @'[] 7)) H.=== [70],
-      testProperty "ordinary lift4 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift4 (\x1 x2 x3 x4 -> x1 + 2 * x2 + 3 * x3 + 4 * x4) (error "inference forced a pullback") input input input input
-        values output H.=== [20],
-      testProperty "lift5 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted5 input
-        values (weighted5 input) H.=== [30]
-        values output H.=== [30]
-        values (backward (T.full @'[] 7)) H.=== [105],
-      testProperty "ordinary lift5 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift5 (\x1 x2 x3 x4 x5 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5) (error "inference forced a pullback") input input input input input
-        values output H.=== [30],
-      testProperty "lift6 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted6 input
-        values (weighted6 input) H.=== [42]
-        values output H.=== [42]
-        values (backward (T.full @'[] 7)) H.=== [147],
-      testProperty "ordinary lift6 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift6 (\x1 x2 x3 x4 x5 x6 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6) (error "inference forced a pullback") input input input input input input
-        values output H.=== [42],
-      testProperty "lift7 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted7 input
-        values (weighted7 input) H.=== [56]
-        values output H.=== [56]
-        values (backward (T.full @'[] 7)) H.=== [196],
-      testProperty "ordinary lift7 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift7 (\x1 x2 x3 x4 x5 x6 x7 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7) (error "inference forced a pullback") input input input input input input input
-        values output H.=== [56],
-      testProperty "lift8 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted8 input
-        values (weighted8 input) H.=== [72]
-        values output H.=== [72]
-        values (backward (T.full @'[] 7)) H.=== [252],
-      testProperty "ordinary lift8 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift8 (\x1 x2 x3 x4 x5 x6 x7 x8 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7 + 8 * x8) (error "inference forced a pullback") input input input input input input input input
-        values output H.=== [72],
-      testProperty "lift9 accumulates all input edges and respects an output seed" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            (output, backward) = AG.pullback weighted9 input
-        values (weighted9 input) H.=== [90]
-        values output H.=== [90]
-        values (backward (T.full @'[] 7)) H.=== [315],
-      testProperty "ordinary lift9 does not evaluate its pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.full @'[] (2 :: Double)
-            output = Ops.lift9 (\x1 x2 x3 x4 x5 x6 x7 x8 x9 -> x1 + 2 * x2 + 3 * x3 + 4 * x4 + 5 * x5 + 6 * x6 + 7 * x7 + 8 * x8 + 9 * x9) (error "inference forced a pullback") input input input input input input input input input
-        values output H.=== [90],
-      testProperty "lift9 preserves the order of independently registered inputs" $ H.withTests 1 $ H.property $ do
-        let input n = T.full @'[] (n :: Double)
-            (output, backward) =
-              AG.pullback @(ScalarInputs T.Tensor) @(T.Tensor '[] Double)
-                weightedInputs9
-                (input 1, input 2, input 3, input 4, input 5, input 6, input 7, input 8, input 9)
-            (da, db, dc, dd, de, df, dg, dh, di) = backward (input 7)
-        values output H.=== [285]
-        concatMap values [da, db, dc, dd, de, df, dg, dh, di] H.=== [7, 14, 21, 28, 35, 42, 49, 56, 63],
-      testProperty "input shapes and gradient results remain independent" $ H.withTests 1 $ H.property $ do
-        let inputs = (T.fromList @'[2] [1, 2 :: Double], T.full @'[1, 1] 4, T.full @'[] 5)
-            (output, (dx, dy, dz)) = AG.backprop (\(x, y, z) -> mixedShapes x y z) inputs
-        values output H.=== [26]
-        values dx H.=== [1, 1]
-        values dy H.=== [2]
-        values dz H.=== [3],
-      testProperty "pullbacks can reuse the forward output" $ H.withTests 1 $ H.property $ do
-        let input = T.fromList @'[2] [0, 1 :: Double]
-            (output, gradient) = AG.backprop expWithOutput input
-        approxList (values output) [1, exp 1]
-        approxList (values gradient) [1, exp 1],
-      testProperty "shape operations on boolean tensors do not require numeric instances" $ H.withTests 1 $ H.property $ do
-        let input = T.fromList @'[2] [False, True]
-        T.toList (T.run T.CPU (T.broadcast @'[2, 2] input)) H.=== [False, True, False, True]
-        T.toList (T.run T.CPU (T.transpose (T.reshape @'[1, 2] input))) H.=== [False, True],
-      testProperty "literal and primal preserve values without preserving incoming gradients" $ H.withTests 1 $ H.property $ do
-        let input = T.fromList @'[2] [2, 3 :: Double]
-            (output, gradient) = AG.backprop (\x -> T.sum (x * Ops.literal (Ops.primal x))) input
-        values output H.=== [13]
-        values gradient H.=== [2, 3],
-      testProperty "plain lift1 accepts a boolean input without using its numeric pullback" $ H.withTests 1 $ H.property $ do
-        let input = T.fromList @'[2] [False, True]
-            output = Ops.lift1 id (error "inference forced a numeric pullback") input
-        T.toList (T.run T.CPU output) H.=== [False, True]
+    "custom tensor primitives"
+    [ testProperty "private cache supports metadata and changing prepared inputs" $ H.withTests 1 $ H.property $ do
+        let execute = T.run1 T.CPU $ \x -> AG.backprop cachedSquare (x :: T.Tensor '[3] Double)
+            (out1, g1) = execute $ T.fromListData [1, 2, 3]
+            (out2, g2) = execute $ T.fromListData [2, 4, 6]
+        T.toList out1 H.=== [1, 4, 9]
+        T.toList g1 H.=== [2, 4, 6]
+        T.toList out2 H.=== [4, 16, 36]
+        T.toList g2 H.=== [4, 8, 12],
+      testProperty "multiple results respect nonuniform seeds" $ H.withTests 1 $ H.property $ do
+        let x = T.fromList @'[3] [1, 2, 3 :: Double]
+            y = T.fromList @'[3] [4, 5, 6 :: Double]
+            (_, backward) = AG.pullback threeOutputs (x, y)
+            (dx, dy) = backward (2, (T.fromList [1, 2, 3], T.fromList [4, 5, 6]))
+        values dx H.=== [13, 17, 21]
+        values dy H.=== [-1, 1, 3],
+      testProperty "Generic records register independent inputs and zero unused results" $ H.withTests 1 $ H.property $ do
+        let x = T.fromList @'[3] [1, 2, 3 :: Double]
+            y = T.fromList @'[3] [4, 5, 6 :: Double]
+            Parameters dx dy = AG.gradient (fst . recordOperation) (Parameters x y)
+            (_, backward) = AG.pullback recordBoth (Parameters x y)
+            Parameters dx2 dy2 = backward $ OutputRecord 2 (T.fromList [1, 2, 3])
+        values dx H.=== [4, 5, 6]
+        values dy H.=== [1, 2, 3]
+        values dx2 H.=== [9, 12, 15]
+        values dy2 H.=== [3, 6, 9],
+      testProperty "ten inputs and ten outputs have no arity limit" $ H.withTests 1 $ H.property $ do
+        let input = Ten 1 2 3 4 5 6 7 8 9 10 :: Ten T.Tensor
+            (out, Ten a b c d e f g h i j) = AG.backprop tenOperation input
+            (_, Ten u v w x y z p q r s) = AG.backprop tenIdentity input
+        values out H.=== [55]
+        mapM_ (\gradient -> values gradient H.=== [1]) [a, b, c, d, e, f, g, h, i, j, u, v, w, x, y, z, p, q, r, s],
+      testProperty "shared input edges accumulate across all results" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[3] [1, 2, 3 :: Double]
+            (out, g) = AG.backprop (\x -> threeOutputs (x, x)) input
+        values (fst out) H.=== [14]
+        values g H.=== [4, 6, 8],
+      testProperty "ordinary Int evaluation skips both differentiation callbacks" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[3] [1, 2, 3 :: Int]
+            output = customVJP Fractional T.sum (error "cache evaluated") (error "pullback evaluated") input
+        T.toList (T.run T.CPU output) H.=== [6],
+      testProperty "ordinary boolean inputs and type-changing results need no numeric instance" $ H.withTests 1 $ H.property $ do
+        let input = T.fromList @'[3] [False, True, False]
+            output = customVJP Numeric id (error "cache evaluated") (error "pullback evaluated") input
+            integral = T.fromList @'[3] [0, 1, 2 :: Int]
+            mask = customVJP Numeric (T.> 1) (error "cache evaluated") (error "pullback evaluated") integral
+        T.toList (T.run T.CPU output) H.=== [False, True, False]
+        T.toList (T.run T.CPU mask) H.=== [False, False, True],
+      testProperty "pullback reuses the cached output" $ H.withTests 1 $ H.property $ do
+        let operation :: (TensorOps t Double) => t '[2] Double -> t '[2] Double
+            operation = customVJP Numeric exp (\x -> let y = exp x in (y, y)) (*)
+            (out, g) = AG.backprop operation $ T.fromList [0, 1]
+        approxList (values out) [1, exp 1]
+        approxList (values g) [1, exp 1]
     ]

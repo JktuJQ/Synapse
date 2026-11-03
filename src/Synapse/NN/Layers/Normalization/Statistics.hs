@@ -8,7 +8,7 @@
 module Synapse.NN.Layers.Normalization.Statistics (expand, moments) where
 
 import qualified Synapse.Autograd.Tensor.Ops.Primitives.Shape as S
-import Synapse.Tensor.Ops (TensorOps (..))
+import Synapse.Tensor.Ops (Needs (Numeric), TensorOps (..))
 import Synapse.Tensor.Ops.Primitives.Math ()
 import qualified Synapse.Tensor.Ops.Primitives.Reduction as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
@@ -18,7 +18,7 @@ import Synapse.Tensor.Type (TensorElement)
 
 -- | Expand reduced statistics back across the axes from which they were computed.
 expand :: forall xs sh t a. (TensorOps t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, Num (TensorElement a)) => t sh a -> t (ReduceShape xs sh) a -> t sh a
-expand reference = lift1 (S.expandReduced (axes @xs) (primal reference)) (\_ _ seed -> Raw.sumAxes @xs seed)
+expand reference = customVJP Numeric (S.expandReduced (axes @xs) (primal reference)) (\primalInput -> let output = S.expandReduced (axes @xs) (primal reference) primalInput in (output, (primalInput, output))) (uncurry (\_ _ seed -> Raw.sumAxes @xs seed))
 
 -- | Compute the mean and population variance independently in each reduction region.
 moments :: forall xs sh t a. (TensorOps t a, RealFloat a, Floating (TensorElement a), Floating (t sh a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh) => t sh a -> (t (ReduceShape xs sh) a, t (ReduceShape xs sh) a)

@@ -15,7 +15,7 @@ module Synapse.Tensor.Ops.Index (Indexable (..), coordinate, index, unsafeDynami
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
 import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
-import Synapse.Tensor.Ops (TensorOps (..))
+import Synapse.Tensor.Ops (Needs (Numeric), TensorOps (..))
 import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
@@ -33,20 +33,37 @@ coordinate = Raw.coordinate @axis
 -- For example, @index \@'[1, 2] matrix@.
 -- Use scalar to materialize the expression.
 index :: forall {t} ix sh a. (TensorOps t a, Shape sh, Index ix, CanIndex ix sh) => t sh a -> Element t a
-index = liftElement (Raw.index @ix) (Pullback.index (Proxy @ix))
+index =
+  customElementVJP
+    Numeric
+    (Raw.index @ix)
+    (\input -> (Raw.index @ix input, input))
+    (Pullback.index (Proxy @ix))
 
 -- | Read an element at a complete computed index without checking coordinate values.
 -- Every coordinate must be nonnegative and strictly less than its dimension.
 -- Invalid coordinates have backend-dependent behavior and may cause invalid memory access.
 -- Indices carry no differentiation history; gradients propagate only to the selected tensor element.
 unsafeDynamicIndex :: (TensorOps t a, Shape sh) => t sh a -> TensorIndex sh -> Element t a
-unsafeDynamicIndex tensor selected = liftElement (Raw.indexAt selected) (Pullback.indexAt selected) tensor
+unsafeDynamicIndex tensor selected =
+  customElementVJP
+    Numeric
+    (Raw.indexAt selected)
+    (\input -> (Raw.indexAt selected input, input))
+    (Pullback.indexAt selected)
+    tensor
 
 -- | Read a computed index, returning the supplied host value when any coordinate is out of bounds.
 -- Empty tensors always return the fallback; scalars accept their unique empty index.
 -- Invalid selections contribute no gradient to the source tensor.
 dynamicIndexOr :: (TensorOps t a, Shape sh) => a -> t sh a -> TensorIndex sh -> Element t a
-dynamicIndexOr fallback tensor selected = liftElement (Raw.dynamicIndexOr fallback selected) (Pullback.dynamicIndexOr selected) tensor
+dynamicIndexOr fallback tensor selected =
+  customElementVJP
+    Numeric
+    (Raw.dynamicIndexOr fallback selected)
+    (\input -> (Raw.dynamicIndexOr fallback selected input, input))
+    (Pullback.dynamicIndexOr selected)
+    tensor
 
 -- | Gather along a zero-based axis using an ordinary integer tensor of computed indices.
 -- Indices and input have equal ranks and equal dimensions outside the selected axis.
@@ -54,20 +71,20 @@ dynamicIndexOr fallback tensor selected = liftElement (Raw.dynamicIndexOr fallba
 -- Index values must lie in @[0, axisSize)@; invalid values may cause invalid memory access.
 -- Gradients accumulate at repeated selections; indices are not differentiated.
 unsafeGather :: forall {t} axis sh indices a. (TensorOps t a, KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices) => t sh a -> Tensor indices Int -> t indices a
-unsafeGather tensor indices = lift1 (\input -> Raw.unsafeGather @axis input indices) (Pullback.gather @axis False indices) tensor
+unsafeGather tensor indices = customVJP Numeric (\input -> Raw.unsafeGather @axis input indices) (\primalInput -> let output = (\input -> Raw.unsafeGather @axis input indices) primalInput in (output, (primalInput, output))) (uncurry (Pullback.gather @axis False indices)) tensor
 
 -- | Gather along an axis, substituting a host fallback for each invalid index.
 -- Shape rules and gradient accumulation match 'unsafeGather'.
 -- Empty source axes produce only fallback values, and invalid selections contribute no source gradient.
 gatherOr :: forall {t} axis sh indices a. (TensorOps t a, KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices) => a -> t sh a -> Tensor indices Int -> t indices a
-gatherOr fallback tensor indices = lift1 (\input -> Raw.gatherOr @axis fallback input indices) (Pullback.gather @axis True indices) tensor
+gatherOr fallback tensor indices = customVJP Numeric (\input -> Raw.gatherOr @axis fallback input indices) (\primalInput -> let output = (\input -> Raw.gatherOr @axis fallback input indices) primalInput in (output, (primalInput, output))) (uncurry (Pullback.gather @axis True indices)) tensor
 
 -- | Select complete rows of a matrix using an ordinary integer tensor of indices.
 -- Appends the matrix column count to the index shape; scalar indices select one row vector.
 -- Indices must lie in @[0, rows)@; values are unchecked and invalid indices may cause invalid memory access.
 -- Repeated selections accumulate gradients into their source rows; indices are not differentiated.
 unsafeLookupRows :: forall {t} rows width indices a. (TensorOps t a, Shape '[rows, width], Shape indices, Shape (LookupRowsShape indices width)) => t '[rows, width] a -> Tensor indices Int -> t (LookupRowsShape indices width) a
-unsafeLookupRows table indices = lift1 (`Raw.unsafeLookupRows` indices) (Pullback.lookupRows indices) table
+unsafeLookupRows table indices = customVJP Numeric (`Raw.unsafeLookupRows` indices) (\primalInput -> let output = (`Raw.unsafeLookupRows` indices) primalInput in (output, (primalInput, output))) (uncurry (Pullback.lookupRows indices)) table
 
 -- | Select a region using one descriptor per axis.
 -- At removes an axis; ranges preserve it.
@@ -75,7 +92,7 @@ unsafeLookupRows table indices = lift1 (`Raw.unsafeLookupRows` indices) (Pullbac
 -- A forward range whose stop precedes its start is empty.
 -- RangeReverse reverses the coordinates selected by the corresponding Range, without changing the output shape.
 slice :: forall {t} spec sh a. (TensorOps t a, Shape sh, Shape (SliceShape spec sh), Slice spec, CanSlice spec sh) => t sh a -> t (SliceShape spec sh) a
-slice = lift1 (Raw.slice @spec) (Pullback.slice (Proxy @spec))
+slice = customVJP Numeric (Raw.slice @spec) (\primalInput -> let output = (Raw.slice @spec) primalInput in (output, (primalInput, output))) (uncurry (Pullback.slice (Proxy @spec)))
 
 -- | Read a coordinate or tensor element using a shape-checked index.
 -- Use @ix !! Proxy \@0@ for a coordinate and @tensor !! Proxy \@'[1, 2]@ for a static element.

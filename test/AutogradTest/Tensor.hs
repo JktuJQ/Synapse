@@ -7,8 +7,10 @@
 module AutogradTest.Tensor (tests) where
 
 import qualified AutogradTest.Tensor.Convolution
+import qualified AutogradTest.Tensor.ElementLifting
 import qualified AutogradTest.Tensor.Elementwise
 import qualified AutogradTest.Tensor.Lifting
+import qualified AutogradTest.Tensor.Sequence
 import qualified AutogradTest.Tensor.Spatial
 import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
@@ -45,7 +47,9 @@ tests =
     [ AutogradTest.Tensor.Spatial.tests,
       AutogradTest.Tensor.Convolution.tests,
       AutogradTest.Tensor.Lifting.tests,
+      AutogradTest.Tensor.Sequence.tests,
       AutogradTest.Tensor.Elementwise.tests,
+      AutogradTest.Tensor.ElementLifting.tests,
       testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
         let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
             (value, gradient) = differentiate forward input
