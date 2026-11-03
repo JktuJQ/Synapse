@@ -95,6 +95,10 @@ main :: IO ()
 main = do
   let training = dataset 273 0
       validation = dataset 128 0.5
+      trainingPlan = NN.planBatches 32 NN.KeepLast training
+      validationPlan = NN.planBatches 128 NN.KeepLast validation
+      step = NN.prepareBatchStep T.CPU trainingPlan trainingStep
+      measure = NN.prepareBatchStep T.CPU validationPlan $ \p x y _ -> validationStep p x y
 
   parameters <- newIORef (T.run T.CPU initialParameters)
   generator <- newIORef (mkStdGen 42)
@@ -107,21 +111,19 @@ main = do
       let (source, nextGenerator) = NN.shuffle training random
       writeIORef generator nextGenerator
 
-      forM_ (NN.loadBatches 32 NN.KeepLast source) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          current <- readIORef parameters
-          let (loss, updated) = T.run4 T.CPU trainingStep current (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
-          _ <- evaluate (sum (T.toList loss))
-          writeIORef parameters updated
+      forM_ (NN.batchLoads $ NN.planBatches 32 NN.KeepLast source) $ \load -> do
+        current <- readIORef parameters
+        (loss, updated) <- either (fail . show) pure $ NN.runBatch step current $ runIdentity load
+        _ <- evaluate (sum (T.toList loss))
+        writeIORef parameters updated
 
     when (epoch `mod` 50 == 0) $
-      forM_ (NN.loadBatches 128 NN.KeepLast validation) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          current <- readIORef parameters
-          let (mse, (mae, r2)) = T.run3 T.CPU validationStep current (NN.batchInputs batch) (NN.batchTargets batch)
-          printf
-            "Epoch %4d | MSE %.5f | MAE %.5f | R² %.5f\n"
-            epoch
-            (sum (T.toList mse))
-            (sum (T.toList mae))
-            (sum (T.toList r2))
+      forM_ (NN.batchLoads validationPlan) $ \load -> do
+        current <- readIORef parameters
+        (mse, (mae, r2)) <- either (fail . show) pure $ NN.runBatch measure current $ runIdentity load
+        printf
+          "Epoch %4d | MSE %.5f | MAE %.5f | R² %.5f\n"
+          epoch
+          (sum (T.toList mse))
+          (sum (T.toList mae))
+          (sum (T.toList r2))

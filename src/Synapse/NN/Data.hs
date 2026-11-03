@@ -14,6 +14,11 @@ module Synapse.NN.Data
   ( Dataset (..),
     getSample,
     loadBatches,
+    BatchPlan,
+    batchPlan,
+    planBatches,
+    batchSizes,
+    batchLoads,
     LastBatch (..),
     Batch (..),
     SomeBatch (..),
@@ -28,7 +33,9 @@ import qualified Data.Array as Array
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Unboxed as Unboxed
 import Data.Proxy (Proxy (..))
+import qualified Data.Set as Set
 import GHC.TypeNats (KnownNat, SomeNat (..), natVal, someNatVal)
+import Numeric.Natural (Natural)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
 import Synapse.Tensor.Type (DType, TensorData (..))
 import System.Random (RandomGen, uniformShuffleList)
@@ -137,6 +144,71 @@ batchMask batch = generateData @'[batch] (< validCount batch)
 -- The result type must not depend on the hidden batch dimension.
 withBatch :: SomeBatch in_sh out_sh features targets -> (forall batch. (KnownNat batch, Shape (batch ': in_sh), Shape (batch ': out_sh)) => Batch batch in_sh out_sh features targets -> r) -> r
 withBatch (SomeBatch batch) handler = handler batch
+
+-- | Expected leading dimensions and lazy loading actions for a source.
+-- A plan describes loading; it does not read examples or compile computations.
+-- The constructor is hidden. Use 'planBatches' for a 'Dataset', or 'batchPlan'
+-- for a custom source.
+data BatchPlan m in_sh out_sh features targets
+  = BatchPlan
+      (Set.Set Natural)
+      [m (SomeBatch in_sh out_sh features targets)]
+
+-- | Describe a custom source with a finite collection of expected batch sizes.
+-- Duplicate sizes are ignored. Loading actions are neither traversed nor executed;
+-- each action should produce a batch with one of the declared sizes.
+-- Extra declared sizes are allowed, even if no action produces them.
+batchPlan ::
+  [Natural] ->
+  [m (SomeBatch in_sh out_sh features targets)] ->
+  BatchPlan m in_sh out_sh features targets
+batchPlan sizes = BatchPlan $ Set.fromList sizes
+
+-- | Concatenate loading schedules and combine their expected sizes.
+instance Semigroup (BatchPlan m in_sh out_sh features targets) where
+  BatchPlan firstSizes firstLoads <> BatchPlan secondSizes secondLoads =
+    BatchPlan (Set.union firstSizes secondSizes) (firstLoads ++ secondLoads)
+
+instance Monoid (BatchPlan m in_sh out_sh features targets) where
+  mempty = BatchPlan Set.empty []
+
+-- | Distinct expected batch sizes in ascending order, including padding.
+batchSizes :: BatchPlan m in_sh out_sh features targets -> [Natural]
+batchSizes (BatchPlan sizes _) = Set.toAscList sizes
+
+-- | Lazy loading actions in source order. Execute them one at a time to avoid
+-- retaining an entire epoch in memory.
+batchLoads :: BatchPlan m in_sh out_sh features targets -> [m (SomeBatch in_sh out_sh features targets)]
+batchLoads (BatchPlan _ loads) = loads
+
+-- | Plan one pass over a dataset using the same size and remainder policy as
+-- 'loadBatches'. Expected sizes are calculated from 'datasetSize' without
+-- traversing the loading actions or reading examples.
+-- Shuffling a source preserves its expected sizes, so its new plan can use
+-- an executor prepared for the original plan.
+planBatches ::
+  ( Applicative m,
+    Shape in_sh,
+    Shape out_sh,
+    forall batch. (KnownNat batch) => Shape (batch ': in_sh),
+    forall batch. (KnownNat batch) => Shape (batch ': out_sh),
+    DType features,
+    DType targets
+  ) =>
+  Int ->
+  LastBatch features targets ->
+  Dataset m (TensorData in_sh features, TensorData out_sh targets) ->
+  BatchPlan m in_sh out_sh features targets
+planBatches limit policy source
+  | limit <= 0 = error "Synapse.NN.planBatches: requested size must be positive"
+  | datasetSize source < 0 = error "Synapse.NN.planBatches: dataset size must be nonnegative"
+  | otherwise =
+      let (full, remainder) = datasetSize source `quotRem` limit
+          sizes = case policy of
+            KeepLast -> [fromIntegral limit | full > 0] ++ [fromIntegral remainder | remainder > 0]
+            DropLast -> [fromIntegral limit | full > 0]
+            PadLast _ _ -> [fromIntegral limit | datasetSize source > 0]
+       in batchPlan sizes $ loadBatches limit policy source
 
 -- | Create loading actions for one pass over a source in its current order.
 -- Each action obtains only its own batch; constructing or traversing the action list does not load examples.

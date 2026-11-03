@@ -138,6 +138,10 @@ main :: IO ()
 main = do
   let training = dataset 128 0
       validation = dataset 32 1000
+      trainingPlan = NN.planBatches 16 NN.DropLast training
+      validationPlan = NN.planBatches 32 NN.KeepLast validation
+      step = NN.prepareBatchStep T.CPU trainingPlan $ \(p, (s, o)) x y _ -> trainingStep p s o x y
+      measure = NN.prepareBatchStep T.CPU validationPlan $ \(p, s) x y _ -> validationStep p s x y
 
   model <- newIORef $ T.run T.CPU (initialParameters, (initialModelState, NN.initialState optimizer initialParameters))
   generator <- newIORef $ mkStdGen 42
@@ -151,16 +155,14 @@ main = do
       let (source, nextGenerator) = NN.shuffle training random
       writeIORef generator nextGenerator
 
-      forM_ (NN.loadBatches 16 NN.DropLast source) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          (parameters, (state, optimizerState)) <- readIORef model
-          let (loss, updated) = T.run5 T.CPU trainingStep parameters state optimizerState (NN.batchInputs batch) (NN.batchTargets batch)
-          _ <- evaluate $ sum $ T.toList loss
-          writeIORef model updated
+      forM_ (NN.batchLoads $ NN.planBatches 16 NN.DropLast source) $ \load -> do
+        current <- readIORef model
+        (loss, updated) <- either (fail . show) pure $ NN.runBatch step current $ runIdentity load
+        _ <- evaluate $ sum $ T.toList loss
+        writeIORef model updated
 
     when (epoch `mod` 10 == 0) $
-      forM_ (NN.loadBatches 32 NN.KeepLast validation) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          (parameters, (state, _)) <- readIORef model
-          let (loss, accuracy) = T.run4 T.CPU validationStep parameters state (NN.batchInputs batch) (NN.batchTargets batch)
-          printf "Epoch %2d | loss %.4f | accuracy %.1f%%\n" epoch (sum $ T.toList loss) (100 * sum (T.toList accuracy))
+      forM_ (NN.batchLoads validationPlan) $ \load -> do
+        (parameters, (state, _)) <- readIORef model
+        (loss, accuracy) <- either (fail . show) pure $ NN.runBatch measure (parameters, state) $ runIdentity load
+        printf "Epoch %2d | loss %.4f | accuracy %.1f%%\n" epoch (sum $ T.toList loss) (100 * sum (T.toList accuracy))

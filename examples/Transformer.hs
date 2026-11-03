@@ -179,10 +179,11 @@ main = do
       initial
       [1 .. 200 :: Int]
 
+  let infer = T.run2 T.CPU $ \p x -> T.argmax @2 $ predict p x
   putStrLn "\nHeld-out motifs (next-token predictions after observing the first three tokens):"
   forM_ [400, 407, 419, 431] $ \index -> do
     let (input, labels) = sample index
-        predicted = T.run2 T.CPU (\p x -> T.argmax @2 $ predict p x) trained $ T.fromListData @'[1, 6] input
+        predicted = infer trained $ T.fromListData @'[1, 6] input
     putStrLn $ "Input:     " ++ show input
     putStrLn $ "Expected:  " ++ show (drop 2 labels)
     putStrLn $ "Predicted: " ++ show (drop 2 $ T.toList predicted)

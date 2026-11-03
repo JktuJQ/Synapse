@@ -17,6 +17,15 @@ module Synapse.NN
     Dataset (..),
     getSample,
     loadBatches,
+    BatchPlan,
+    batchPlan,
+    planBatches,
+    batchSizes,
+    batchLoads,
+    PreparedStep,
+    prepareBatchStep,
+    runBatch,
+    UnexpectedSize (..),
     LastBatch (..),
     Batch (..),
     SomeBatch (..),
@@ -69,7 +78,8 @@ module Synapse.NN
 where
 
 import Synapse.NN.Activation (leakyRelu, relu, sigmoid, sin, softplus, tanh)
-import Synapse.NN.Data (Batch (..), Dataset (..), LastBatch (..), SomeBatch (..), batchMask, batchSize, getSample, loadBatches, shuffle, withBatch)
+import Synapse.NN.Data (Batch (..), BatchPlan, Dataset (..), LastBatch (..), SomeBatch (..), batchLoads, batchMask, batchPlan, batchSize, batchSizes, getSample, loadBatches, planBatches, shuffle, withBatch)
+import Synapse.NN.Data.Execution (PreparedStep, UnexpectedSize (..), prepareBatchStep, runBatch)
 import Synapse.NN.Forward (Forward (..), ForwardMode (..), State, evalState, runState, stateful)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Layers

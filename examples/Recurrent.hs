@@ -88,6 +88,11 @@ main :: IO ()
 main = do
   let training = dataset 128 0
       validation = dataset 32 1000
+      trainingPlan = NN.planBatches 16 NN.DropLast training
+      validationPlan = NN.planBatches 32 NN.DropLast validation
+      step = NN.prepareBatchStep T.CPU trainingPlan $ \(p, s) x y _ -> trainingStep p s x y
+      measure = NN.prepareBatchStep T.CPU validationPlan $ \p x y _ ->
+        NN.mse T.mean (NN.evalState (NN.forward (predict p) x) $ NN.LSTMState 0 0) y
 
   model <- newIORef $ T.run T.CPU (initialParameters, NN.initialState optimizer initialParameters)
   generator <- newIORef $ mkStdGen 42
@@ -100,45 +105,31 @@ main = do
       random <- readIORef generator
       let (source, nextGenerator) = NN.shuffle training random
       writeIORef generator nextGenerator
-      forM_ (NN.loadBatches 16 NN.DropLast source) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          (parameters, optimizerState) <- readIORef model
-          let (loss, updated) = T.run4 T.CPU trainingStep parameters optimizerState (NN.batchInputs batch) (NN.batchTargets batch)
-          _ <- evaluate $ sum $ T.toList loss
-          writeIORef model updated
+      forM_ (NN.batchLoads $ NN.planBatches 16 NN.DropLast source) $ \load -> do
+        current <- readIORef model
+        (loss, updated) <- either (fail . show) pure $ NN.runBatch step current $ runIdentity load
+        _ <- evaluate $ sum $ T.toList loss
+        writeIORef model updated
 
     when (epoch `mod` 20 == 0) $
-      forM_ (NN.loadBatches 32 NN.DropLast validation) $ \load ->
-        NN.withBatch (runIdentity load) $ \batch -> do
-          (parameters, _) <- readIORef model
-          let loss =
-                T.run3
-                  T.CPU
-                  (\p x y -> NN.mse T.mean (NN.evalState (NN.forward (predict p) x) $ NN.LSTMState 0 0) y)
-                  parameters
-                  (NN.batchInputs batch)
-                  (NN.batchTargets batch)
-          printf "Epoch %3d | validation MSE %.6f\n" epoch (sum $ T.toList loss)
+      forM_ (NN.batchLoads validationPlan) $ \load -> do
+        (parameters, _) <- readIORef model
+        loss <- either (fail . show) pure $ NN.runBatch measure parameters $ runIdentity load
+        printf "Epoch %3d | validation MSE %.6f\n" epoch (sum $ T.toList loss)
 
   -- The same trained weights also work one step at a time. State is carried
   -- between calls; resetting it here would lose the moving-average history.
   (parameters, _) <- readIORef model
   let (inputs, targets) = sample 2000
+      cell = T.run3 T.CPU $ \p s x ->
+        let (hidden, next) = NN.runState (NN.lstmCell (memory p) x) s
+         in (NN.dense (output p) hidden, next)
   recurrentState <- newIORef $ T.run T.CPU (NN.LSTMState 0 0 :: NN.LSTMState 1 8 T.Tensor Double)
   putStrLn "\nStreaming inference on a new sequence:"
   putStrLn " input   target  predicted"
   forM_ (zip inputs targets) $ \(input, target) -> do
     state <- readIORef recurrentState
-    let (prediction, nextState) =
-          T.run3
-            T.CPU
-            ( \p s x ->
-                let (hidden, next) = NN.runState (NN.lstmCell (memory p) x) s
-                 in (NN.dense (output p) hidden, next)
-            )
-            parameters
-            state
-            (T.fromListData @'[1, 1] [input])
+    let (prediction, nextState) = cell parameters state $ T.fromListData @'[1, 1] [input]
     _ <- evaluate $ sum $ T.toList prediction
     writeIORef recurrentState nextState
     printf "% .3f  % .3f  % .3f\n" input target (sum $ T.toList prediction)
