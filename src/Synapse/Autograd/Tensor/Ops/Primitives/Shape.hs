@@ -5,6 +5,8 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | Shape transformations used by tensor pullbacks.
 module Synapse.Autograd.Tensor.Ops.Primitives.Shape
@@ -18,16 +20,17 @@ module Synapse.Autograd.Tensor.Ops.Primitives.Shape
     shapeOf,
     axesOf,
     singletonAxis,
+    joinMatrixChunks,
   )
 where
 
 import qualified Data.Array.Accelerate as A
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
-import GHC.TypeLits (KnownNat, Nat, natVal)
+import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
 import Synapse.Tensor.Shapes.Axes (Axes, axes)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, shape, shapeSize, strides)
-import Synapse.Tensor.Type (DType)
+import Synapse.Tensor.Type (DType, Tensor (..), TensorElement (..))
 import qualified Synapse.Tensor.Type as T
 import Prelude hiding (concat)
 
@@ -124,3 +127,22 @@ stack selected left right _ gradient =
   let axis = fromInteger (toInteger (natVal selected))
       insert value coordinates = take axis coordinates ++ [value] ++ drop axis coordinates
    in (reindexGradient (insert 0) left gradient, reindexGradient (insert 1) right gradient)
+
+-- | Join gate cotangents in their original packed order.
+-- The list must contain exactly @gates@ tensors.
+joinMatrixChunks :: forall gates hidden batch a. (KnownNat gates, KnownNat hidden, KnownNat batch, DType a, Num (TensorElement a)) => [Tensor '[batch, hidden] a] -> Tensor '[batch, gates * hidden] a
+joinMatrixChunks parts = Tensor $ A.generate (A.constant $ A.Z A.:. batch A.:. (count * width)) $ \ix ->
+  let row = A.indexHead $ A.indexTail ix
+      column = A.indexHead ix
+      select :: [Tensor '[batch, hidden] a] -> Int -> A.Exp a
+      select [] _ = unTensorElement (0 :: TensorElement a)
+      select (Tensor part : rest) offset =
+        A.cond
+          (column A.< A.constant (offset + width))
+          (part A.! A.index2 row (column - A.constant offset))
+          (select rest $ offset + width)
+   in select parts 0
+  where
+    batch = fromIntegral $ natVal $ Proxy @batch
+    count = fromIntegral $ natVal $ Proxy @gates
+    width = fromIntegral $ natVal $ Proxy @hidden

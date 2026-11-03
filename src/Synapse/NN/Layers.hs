@@ -6,6 +6,7 @@ module Synapse.NN.Layers
     module Synapse.NN.Layers.Normalization,
     module Synapse.NN.Layers.Dropout,
     module Synapse.NN.Layers.Embedding,
+    module Synapse.NN.Layers.Recurrent,
   )
 where
 
@@ -14,3 +15,4 @@ import Synapse.NN.Layers.Dense
 import Synapse.NN.Layers.Dropout
 import Synapse.NN.Layers.Embedding
 import Synapse.NN.Layers.Normalization
+import Synapse.NN.Layers.Recurrent

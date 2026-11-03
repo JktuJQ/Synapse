@@ -18,6 +18,7 @@ import qualified Synapse.Autograd.Tensor.Ops.Primitives.Sequence as Reverse
 import Synapse.Autograd.Type (Differentiable)
 import Synapse.Tensor.Fields (Flatten, Leaves)
 import Synapse.Tensor.Ops (Compatible, Needs (Fractional), TensorOps (..))
+import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Primitives.Sequence as Raw
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Type (Tensor, TensorElement, WithTensor)
@@ -32,6 +33,7 @@ import Synapse.Tensor.Type (Tensor, TensorElement, WithTensor)
 -- for its pullback. Ordinary evaluation does not retain those histories.
 -- Differentiable parameters must be passed explicitly rather than captured by
 -- the step function. Shapes and the structure of the state remain fixed.
+-- Each step can use floating point arithmetic and ordered tensor operations.
 -- A sequence of batched feature vectors has shape @'[time, batch, features]@;
 -- each step receives a tensor of shape @'[batch, features]@.
 --
@@ -53,6 +55,7 @@ mapAccum ::
     KnownNat n,
     Floating a,
     Floating (TensorElement a),
+    E.Ord (TensorElement a),
     WithTensor Tensor parameters ~ parameters,
     WithTensor Tensor recurrent ~ recurrent,
     Flatten Tensor parameters,
@@ -67,7 +70,7 @@ mapAccum ::
     Raw.ScanValues a (Leaves Tensor recurrent),
     Compatible t a (parameters, (Tensor (n ': input) a, recurrent)) (Tensor (n ': output) a, recurrent)
   ) =>
-  (forall u. (TensorOps u a, forall sh. (Shape sh) => Floating (u sh a)) => WithTensor u parameters -> u input a -> State (WithTensor u recurrent) (u output a)) ->
+  (forall u. (TensorOps u a, forall sh. (Shape sh) => Floating (u sh a), forall sh. (Shape sh) => E.Ord (u sh a)) => WithTensor u parameters -> u input a -> State (WithTensor u recurrent) (u output a)) ->
   WithTensor t parameters ->
   t (n ': input) a ->
   State (WithTensor t recurrent) (t (n ': output) a)

@@ -24,12 +24,11 @@ leakyRelu :: forall {arrow} a. (Arrow arrow, Num a, E.Ord a, E.Conditional a, E.
 leakyRelu slope = arr $ \x -> E.select (x E.> 0) x (slope * x)
 
 -- | Apply the logistic sigmoid @sigmoid x = 1 / (1 + exp (-x))@ elementwise.
-sigmoid :: forall {arrow} a. (Arrow arrow, Floating a, E.Ord a, E.Conditional a, E.Condition a ~ E.Comparison a) => arrow a a
+sigmoid :: forall {arrow} a. (Arrow arrow, Floating a, E.Ord a) => arrow a a
 sigmoid = arr $ \x ->
-  let positive = x E.> 0
-      exponential = exp $ E.select positive (-x) x
-      denominator = 1 + exponential
-   in E.select positive (recip denominator) (exponential / denominator)
+  let numerator = exp $ E.min x 0
+      complement = exp $ negate $ E.max x 0
+   in numerator / (numerator + complement)
 
 -- | Apply the hyperbolic tangent @tanh x = (exp x - exp (-x)) / (exp x + exp (-x))@ elementwise.
 tanh :: forall {arrow} a. (Arrow arrow, Floating a) => arrow a a

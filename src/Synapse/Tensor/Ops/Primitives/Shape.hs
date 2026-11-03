@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Coordinate transformations and contiguous tensor assembly.
-module Synapse.Tensor.Ops.Primitives.Shape (reshape, permuteAxes, transpose, concat, stack, broadcast) where
+module Synapse.Tensor.Ops.Primitives.Shape (reshape, permuteAxes, transpose, concat, stack, broadcast, matrixChunk) where
 
 import qualified Data.Array.Accelerate as A
 import Data.List (foldl')
@@ -144,3 +144,14 @@ broadcast (Tensor acc) =
 
     fromDims = shape @from
     leadingAxes = shapeRank @to - shapeRank @from
+
+-- | Read a statically selected contiguous gate from a packed projection.
+-- Callers must establish that the selected chunk is within the packed width.
+matrixChunk :: forall hidden batch width a. (KnownNat batch, KnownNat hidden, DType a) => Int -> Tensor '[batch, width] a -> Tensor '[batch, hidden] a
+matrixChunk selected (Tensor input) = Tensor $ A.generate (A.constant $ A.Z A.:. batch A.:. width) $ \ix ->
+  let row = A.indexHead $ A.indexTail ix
+      column = A.indexHead ix
+   in input A.! A.index2 row (A.constant (selected * width) + column)
+  where
+    batch = fromIntegral $ natVal $ Proxy @batch
+    width = fromIntegral $ natVal $ Proxy @hidden
