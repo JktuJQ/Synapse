@@ -7,6 +7,7 @@ import Control.Exception (ErrorCall, evaluate, try)
 import qualified Hedgehog as H
 import qualified NNTest.Activation as Activation
 import qualified NNTest.Data as Data
+import qualified NNTest.Forward
 import qualified NNTest.Initialization as Initialization
 import qualified NNTest.Layers as Layers
 import qualified NNTest.Metrics as Metrics
@@ -26,7 +27,7 @@ values :: (T.Shape sh) => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
 
 tests :: TestTree
-tests = testGroup "nn" [lossTests, Weights.tests, Data.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, Optimizer.tests, Regression.tests]
+tests = testGroup "nn" [lossTests, Weights.tests, Data.tests, Activation.tests, Initialization.tests, Metrics.tests, Layers.tests, Network.tests, NNTest.Forward.tests, Optimizer.tests, Regression.tests]
 
 lossTests :: TestTree
 lossTests =

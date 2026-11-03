@@ -6,7 +6,9 @@
 -- import qualified Synapse.NN as NN
 -- @
 module Synapse.NN
-  ( ExecutionMode (..),
+  ( Forward (..),
+    stateful,
+    ExecutionMode (..),
     extractWeights,
     loadWeights,
     Dataset (..),
@@ -66,6 +68,7 @@ where
 import Synapse.NN.Activation (leakyRelu, relu, sigmoid, sin, softplus, tanh)
 import Synapse.NN.Data (Batch (..), Dataset (..), LastBatch (..), SomeBatch (..), batchMask, batchSize, getSample, loadBatches, shuffle, withBatch)
 import Synapse.NN.Execution (ExecutionMode (..))
+import Synapse.NN.Forward (Forward (..), stateful)
 import Synapse.NN.Initialization (kaimingNormal, kaimingUniform, normal, uniform, xavierNormal, xavierUniform)
 import Synapse.NN.Layers
 import Synapse.NN.Loss (binaryCrossEntropy, binaryCrossEntropyWithLogits, crossEntropy, huber, mae, mse, negativeLogLikelihood, smoothL1, smoothLabels, unsafeCrossEntropy, unsafeCrossEntropySmoothed, unsafeNegativeLogLikelihood)

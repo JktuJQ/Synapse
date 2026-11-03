@@ -8,6 +8,7 @@
 -- | Root mean square propagation.
 module Synapse.NN.Optimizers.RMSprop (RMSprop (..)) where
 
+import Control.Monad.Trans.State.Strict (get, put)
 import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
 
@@ -24,7 +25,9 @@ data RMSprop = RMSprop
 instance (Differentiable p, ParametersConstraints Floating p) => Optimizer RMSprop p where
   type OptimizerState RMSprop p = p
   initialState _ p = updateParameters @Floating (\_ _ -> 0) p p
-  optimizerStep (RMSprop lr alpha epsilon) p g previous =
+  optimizerStep (RMSprop lr alpha epsilon) p g = do
+    previous <- get
     let square = updateParameters @Floating (\v gradient -> realToFrac alpha * v + realToFrac (1 - alpha) * gradient * gradient) previous g
         direction = updateParameters @Floating (\gradient v -> gradient / (sqrt v + realToFrac epsilon)) g square
-     in (updateParameters @Floating (\parameter delta -> parameter - realToFrac lr * delta) p direction, square)
+    put square
+    pure $ updateParameters @Floating (\parameter delta -> parameter - realToFrac lr * delta) p direction

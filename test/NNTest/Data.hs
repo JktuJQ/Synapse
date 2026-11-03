@@ -10,6 +10,7 @@ module NNTest.Data (tests) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (foldM, forM_)
+import Control.Monad.Trans.State.Strict (evalState)
 import Data.Char (ord)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.IORef (modifyIORef', newIORef, readIORef)
@@ -48,7 +49,7 @@ step parameters inputs targets mask =
       objective :: forall s. (AG.Context s) => NN.Dense 1 1 (AG.Tensor s) Double -> AG.Tensor s '[] Double
       objective p = NN.mse (\errors -> T.sum (errors * AG.constant weights) / AG.constant (T.sum weights)) (NN.dense p (AG.constant inputs)) (AG.constant targets)
       gradients = AG.gradient objective parameters
-   in fst (NN.optimizerStep (NN.SGD 0.01) parameters gradients ())
+   in evalState (NN.optimizerStep (NN.SGD 0.01) parameters gradients) ()
 
 train :: NN.LastBatch Double Double -> [Double]
 train policy =

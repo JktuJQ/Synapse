@@ -111,5 +111,5 @@ tests =
           Compiler.rejects "test/NNTest/Fixtures/Rejected/DenseScalar.hs" "Matmul requires tensors of rank at least one",
       testProperty "dense rejects an incorrect declared output shape" $
         H.withTests 1 $
-          Compiler.rejects "test/NNTest/Fixtures/Rejected/DenseOutput.hs" "Cannot broadcast dimension 3 to 4"
+          Compiler.rejects "test/NNTest/Fixtures/Rejected/DenseOutput.hs" "Couldn't match type"
     ]

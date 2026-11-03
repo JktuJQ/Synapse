@@ -8,6 +8,7 @@
 -- | Stochastic gradient descent with optional momentum and Nesterov updates.
 module Synapse.NN.Optimizers.SGD (SGD (..), Momentum (..)) where
 
+import Control.Monad.Trans.State.Strict (get, put)
 import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
 
@@ -23,8 +24,8 @@ newtype SGD = SGD
 instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer SGD p where
   type OptimizerState SGD p = ()
   initialState _ _ = ()
-  optimizerStep (SGD lr) parameters gradients () =
-    (updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients, ())
+  optimizerStep (SGD lr) parameters gradients =
+    pure $ updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients
 
 -- | Momentum SGD: @v' = momentum * v + gradient@.
 -- Nesterov uses @gradient + momentum * v'@ as the update direction.
@@ -39,7 +40,9 @@ data Momentum = Momentum
 instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer Momentum p where
   type OptimizerState Momentum p = p
   initialState _ p = updateParameters @Fractional (\_ _ -> 0) p p
-  optimizerStep (Momentum lr coefficient nesterov) p g velocity =
+  optimizerStep (Momentum lr coefficient nesterov) p g = do
+    velocity <- get
     let nextVelocity = updateParameters @Fractional (\v gradient -> realToFrac coefficient * v + gradient) velocity g
         direction = if nesterov then updateParameters @Fractional (\gradient v -> gradient + realToFrac coefficient * v) g nextVelocity else nextVelocity
-     in (updateParameters @Fractional (\parameter gradient -> parameter - realToFrac lr * gradient) p direction, nextVelocity)
+    put nextVelocity
+    pure $ updateParameters @Fractional (\parameter gradient -> parameter - realToFrac lr * gradient) p direction

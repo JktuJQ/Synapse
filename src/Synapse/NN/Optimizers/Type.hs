@@ -19,6 +19,7 @@ module Synapse.NN.Optimizers.Type
   )
 where
 
+import Control.Monad.Trans.State.Strict (State)
 import Synapse.Autograd.Execution.Variable (ValueTree (..), Values (..))
 import Synapse.Autograd.Tensor ()
 import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
@@ -27,7 +28,8 @@ import qualified Synapse.Tensor.Type as T
 
 -- | Optimizers for a parameter structure.
 -- The initial state is constructed before the first step.
--- Updated parameters and state can be passed directly to the next step.
+-- State actions compose successive updates without manually passing optimizer state.
+-- Define 'initialState' and 'optimizerStep'; run steps with @runState@ or @evalState@.
 class Optimizer optimizer parameters where
   -- | Accumulated values carried between updates.
   type OptimizerState optimizer parameters
@@ -35,14 +37,10 @@ class Optimizer optimizer parameters where
   -- | Initialize optimizer state for the supplied parameters.
   initialState :: optimizer -> parameters -> OptimizerState optimizer parameters
 
-  -- | Update parameters using their gradients and the previous optimizer state.
-  -- Returns the new parameters followed by the new state.
-  optimizerStep ::
-    optimizer ->
-    parameters ->
-    parameters ->
-    OptimizerState optimizer parameters ->
-    (parameters, OptimizerState optimizer parameters)
+  -- | Update parameters using their gradients in a pure state computation.
+  -- Initialize the state once with 'initialState' and carry it between updates.
+  -- Successive steps compose directly in @do@ notation.
+  optimizerStep :: optimizer -> parameters -> parameters -> State (OptimizerState optimizer parameters) parameters
 
 -- | Compute new parameters by applying an update formula to each parameter and its corresponding gradient.
 -- The formula receives the current parameter component first and its gradient second, and returns the updated component.

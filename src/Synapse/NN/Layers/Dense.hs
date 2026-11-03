@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -9,6 +10,7 @@
 -- | Fully connected layers acting on the last input dimension.
 module Synapse.NN.Layers.Dense (Dense (..), dense) where
 
+import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
 import Synapse.Tensor.Ops (TensorOps)
@@ -42,7 +44,9 @@ type instance WithTensor t (Dense in_features out_features T.Tensor a) = Dense i
 -- The input must have at least one dimension, with @in_features@ elements on the last axis.
 -- Leading input dimensions are preserved, and the last dimension becomes @out_features@.
 dense ::
-  ( KnownNat in_features,
+  forall in_features out_features in_sh out_sh t a {arrow}.
+  ( Arrow arrow,
+    KnownNat in_features,
     KnownNat out_features,
     Shape in_sh,
     out_sh ~ MatmulShape in_sh '[in_features, out_features],
@@ -53,6 +57,5 @@ dense ::
     Num (t out_sh a)
   ) =>
   Dense in_features out_features t a ->
-  t in_sh a ->
-  t out_sh a
-dense parameters input = matmul input (denseWeights parameters) + broadcast (denseBias parameters)
+  arrow (t in_sh a) (t out_sh a)
+dense parameters = arr $ \input -> matmul input (denseWeights parameters) + broadcast (denseBias parameters)

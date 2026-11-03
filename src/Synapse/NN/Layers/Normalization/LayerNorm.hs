@@ -11,6 +11,7 @@
 -- | Normalization over trailing tensor dimensions.
 module Synapse.NN.Layers.Normalization.LayerNorm (LayerNorm (..), layerNorm) where
 
+import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (Nat)
 import Synapse.NN.Layers.Normalization.Statistics (expand, moments)
@@ -39,13 +40,12 @@ type instance WithTensor t (LayerNorm normalized Tensor.Tensor a) = LayerNorm no
 -- The normalized dimensions are inferred from the parameters and must match the input suffix.
 -- Epsilon must be positive; training and evaluation use the same computation.
 layerNorm ::
-  forall normalized sh t a xs.
-  (xs ~ LayerNormAxes normalized sh, TensorOps t a, RealFloat a, Floating (TensorElement a), Floating (t sh a), Shape sh, Shape normalized, NonEmpty normalized, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, CanBroadcast normalized sh) =>
+  forall normalized sh t a xs {arrow}.
+  (Arrow arrow, xs ~ LayerNormAxes normalized sh, TensorOps t a, RealFloat a, Floating (TensorElement a), Floating (t sh a), Shape sh, Shape normalized, NonEmpty normalized, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, CanBroadcast normalized sh) =>
   Double ->
   LayerNorm normalized t a ->
-  t sh a ->
-  t sh a
-layerNorm epsilon parameters input =
+  arrow (t sh a) (t sh a)
+layerNorm epsilon parameters = arr $ \input ->
   let (mean, variance) = moments @xs input
       normalized = (input - expand @xs input mean) / sqrt (expand @xs input variance + realToFrac epsilon)
    in normalized * T.broadcast (layerNormWeights parameters) + T.broadcast (layerNormBias parameters)

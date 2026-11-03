@@ -3,6 +3,7 @@
 
 module NNTest.Layers.Convolution (tests) where
 
+import Control.Monad.Trans.State.Strict (evalState)
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
@@ -66,7 +67,7 @@ propRecords = H.withTests 1 $ H.property $ do
   let parameters = NN.Convolution (T.fromList @'[2, 1, 1] [2, 3]) (T.fromList @'[2] [0.5, -1]) :: NN.Convolution 1 2 '[1] 1 T.Tensor Double
       execute = T.run2 T.CPU $ \p batch ->
         let (objective, gradient) = AG.backprop (\layer -> T.sum $ NN.conv1d @'[1] @'[0, 0] @'[1] layer $ AG.constant batch) p
-            (updatedParameters, _) = NN.optimizerStep (NN.SGD 0.1) p gradient ()
+            updatedParameters = evalState (NN.optimizerStep (NN.SGD 0.1) p gradient) ()
          in (objective, updatedParameters)
       materialized = T.run T.CPU parameters
       input = T.fromListData @'[1, 1, 3] [1, 2, 3 :: Double]

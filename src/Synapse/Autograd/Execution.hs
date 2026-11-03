@@ -34,6 +34,8 @@ evaluate f input = rebuild @T.Tensor $ BPE.evalBP0 result
 
 -- | Return the output and the gradient of the sum of its tensor elements.
 -- Unused inputs receive zero tensors with their original shapes.
+-- Auxiliary outputs such as updated model state can be returned alongside the result
+-- using 'constant'; these outputs do not contribute to the input gradients.
 backprop ::
   forall a b.
   (Differentiable a, Differentiable b) =>

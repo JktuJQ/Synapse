@@ -78,7 +78,7 @@ trainingStep parameters features targets mask =
       objective :: (AG.Context s) => Parameters (AG.Tensor s) -> AG.Tensor s '[] Double
       objective p = NN.mse (\errors -> T.sum (errors * AG.constant weights) / AG.constant (T.sum weights)) (predict p (AG.constant features)) (AG.constant targets)
       (loss, gradients) = AG.backprop objective parameters
-      (updated, ()) = NN.optimizerStep (NN.SGD 0.02) parameters gradients ()
+      updated = NN.evalState (NN.optimizerStep (NN.SGD 0.02) parameters gradients) ()
    in (loss, updated)
 
 validationStep ::

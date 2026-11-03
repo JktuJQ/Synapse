@@ -8,6 +8,7 @@
 module NNTest.Regression (tests) where
 
 import Control.Monad (forM_)
+import Control.Monad.Trans.State.Strict (evalState)
 import GHC.Generics (Generic)
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
@@ -47,7 +48,7 @@ step ::
   (T.Tensor '[] Double, Regression T.Tensor Double)
 step optimizer parameters inputs targets =
   let (loss, gradients) = AG.backprop (objective inputs targets) parameters
-      (updated, ()) = NN.optimizerStep optimizer parameters gradients (NN.initialState optimizer parameters)
+      updated = evalState (NN.optimizerStep optimizer parameters gradients) (NN.initialState optimizer parameters)
    in (loss, updated)
 
 prepareStep ::

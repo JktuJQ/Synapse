@@ -11,6 +11,7 @@
 -- | Per-channel normalization with explicit running statistics.
 module Synapse.NN.Layers.Normalization.BatchNorm (BatchNorm (..), BatchNormState (..), initialBatchNormState, batchNorm) where
 
+import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
 import Synapse.NN.Execution (ExecutionMode (..))
@@ -60,16 +61,15 @@ initialBatchNormState = BatchNormState 0 1
 -- Empty training inputs preserve running statistics; a nonempty training region requires at least two elements per channel.
 -- Epsilon must be positive and momentum must lie in @[0, 1]@.
 batchNorm ::
-  forall axis channels sh t a xs.
-  (xs ~ BatchNormAxes axis sh, AxisSize axis sh ~ channels, ReduceShape xs sh ~ '[channels], KnownNat channels, TensorOps t a, RealFloat a, Floating (TensorElement a), Floating (t sh a), Shape sh, Axes xs, CanReduce xs sh) =>
+  forall axis channels sh t a xs {arrow}.
+  (Arrow arrow, xs ~ BatchNormAxes axis sh, AxisSize axis sh ~ channels, ReduceShape xs sh ~ '[channels], KnownNat channels, TensorOps t a, RealFloat a, Floating (TensorElement a), Floating (t sh a), Shape sh, Axes xs, CanReduce xs sh) =>
   ExecutionMode ->
   Double ->
   Double ->
   BatchNorm channels t a ->
   BatchNormState channels Tensor.Tensor a ->
-  t sh a ->
-  (t sh a, BatchNormState channels Tensor.Tensor a)
-batchNorm mode epsilon momentum parameters state input =
+  arrow (t sh a) (t sh a, BatchNormState channels Tensor.Tensor a)
+batchNorm mode epsilon momentum parameters state = arr $ \input ->
   let apply mean variance =
         let normalized = (input - expand @xs input mean) / sqrt (expand @xs input variance + realToFrac epsilon)
          in normalized * expand @xs input (batchNormWeights parameters) + expand @xs input (batchNormBias parameters)

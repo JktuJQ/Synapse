@@ -24,7 +24,7 @@ trainingStep ::
   (T.Tensor '[] Double, (T.Tensor '[] Double, NN.Dense 2 3 T.Tensor Double))
 trainingStep parameters features targets =
   let (loss, gradients) = AG.backprop (\p -> NN.unsafeCrossEntropy @1 T.mean (predict p $ AG.constant features) targets) parameters
-      (updated, ()) = NN.optimizerStep (NN.SGD 0.1) parameters gradients ()
+      updated = NN.evalState (NN.optimizerStep (NN.SGD 0.1) parameters gradients) ()
       accuracy = NN.accuracy @1 (predict parameters features) targets
    in (loss, (accuracy, updated))
 

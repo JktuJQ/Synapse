@@ -12,6 +12,7 @@
 -- | Channels-first convolution parameters and their functional application.
 module Synapse.NN.Layers.Convolution (Convolution (..), TransposedConvolution (..), conv1d, conv2d, conv3d, convTranspose1d, convTranspose2d, convTranspose3d) where
 
+import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (Div, KnownNat, Mod, Nat)
 import Synapse.Tensor.Ops (TensorOps)
@@ -54,8 +55,9 @@ type instance WithTensor t (TransposedConvolution cin cout kernel groups Tensor.
 -- Type arguments specify stride, @[left, right]@ padding and dilation.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 conv1d ::
-  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {length} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {length} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -70,16 +72,16 @@ conv1d ::
     CanBroadcast '[out_channels, 1] out_sh
   ) =>
   Convolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, length] a ->
-  t out_sh a
-conv1d parameters input = T.conv1d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1] (convolutionBias parameters))
+  arrow (t '[batch, in_channels, length] a) (t out_sh a)
+conv1d parameters = arr $ \input -> T.conv1d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1] (convolutionBias parameters))
 
 -- | Apply a 2D convolution and add bias to every output channel in NCHW layout.
 -- Type arguments specify stride, @[top, bottom, left, right]@ padding and dilation.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 conv2d ::
-  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {height} {width} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {height} {width} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -94,16 +96,16 @@ conv2d ::
     CanBroadcast '[out_channels, 1, 1] out_sh
   ) =>
   Convolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, height, width] a ->
-  t out_sh a
-conv2d parameters input = T.conv2d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1, 1] (convolutionBias parameters))
+  arrow (t '[batch, in_channels, height, width] a) (t out_sh a)
+conv2d parameters = arr $ \input -> T.conv2d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1, 1] (convolutionBias parameters))
 
 -- | Apply a 3D convolution and add bias to every output channel in NCDHW layout.
 -- Type arguments specify stride, @[front, back, top, bottom, left, right]@ padding and dilation.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 conv3d ::
-  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {depth} {height} {width} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation {in_channels} {out_channels} {kernel} {groups} {batch} {depth} {height} {width} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -118,16 +120,16 @@ conv3d ::
     CanBroadcast '[out_channels, 1, 1, 1] out_sh
   ) =>
   Convolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, depth, height, width] a ->
-  t out_sh a
-conv3d parameters input = T.conv3d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1, 1, 1] (convolutionBias parameters))
+  arrow (t '[batch, in_channels, depth, height, width] a) (t out_sh a)
+conv3d parameters = arr $ \input -> T.conv3d @stride @padding @dilation @groups input (convolutionWeights parameters) + broadcast (reshape @'[out_channels, 1, 1, 1] (convolutionBias parameters))
 
 -- | Apply a 1D transposed convolution and add bias to every output channel in NCL layout.
 -- Type arguments specify stride, @[left, right]@ padding and dilation, then @[extra_length]@ output padding.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 convTranspose1d ::
-  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {length} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {length} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -143,16 +145,16 @@ convTranspose1d ::
     CanBroadcast '[out_channels, 1] out_sh
   ) =>
   TransposedConvolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, length] a ->
-  t out_sh a
-convTranspose1d parameters input = T.convTranspose1d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1] (transposedBias parameters))
+  arrow (t '[batch, in_channels, length] a) (t out_sh a)
+convTranspose1d parameters = arr $ \input -> T.convTranspose1d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1] (transposedBias parameters))
 
 -- | Apply a 2D transposed convolution and add bias to every output channel in NCHW layout.
 -- Type arguments specify stride, @[top, bottom, left, right]@ padding and dilation, then @[extra_height, extra_width]@ output padding.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 convTranspose2d ::
-  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {height} {width} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {height} {width} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -168,16 +170,16 @@ convTranspose2d ::
     CanBroadcast '[out_channels, 1, 1] out_sh
   ) =>
   TransposedConvolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, height, width] a ->
-  t out_sh a
-convTranspose2d parameters input = T.convTranspose2d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1, 1] (transposedBias parameters))
+  arrow (t '[batch, in_channels, height, width] a) (t out_sh a)
+convTranspose2d parameters = arr $ \input -> T.convTranspose2d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1, 1] (transposedBias parameters))
 
 -- | Apply a 3D transposed convolution and add bias to every output channel in NCDHW layout.
 -- Type arguments specify stride, @[front, back, top, bottom, left, right]@ padding and dilation, then @[extra_depth, extra_height, extra_width]@ output padding.
 -- Channel counts, kernel sizes and groups are inferred from the parameter record.
 convTranspose3d ::
-  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {depth} {height} {width} {t} a out_sh.
-  ( TensorOps t a,
+  forall stride padding dilation extra {in_channels} {out_channels} {kernel} {groups} {batch} {depth} {height} {width} {t} a out_sh {arrow}.
+  ( Arrow arrow,
+    TensorOps t a,
     Num (Tensor.TensorElement a),
     Num (t out_sh a),
     KnownNat out_channels,
@@ -193,6 +195,5 @@ convTranspose3d ::
     CanBroadcast '[out_channels, 1, 1, 1] out_sh
   ) =>
   TransposedConvolution in_channels out_channels kernel groups t a ->
-  t '[batch, in_channels, depth, height, width] a ->
-  t out_sh a
-convTranspose3d parameters input = T.convTranspose3d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1, 1, 1] (transposedBias parameters))
+  arrow (t '[batch, in_channels, depth, height, width] a) (t out_sh a)
+convTranspose3d parameters = arr $ \input -> T.convTranspose3d @stride @padding @dilation @groups @extra input (transposedWeights parameters) + broadcast (reshape @'[out_channels, 1, 1, 1] (transposedBias parameters))
