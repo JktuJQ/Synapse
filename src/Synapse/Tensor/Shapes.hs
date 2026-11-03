@@ -22,6 +22,7 @@ module Synapse.Tensor.Shapes
     Slice,
     SliceAxis (..),
     CanIndex,
+    LookupRowsShape,
     CanSlice,
     SliceShape,
     MatmulShape,
@@ -65,7 +66,7 @@ import Synapse.Tensor.Shapes.Axes
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Convolution (Conv1dShape, Conv2dShape, Conv3dShape, ConvTranspose1dShape, ConvTranspose2dShape, ConvTranspose3dShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..), ShapeSize, ShapeToDIM)
-import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, Slice, SliceAxis (..), SliceShape)
+import Synapse.Tensor.Shapes.Index (CanIndex, CanSlice, Index, LookupRowsShape, Slice, SliceAxis (..), SliceShape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Synapse.Tensor.Shapes.Normalization (BatchNormAxes, LayerNormAxes)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)

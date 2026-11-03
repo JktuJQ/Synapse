@@ -16,6 +16,7 @@ module Synapse.Tensor.Shapes.Index
     Slice (..),
     CanIndex,
     CanGather,
+    LookupRowsShape,
     CanSlice,
     SliceShape,
   )
@@ -40,6 +41,12 @@ import Synapse.Tensor.Shapes.Axes (CanSelectAxes, RemoveAxis)
 -- The result has the shape of the indices.
 type CanGather axis source indices =
   (CanSelectAxes '[axis] source, CanSelectAxes '[axis] indices, RemoveAxis axis source ~ RemoveAxis axis indices)
+
+-- | Shape of complete rows selected by an arbitrary-shaped index tensor.
+-- Appends the row width to the index shape, so @'[batch, time]@ becomes @'[batch, time, width]@.
+type family LookupRowsShape (indices :: [Nat]) (width :: Nat) :: [Nat] where
+  LookupRowsShape '[] width = '[width]
+  LookupRowsShape (dim ': rest) width = dim ': LookupRowsShape rest width
 
 -- | Ranges use an exclusive stop and a positive step.
 data SliceAxis a

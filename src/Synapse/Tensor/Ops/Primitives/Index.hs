@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Element access and region selection on ordinary staged tensors.
-module Synapse.Tensor.Ops.Primitives.Index (coordinate, index, indexAt, dynamicIndexOr, unsafeGather, gatherOr, indexInBounds, gatherIndex, gatherReducedIndex, unsafeGatherReduced, slice) where
+module Synapse.Tensor.Ops.Primitives.Index (coordinate, index, indexAt, dynamicIndexOr, unsafeGather, gatherOr, indexInBounds, gatherIndex, gatherReducedIndex, unsafeGatherReduced, unsafeLookupRows, slice) where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
@@ -18,6 +18,7 @@ import Synapse.Tensor.Shapes.Index
     CanIndex,
     CanSlice,
     Index,
+    LookupRowsShape,
     Slice,
     SliceAxis (..),
     SliceShape,
@@ -116,3 +117,14 @@ gatherReducedIndex (Tensor indices) ix =
 unsafeGatherReduced :: forall axis sh a. (KnownNat axis, Shape sh, Shape (RemoveAxis axis sh), DType a) => Tensor sh a -> Tensor (RemoveAxis axis sh) Int -> Tensor (RemoveAxis axis sh) a
 unsafeGatherReduced input indices = Tensor $ A.generate (A.constant (backendShape (Proxy @(RemoveAxis axis sh)))) $ \ix ->
   unTensorElement (indexAt (gatherReducedIndex @axis @sh indices ix) input)
+
+-- | Select complete rows without expanding the table or the index tensor.
+unsafeLookupRows :: forall rows width indices a. (Shape indices, Shape (LookupRowsShape indices width), DType a) => Tensor '[rows, width] a -> Tensor indices Int -> Tensor (LookupRowsShape indices width) a
+unsafeLookupRows (Tensor table) (Tensor indices) =
+  let outputShape = A.constant $ backendShape $ Proxy @(LookupRowsShape indices width)
+      columns = A.indexHead $ A.shape table
+      selected = A.flatten indices
+   in Tensor $ A.generate outputShape $ \ix ->
+        let offset = A.toIndex outputShape ix
+            row = selected A.! A.index1 (offset `A.quot` columns)
+         in table A.! A.index2 row (offset `A.rem` columns)

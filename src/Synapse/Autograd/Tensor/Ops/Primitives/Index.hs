@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Scatter selected-element and slice seeds back into the input shape.
-module Synapse.Autograd.Tensor.Ops.Primitives.Index (index, indexAt, dynamicIndexOr, gather, gatherReduced, slice) where
+module Synapse.Autograd.Tensor.Ops.Primitives.Index (index, indexAt, dynamicIndexOr, gather, gatherReduced, lookupRows, slice) where
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
@@ -15,7 +15,7 @@ import Synapse.Autograd.Tensor.Ops.Primitives.Shape (shapeOf)
 import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import Synapse.Tensor.Shapes.Axes (RemoveAxis)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape, strides)
-import Synapse.Tensor.Shapes.Index (CanGather, Index, Slice, SliceAxis (..), coordinates, sliceAxes)
+import Synapse.Tensor.Shapes.Index (CanGather, Index, LookupRowsShape, Slice, SliceAxis (..), coordinates, sliceAxes)
 import Synapse.Tensor.Type (DType)
 import qualified Synapse.Tensor.Type as T
 
@@ -81,3 +81,15 @@ gatherReduced indices _ _ (T.Tensor gradient) =
   where
     zeros = A.fill (A.constant (backendShape (Proxy @sh))) (T.unTensorElement (0 :: T.TensorElement a))
     destination ix = let T.TensorIndex selected = Raw.gatherReducedIndex @axis @sh indices ix in A.Just_ selected
+
+-- | Sum selected row gradients, including repeated selections, into the original table.
+lookupRows :: forall rows width indices a. (Shape indices, Shape (LookupRowsShape indices width), DType a, Num (T.TensorElement a)) => T.Tensor indices Int -> T.Tensor '[rows, width] a -> T.Tensor (LookupRowsShape indices width) a -> T.Tensor (LookupRowsShape indices width) a -> T.Tensor '[rows, width] a
+lookupRows (T.Tensor indices) (T.Tensor table) _ (T.Tensor gradient) =
+  let columns = A.indexHead $ A.shape table
+      selected = A.flatten indices
+      zeros = A.fill (A.shape table) (T.unTensorElement (0 :: T.TensorElement a))
+      destination ix =
+        let offset = A.unindex1 ix
+            row = selected A.! A.index1 (offset `A.quot` columns)
+         in A.Just_ $ A.index2 row (offset `A.rem` columns)
+   in T.Tensor $ A.permute (\x y -> T.unTensorElement (T.TensorElement x + T.TensorElement y)) zeros destination (A.flatten gradient)

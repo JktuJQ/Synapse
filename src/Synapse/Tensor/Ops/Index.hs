@@ -10,7 +10,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Static element indexing and multidimensional region selection.
-module Synapse.Tensor.Ops.Index (Indexable (..), coordinate, index, unsafeDynamicIndex, dynamicIndexOr, unsafeGather, gatherOr, slice) where
+module Synapse.Tensor.Ops.Index (Indexable (..), coordinate, index, unsafeDynamicIndex, dynamicIndexOr, unsafeGather, gatherOr, unsafeLookupRows, slice) where
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
@@ -19,7 +19,7 @@ import Synapse.Tensor.Ops (TensorOps (..))
 import qualified Synapse.Tensor.Ops.Primitives.Index as Raw
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, Slice, SliceShape)
+import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, LookupRowsShape, Slice, SliceShape)
 import Synapse.Tensor.Type (Element, Tensor, TensorElement, TensorIndex)
 import Prelude hiding ((!!))
 
@@ -61,6 +61,13 @@ unsafeGather tensor indices = lift1 (\input -> Raw.unsafeGather @axis input indi
 -- Empty source axes produce only fallback values, and invalid selections contribute no source gradient.
 gatherOr :: forall {t} axis sh indices a. (TensorOps t a, KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices) => a -> t sh a -> Tensor indices Int -> t indices a
 gatherOr fallback tensor indices = lift1 (\input -> Raw.gatherOr @axis fallback input indices) (Pullback.gather @axis True indices) tensor
+
+-- | Select complete rows of a matrix using an ordinary integer tensor of indices.
+-- Appends the matrix column count to the index shape; scalar indices select one row vector.
+-- Indices must lie in @[0, rows)@; values are unchecked and invalid indices may cause invalid memory access.
+-- Repeated selections accumulate gradients into their source rows; indices are not differentiated.
+unsafeLookupRows :: forall {t} rows width indices a. (TensorOps t a, Shape '[rows, width], Shape indices, Shape (LookupRowsShape indices width)) => t '[rows, width] a -> Tensor indices Int -> t (LookupRowsShape indices width) a
+unsafeLookupRows table indices = lift1 (`Raw.unsafeLookupRows` indices) (Pullback.lookupRows indices) table
 
 -- | Select a region using one descriptor per axis.
 -- At removes an axis; ranges preserve it.

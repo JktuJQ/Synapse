@@ -19,7 +19,17 @@ tests :: TestTree
 tests =
   testGroup
     "operations"
-    [ testProperty "dynamic indexing and fallback respect individual coordinates" (H.withTests 1 propDynamic),
+    [ testProperty "row lookup selects vectors with a trailing feature axis" $ H.withTests 1 $ H.property $ do
+        let table = T.fromList @'[3, 2] [10, 11, 20, 21, 30, 31 :: Int]
+            indices = T.fromList @'[2, 2] [2, 0, 1, 2]
+            output :: T.Tensor '[2, 2, 2] Int
+            output = T.unsafeLookupRows table indices
+        T.toList (T.run T.CPU output) H.=== [30, 31, 10, 11, 20, 21, 30, 31],
+      testProperty "row lookup supports non-numeric tensor elements" $ H.withTests 1 $ H.property $ do
+        let table = T.fromList @'[2, 2] [True, False, False, True]
+            indices = T.fromList @'[3] [1, 0, 1]
+        T.toList (T.run T.CPU $ T.unsafeLookupRows table indices) H.=== [False, True, True, False, False, True],
+      testProperty "dynamic indexing and fallback respect individual coordinates" (H.withTests 1 propDynamic),
       testProperty "gather selects each axis and safely handles empty inputs" (H.withTests 1 propGather),
       testProperty "index operators read coordinates and elements" (H.withTests 1 propOperators),
       testProperty "index reads elements in row-major order" propIndex,

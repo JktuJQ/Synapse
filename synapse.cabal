@@ -84,6 +84,7 @@ library
                     , Synapse.NN.Layers.Dropout
                     , Synapse.Tensor.Shapes.Normalization
                     , Synapse.NN.Layers.Dense
+                    , Synapse.NN.Layers.Embedding
                     , Synapse.NN.Optimizers
                     , Synapse.NN.Optimizers.Type
                     , Synapse.NN.Optimizers.SGD
@@ -217,6 +218,7 @@ test-suite synapse-test
                     , NNTest.Layers.Normalization
                     , NNTest.Layers.Dropout
                     , NNTest.Layers.Dense
+                    , NNTest.Layers.Embedding
                     , NNTest.Network
                     , NNTest.Optimizer
                     , NNTest.Regression
