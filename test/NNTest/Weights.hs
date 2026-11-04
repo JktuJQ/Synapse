@@ -11,6 +11,7 @@ import Data.Typeable (cast, typeRep)
 import GHC.Generics (Generic)
 import qualified Hedgehog as H
 import qualified NNTest.Weights.Public as Public
+import qualified NNTest.Weights.Safetensors as Safetensors
 import qualified Synapse.NN as NN
 import qualified Synapse.NN.Weights as Weights
 import qualified Synapse.Tensor as T
@@ -43,7 +44,43 @@ tests :: TestTree
 tests =
   testGroup
     "weight state"
-    [ testProperty "nested records extract only tensors and preserve destination metadata" $ H.withTests 1 $ H.property $ do
+    [ Safetensors.tests,
+      testProperty "dictionary adapters reject collisions and preserve selected entries" $ H.withTests 1 $ H.property $ do
+        let tensor = Weights.weightTensor (T.fromListData @'[] [1 :: Double])
+        dictionary <- H.evalEither $ Weights.weightsFromList [(["a"], tensor), (["b"], tensor)]
+        rejects (Weights.DuplicateField ["same"]) $ Weights.renameWeights (const ["same"]) dictionary
+        rejects (Weights.DuplicateField ["a"]) $ Weights.insertWeight ["a"] tensor dictionary
+        renamed <- H.evalEither $ Weights.renameWeights ("layer" :) dictionary
+        map fst (Weights.weightsToList renamed) H.=== [["layer", "a"], ["layer", "b"]]
+        let selected = Weights.filterWeights (== ["layer", "a"]) renamed
+        map fst (Weights.weightsToList selected) H.=== [["layer", "a"]]
+        inserted <- H.evalEither $ Weights.insertWeight ["new"] tensor $ Weights.deleteWeight ["layer", "a"] selected
+        map fst (Weights.weightsToList inserted) H.=== [["new"]],
+      testProperty "host tensor adapters transpose reshape and split packed projections" $ H.withTests 1 $ H.property $ do
+        source <- H.evalEither $ Weights.weightTensorFromList [3, 2] [1, 2, 3, 4, 5, 6 :: Double]
+        transposed <- H.evalEither $ Weights.permuteWeightTensor [1, 0] source
+        Weights.weightTensorShape transposed H.=== [2, 3]
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double transposed) H.=== Just [1, 3, 5, 2, 4, 6]
+        reshaped <- H.evalEither $ Weights.reshapeWeightTensor [6] transposed
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double reshaped) H.=== Just [1, 3, 5, 2, 4, 6]
+        middle <- H.evalEither $ Weights.sliceWeightTensor 0 1 1 source
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double middle) H.=== Just [3, 4]
+        column <- H.evalEither $ Weights.sliceWeightTensor 1 1 1 source
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double column) H.=== Just [2, 4, 6]
+        rejects (Weights.InvalidAxes [0, 0] [3, 2]) $ Weights.permuteWeightTensor [0, 0] source
+        rejects (Weights.InvalidSlice 1 1 2 [3, 2]) $ Weights.sliceWeightTensor 1 1 2 source
+        rejects (Weights.ElementCountMismatch 5 6) $ Weights.reshapeWeightTensor [5] source,
+      testProperty "host adapters support scalar identity empty outputs and type inspection" $ H.withTests 1 $ H.property $ do
+        scalar <- H.evalEither $ Weights.weightTensorFromList [] [True]
+        same <- H.evalEither $ Weights.permuteWeightTensor [] scalar
+        fmap Weights.valuesToList (Weights.weightTensorValues @Bool same) H.=== Just [True]
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double same) H.=== Nothing
+        empty <- H.evalEither $ Weights.weightTensorFromList [2, 0] ([] :: [Double])
+        transposed <- H.evalEither $ Weights.permuteWeightTensor [1, 0] empty
+        Weights.weightTensorShape transposed H.=== [0, 2]
+        fmap Weights.valuesToList (Weights.weightTensorValues @Double transposed) H.=== Just []
+        rejects (Weights.InvalidSlice (-1) 0 0 []) $ Weights.sliceWeightTensor (-1) 0 0 scalar,
+      testProperty "nested records extract only tensors and preserve destination metadata" $ H.withTests 1 $ H.property $ do
         let dictionary = NN.extractWeights parameters
             destination = Parameters (NN.Dense (T.fromListData @'[2, 1] [0, 0]) (T.fromListData @'[1] [0])) 0.3 ["destination"] False Nothing
         map fst (Weights.weightsToList dictionary) H.=== [["layer", "denseBias"], ["layer", "denseWeights"]]
