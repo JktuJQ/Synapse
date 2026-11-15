@@ -9,4 +9,7 @@ import qualified NNTest.Layers.Recurrent as Recurrent
 import Test.Tasty (TestTree, testGroup)
 
 tests :: TestTree
-tests = testGroup "layers" [Dense.tests, Convolution.tests, Normalization.tests, Dropout.tests, Embedding.tests, Recurrent.tests]
+tests =
+    testGroup
+        "layers"
+        [Dense.tests, Convolution.tests, Normalization.tests, Dropout.tests, Embedding.tests, Recurrent.tests]

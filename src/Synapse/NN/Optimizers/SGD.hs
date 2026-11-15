@@ -12,37 +12,42 @@ import Control.Monad.Trans.State.Strict (get, put)
 import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
 
--- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
--- The caller supplies a finite, nonnegative learning rate.
--- Hyperparameters are used without runtime validation.
+{- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
+The caller supplies a finite, nonnegative learning rate.
+Hyperparameters are used without runtime validation.
+-}
 newtype SGD = SGD
-  { -- | Step size applied to each gradient.
-    sgdLearningRate :: Double
-  }
-  deriving (Eq, Show)
+    { sgdLearningRate :: Double
+    -- ^ Step size applied to each gradient.
+    }
+    deriving (Eq, Show)
 
 instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer SGD p where
-  type OptimizerState SGD p = ()
-  initialState _ _ = ()
-  optimizerStep (SGD lr) parameters gradients =
-    pure $ updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients
+    type OptimizerState SGD p = ()
+    initialState _ _ = ()
+    optimizerStep (SGD lr) parameters gradients =
+        pure $ updateParameters @Fractional (\p g -> p - realToFrac lr * g) parameters gradients
 
--- | Momentum SGD: @v' = momentum * v + gradient@.
--- Nesterov uses @gradient + momentum * v'@ as the update direction.
--- Initial velocity is zero; no dampening or weight decay is applied.
+{- | Momentum SGD: @v' = momentum * v + gradient@.
+Nesterov uses @gradient + momentum * v'@ as the update direction.
+Initial velocity is zero; no dampening or weight decay is applied.
+-}
 data Momentum = Momentum
-  { momentumLearningRate :: Double,
-    momentumCoefficient :: Double,
-    momentumNesterov :: Bool
-  }
-  deriving (Eq, Show)
+    { momentumLearningRate :: Double
+    , momentumCoefficient :: Double
+    , momentumNesterov :: Bool
+    }
+    deriving (Eq, Show)
 
 instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer Momentum p where
-  type OptimizerState Momentum p = p
-  initialState _ p = updateParameters @Fractional (\_ _ -> 0) p p
-  optimizerStep (Momentum lr coefficient nesterov) p g = do
-    velocity <- get
-    let nextVelocity = updateParameters @Fractional (\v gradient -> realToFrac coefficient * v + gradient) velocity g
-        direction = if nesterov then updateParameters @Fractional (\gradient v -> gradient + realToFrac coefficient * v) g nextVelocity else nextVelocity
-    put nextVelocity
-    pure $ updateParameters @Fractional (\parameter gradient -> parameter - realToFrac lr * gradient) p direction
+    type OptimizerState Momentum p = p
+    initialState _ p = updateParameters @Fractional (\_ _ -> 0) p p
+    optimizerStep (Momentum lr coefficient nesterov) p g = do
+        velocity <- get
+        let nextVelocity = updateParameters @Fractional (\v gradient -> realToFrac coefficient * v + gradient) velocity g
+            direction =
+                if nesterov
+                    then updateParameters @Fractional (\gradient v -> gradient + realToFrac coefficient * v) g nextVelocity
+                    else nextVelocity
+        put nextVelocity
+        pure $ updateParameters @Fractional (\parameter gradient -> parameter - realToFrac lr * gradient) p direction

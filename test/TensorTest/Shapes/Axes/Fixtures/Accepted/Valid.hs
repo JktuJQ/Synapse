@@ -8,7 +8,7 @@ module Valid where
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Shapes.Axes as Axes
 
-selection :: (Axes.CanSelectAxes '[2, 0] '[2, 3, 4]) => ()
+selection :: Axes.CanSelectAxes '[2, 0] '[2, 3, 4] => ()
 selection = ()
 
 validSelection :: ()

@@ -10,12 +10,12 @@ import Test.Tasty (TestTree, testGroup)
 
 tests :: TestTree
 tests =
-  testGroup
-    "tensor"
-    [ TensorTest.Backend.tests,
-      TensorTest.Construction.tests,
-      TensorTest.Conversion.tests,
-      TensorTest.Ops.tests,
-      TensorTest.Random.tests,
-      TensorTest.Shapes.tests
-    ]
+    testGroup
+        "tensor"
+        [ TensorTest.Backend.tests
+        , TensorTest.Construction.tests
+        , TensorTest.Conversion.tests
+        , TensorTest.Ops.tests
+        , TensorTest.Random.tests
+        , TensorTest.Shapes.tests
+        ]

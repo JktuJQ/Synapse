@@ -7,10 +7,10 @@ import Test.Tasty (defaultMain, testGroup)
 
 main :: IO ()
 main =
-  defaultMain $
-    testGroup
-      "synapse"
-      [ TensorTest.tests,
-        AutogradTest.tests,
-        NNTest.tests
-      ]
+    defaultMain $
+        testGroup
+            "synapse"
+            [ TensorTest.tests
+            , AutogradTest.tests
+            , NNTest.tests
+            ]

@@ -1,0 +1,10 @@
+indentation: 4
+column-limit: 110
+function-arrows: leading
+single-constraint-parens: never
+haddock-location-signature: trailing
+comma-style: leading
+import-export-style: leading
+indent-wheres: false
+haddock-style: multi-line
+respectful: true

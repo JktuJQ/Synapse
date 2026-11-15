@@ -11,13 +11,13 @@ import Test.Tasty (TestTree, testGroup)
 
 tests :: TestTree
 tests =
-  testGroup
-    "operations"
-    [ TensorTest.Ops.Spatial.tests,
-      TensorTest.Ops.Convolution.tests,
-      TensorTest.Ops.Elementwise.tests,
-      TensorTest.Ops.Math.tests,
-      TensorTest.Ops.Index.tests,
-      TensorTest.Ops.Shape.tests,
-      TensorTest.Ops.Reduction.tests
-    ]
+    testGroup
+        "operations"
+        [ TensorTest.Ops.Spatial.tests
+        , TensorTest.Ops.Convolution.tests
+        , TensorTest.Ops.Elementwise.tests
+        , TensorTest.Ops.Math.tests
+        , TensorTest.Ops.Index.tests
+        , TensorTest.Ops.Shape.tests
+        , TensorTest.Ops.Reduction.tests
+        ]

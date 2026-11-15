@@ -28,7 +28,7 @@
             haskellPackages.ghcid
             haskellPackages.haskell-language-server
             haskellPackages.hlint
-            haskellPackages.ormolu
+            pkgs.haskellPackages.fourmolu
             pkgs.clang
             pkgs.llvm
             pkgs.libffi
@@ -39,6 +39,7 @@
           ACCELERATE_LLVM_CLANG_PATH = "${pkgs.llvmPackages.clang-unwrapped}/bin/clang";
 
           shellHook = ''
+            export PATH="${pkgs.haskellPackages.fourmolu}/bin:$PATH"
             echo "Synapse dev shell: GHC ${haskellPackages.ghc.version}"
           '';
         };

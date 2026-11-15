@@ -9,7 +9,7 @@ import GHC.TypeLits (natVal)
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Shapes.Axes as Axes
 
-proof :: (Axes.CanSelectAxes '[1, 1] '[2, 3]) => ()
+proof :: Axes.CanSelectAxes '[1, 1] '[2, 3] => ()
 proof = ()
 
 bad :: ()

@@ -6,8 +6,8 @@ import Test.Tasty (TestTree, testGroup)
 
 tests :: TestTree
 tests =
-  testGroup
-    "shapes"
-    [ TensorTest.Shapes.Axes.tests,
-      TensorTest.Shapes.Dimensions.tests
-    ]
+    testGroup
+        "shapes"
+        [ TensorTest.Shapes.Axes.tests
+        , TensorTest.Shapes.Dimensions.tests
+        ]
