@@ -6,6 +6,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module NNTest.Network (tests) where
 
@@ -26,12 +28,14 @@ data Parameters t a = Parameters
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor Double) = Parameters t Double
+instance T.TensorStructure (Parameters T.Tensor Double) where
+    type WithTensor t (Parameters T.Tensor Double) = Parameters t Double
 
 newtype Shared t a = Shared {sharedLayer :: NN.Dense 2 2 t a}
     deriving (Generic)
 
-type instance T.WithTensor t (Shared T.Tensor Double) = Shared t Double
+instance T.TensorStructure (Shared T.Tensor Double) where
+    type WithTensor t (Shared T.Tensor Double) = Shared t Double
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU

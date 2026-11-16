@@ -2,11 +2,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Generator initialization, random sampling, and Philox rounds.
 module Synapse.Tensor.Ops.Raw.Random
@@ -34,8 +36,9 @@ import System.Random (RandomGen, genWord64)
 import Synapse.Tensor.Data (fromList)
 import Synapse.Tensor.Ops.Elementwise (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Construction (element)
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), WithTensor)
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
+import Synapse.Tensor.Structure
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.Data.Bits as B
@@ -55,7 +58,8 @@ data StagedGenerator t = StagedGenerator (t '[2] Word32) (t '[] Word64)
 
 deriving stock instance (Show (t '[2] Word32), Show (t '[] Word64)) => Show (StagedGenerator t)
 
-type instance WithTensor t (StagedGenerator Tensor) = StagedGenerator t
+instance TensorStructure (StagedGenerator Tensor) where
+    type WithTensor t (StagedGenerator Tensor) = StagedGenerator t
 
 -- | Initialize a generator from a 64-bit seed.
 generatorFromSeed

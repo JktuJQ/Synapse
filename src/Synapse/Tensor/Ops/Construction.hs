@@ -31,11 +31,11 @@ module Synapse.Tensor.Ops.Construction
     , scalar
     ) where
 
-import Synapse.Tensor.Ops.Definition (TensorOps (fromElement, fromTensor))
+import Synapse.Tensor.Ops.Definition (TensorOps (Element, fromElement, fromTensor))
 import Synapse.Tensor.Ops.Elementwise (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Construction (element)
 import qualified Synapse.Tensor.Ops.Raw.Construction as Raw
-import Synapse.Tensor.Representation (Element, TensorElement, TensorIndex)
+import Synapse.Tensor.Representation (TensorElement, TensorIndex)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 
 -- | Generate each element from its multidimensional index.

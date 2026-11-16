@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Channels-first convolution parameters and their functional application.
 module Synapse.NN.Layers.Convolution
@@ -27,7 +28,7 @@ import GHC.TypeLits (Div, KnownNat, Mod, Nat)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import qualified Synapse.Tensor.Ops.Window as T
-import Synapse.Tensor.Representation (TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
@@ -39,6 +40,7 @@ import Synapse.Tensor.Shapes.Window
     , ConvTranspose2dShape
     , ConvTranspose3dShape
     )
+import Synapse.Tensor.Structure
 
 {- | Weights and per-output-channel bias for an ordinary spatial convolution.
 The kernel is a list of one, two or three spatial sizes; each filter consumes @in_channels / groups@ channels.
@@ -53,9 +55,10 @@ data Convolution (in_channels :: Nat) (out_channels :: Nat) (kernel :: [Nat]) (g
     }
     deriving (Generic)
 
-type instance
-    WithTensor t (Convolution cin cout kernel groups Tensor.Tensor a) =
-        Convolution cin cout kernel groups t a
+instance TensorStructure (Convolution cin cout kernel groups Tensor.Tensor a) where
+    type
+        WithTensor t (Convolution cin cout kernel groups Tensor.Tensor a) =
+            Convolution cin cout kernel groups t a
 
 {- | Weights and bias for a transposed spatial convolution.
 Each input channel has @out_channels / groups@ spatial filters; input and output channels are split into the same number of groups.
@@ -77,9 +80,10 @@ data
     }
     deriving (Generic)
 
-type instance
-    WithTensor t (TransposedConvolution cin cout kernel groups Tensor.Tensor a) =
-        TransposedConvolution cin cout kernel groups t a
+instance TensorStructure (TransposedConvolution cin cout kernel groups Tensor.Tensor a) where
+    type
+        WithTensor t (TransposedConvolution cin cout kernel groups Tensor.Tensor a) =
+            TransposedConvolution cin cout kernel groups t a
 
 {- | Apply a 1D convolution and add bias to every output channel in NCL layout.
 Type arguments specify stride, @[left, right]@ padding and dilation.

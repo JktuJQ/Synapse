@@ -6,33 +6,41 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Vector-Jacobian products for reductions and normalization.
-module Synapse.Autograd.Tensor.Ops.Primitives.Reduction
-    ( sum
+module Synapse.Autograd.Tensor.Ops.Pullback.Reduction
+    ( -- * Sums and means
+      sum
     , sumAxes
     , mean
     , meanAxes
+
+      -- * Norms
     , normL1
     , normL2
+
+      -- * Extrema
     , extremum
     , extremumAxes
+
+      -- * Exponential reductions and normalization
     , softmax
     , logSoftmax
     , logSumExp
     , logSumExpAxes
-    )
-where
+    ) where
 
 import Data.Proxy (Proxy (..))
-import Synapse.Autograd.Tensor.Ops.Primitives.Shape (axesOf, expandReduced, shapeOf, singletonAxis)
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import Prelude hiding (sum)
+
+import Synapse.Autograd.Tensor.Ops.Pullback.Shape (axesOf, expandReduced, shapeOf, singletonAxis)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Raw.Construction (element)
-import qualified Synapse.Tensor.Ops.Raw.Elementwise as H
-import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
 import Synapse.Tensor.Representation (DType, Tensor, TensorElement)
 import Synapse.Tensor.Shapes.Axes (Axes, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
-import Prelude hiding (sum)
+
+import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Raw.Elementwise as H
+import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
 
 -- | All axes removed by a full reduction.
 allAxes

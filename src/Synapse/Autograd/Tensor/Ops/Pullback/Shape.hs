@@ -9,30 +9,39 @@
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Shape transformations used by tensor pullbacks.
-module Synapse.Autograd.Tensor.Ops.Primitives.Shape
-    ( reshape
+module Synapse.Autograd.Tensor.Ops.Pullback.Shape
+    ( -- * Shape information
+      singletonAxis
+    , shapeOf
+    , axesOf
+
+      -- * Reduction seeds
+    , expandReduced
+
+      -- * Shape transformations
+    , reshape
     , broadcast
     , permuteAxes
     , transpose
     , concat
     , stack
-    , expandReduced
-    , shapeOf
-    , axesOf
-    , singletonAxis
-    , joinMatrixChunks
-    )
-where
 
-import qualified Data.Array.Accelerate as A
+      -- * Matrix assembly
+    , joinMatrixChunks
+    ) where
+
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
+import Prelude hiding (concat)
+
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
-import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Axes (Axes, axes)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, shape, shapeSize, strides)
-import Prelude hiding (concat)
+
+import qualified Data.Array.Accelerate as A
+
+import qualified Synapse.Tensor.Representation as T
 
 -- | Turn a selected axis into a singleton axis list.
 singletonAxis

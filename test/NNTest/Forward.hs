@@ -2,11 +2,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module NNTest.Forward (tests) where
 
@@ -31,7 +34,8 @@ data Parameters t = Parameters
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
+instance T.TensorStructure (Parameters T.Tensor) where
+    type WithTensor t (Parameters T.Tensor) = Parameters t
 
 data NetworkState t = NetworkState
     { statistics :: NN.BatchNormState 2 t Double
@@ -40,7 +44,8 @@ data NetworkState t = NetworkState
     }
     deriving (Generic)
 
-type instance T.WithTensor t (NetworkState T.Tensor) = NetworkState t
+instance T.TensorStructure (NetworkState T.Tensor) where
+    type WithTensor t (NetworkState T.Tensor) = NetworkState t
 
 statisticsLens
     :: Functor f

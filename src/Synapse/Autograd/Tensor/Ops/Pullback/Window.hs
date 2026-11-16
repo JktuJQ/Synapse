@@ -4,12 +4,23 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- | Reverse-mode rules for spatial convolutions and pooling.
-module Synapse.Autograd.Tensor.Ops.Primitives.Convolution (convolution, convTranspose, maxPool, avgPool) where
+-- | Pullbacks for patch extraction, convolutions, and pooling.
+module Synapse.Autograd.Tensor.Ops.Pullback.Window
+    ( -- * Patches
+      extractPatches
+    , combinePatches
 
-import qualified Data.Array.Accelerate as A
+      -- * Convolutions
+    , convolution
+    , convTranspose
+
+      -- * Pooling
+    , maxPool
+    , avgPool
+    ) where
+
 import GHC.TypeNats (KnownNat)
-import qualified Synapse.Tensor.Ops.Elementwise as E
+
 import Synapse.Tensor.Ops.Raw.Window
     ( combine
     , convolutionWindow
@@ -24,6 +35,49 @@ import Synapse.Tensor.Ops.Raw.Window
     )
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape (shape, shapeRank))
+
+import qualified Data.Array.Accelerate as A
+
+import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Raw.Window as Raw
+
+-- | Sum the seed's overlapping patches into the original input shape.
+extractPatches
+    :: forall kernel stride padding dilation input out a
+     . ( Shape input
+       , Shape kernel
+       , Shape stride
+       , Shape padding
+       , Shape dilation
+       , Shape out
+       , DType a
+       , Num (TensorElement a)
+       )
+    => Tensor input a
+    -> Tensor out a
+    -> Tensor out a
+    -> Tensor input a
+extractPatches _ _ = Raw.combinePatches @input @kernel @stride @padding @dilation
+
+-- | Extract output seed windows in the original patch layout.
+combinePatches
+    :: forall kernel stride padding dilation patches out a
+     . ( Shape patches
+       , Shape kernel
+       , Shape stride
+       , Shape padding
+       , Shape dilation
+       , Shape out
+       , DType a
+       , Num (TensorElement a)
+       )
+    => Tensor patches a
+    -> Tensor out a
+    -> Tensor out a
+    -> Tensor patches a
+combinePatches (Tensor patches) _ (Tensor seed) = Tensor $ A.reshape (A.shape patches) $ Raw.matrixToPatches dims $ Raw.extract dims $ A.flatten seed
+  where
+    dims = Raw.window (shape @out) (shape @kernel) (shape @stride) (shape @padding) (shape @dilation)
 
 -- | Differentiate kernels and inputs through the same spatial window mapping.
 convolution

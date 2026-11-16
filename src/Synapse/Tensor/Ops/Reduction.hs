@@ -41,8 +41,8 @@ module Synapse.Tensor.Ops.Reduction
 
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Reduction as Pullback
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Reduction as Pullback
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
 import Synapse.Tensor.Representation (Tensor, TensorElement)
@@ -57,11 +57,10 @@ sum
     => t sh a
     -> t '[] a
 sum =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         Raw.sum
-        (\primalInput -> let output = Raw.sum primalInput in (output, (primalInput, output)))
-        (uncurry Pullback.sum)
+        Pullback.sum
 
 -- | Sum over selected axes and remove them from the output shape.
 sumAxes
@@ -70,11 +69,10 @@ sumAxes
     => t sh a
     -> t (ReduceShape xs sh) a
 sumAxes =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (Raw.sumAxes @xs)
-        (\primalInput -> let output = (Raw.sumAxes @xs) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.sumAxes @xs))
+        (Pullback.sumAxes @xs)
 
 -- | Mean of all floating point elements, returning NaN for an empty tensor.
 mean
@@ -83,11 +81,10 @@ mean
     => t sh a
     -> t '[] a
 mean =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         Raw.mean
-        (\primalInput -> let output = Raw.mean primalInput in (output, (primalInput, output)))
-        (uncurry Pullback.mean)
+        Pullback.mean
 
 -- | Compute means over the selected axes.
 meanAxes
@@ -103,11 +100,10 @@ meanAxes
     => t sh a
     -> t (ReduceShape xs sh) a
 meanAxes =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (Raw.meanAxes @xs)
-        (\primalInput -> let output = (Raw.meanAxes @xs) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.meanAxes @xs))
+        (Pullback.meanAxes @xs)
 
 -- | Sum the absolute values of all elements.
 normL1
@@ -116,11 +112,10 @@ normL1
     => t sh a
     -> t '[] a
 normL1 =
-    customVJP
+    withVJP
         (Proxy @(Num a))
         Raw.normL1
-        (\input -> let output = Raw.normL1 input in (output, (input, output)))
-        (uncurry Pullback.normL1)
+        Pullback.normL1
 
 -- | Compute the square root of the sum of squared elements.
 normL2
@@ -135,11 +130,10 @@ normL2
     => t sh a
     -> t '[] a
 normL2 =
-    customVJP
+    withVJP
         (Proxy @(Fractional a))
         Raw.normL2
-        (\input -> let output = Raw.normL2 input in (output, (input, output)))
-        (uncurry Pullback.normL2)
+        Pullback.normL2
 
 -- | Minimum of all elements of a statically nonempty tensor.
 minimum
@@ -153,11 +147,10 @@ minimum
     => t sh a
     -> t '[] a
 minimum =
-    customVJP
+    withVJP
         (Proxy @(Fractional a, Fractional (TensorElement a)))
         Raw.minimum
-        (\primalInput -> let output = Raw.minimum primalInput in (output, (primalInput, output)))
-        (uncurry Pullback.extremum)
+        Pullback.extremum
 
 -- | Minimum over selected axes, removing them from the output shape.
 minimumAxes
@@ -173,11 +166,10 @@ minimumAxes
     => t sh a
     -> t (ReduceShape xs sh) a
 minimumAxes =
-    customVJP
+    withVJP
         (Proxy @(Fractional a, Fractional (TensorElement a)))
         (Raw.minimumAxes @xs)
-        (\primalInput -> let output = (Raw.minimumAxes @xs) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.extremumAxes @xs))
+        (Pullback.extremumAxes @xs)
 
 -- | Position of the minimum along one nonempty axis, removing that axis.
 argmin
@@ -205,11 +197,10 @@ maximum
     => t sh a
     -> t '[] a
 maximum =
-    customVJP
+    withVJP
         (Proxy @(Fractional a, Fractional (TensorElement a)))
         Raw.maximum
-        (\primalInput -> let output = Raw.maximum primalInput in (output, (primalInput, output)))
-        (uncurry Pullback.extremum)
+        Pullback.extremum
 
 -- | Maximum over selected axes, removing them from the output shape.
 maximumAxes
@@ -225,11 +216,10 @@ maximumAxes
     => t sh a
     -> t (ReduceShape xs sh) a
 maximumAxes =
-    customVJP
+    withVJP
         (Proxy @(Fractional a, Fractional (TensorElement a)))
         (Raw.maximumAxes @xs)
-        (\primalInput -> let output = (Raw.maximumAxes @xs) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.extremumAxes @xs))
+        (Pullback.extremumAxes @xs)
 
 -- | Position of the maximum along one nonempty axis, removing that axis.
 argmax
@@ -290,11 +280,10 @@ logSumExp
     => t sh a
     -> t '[] a
 logSumExp =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         Raw.logSumExp
-        (\primalInput -> let output = Raw.logSumExp primalInput in (output, (primalInput, output)))
-        (uncurry Pullback.logSumExp)
+        Pullback.logSumExp
 
 -- | Logarithm of summed exponentials over selected axes, removing those axes.
 logSumExpAxes
@@ -312,11 +301,10 @@ logSumExpAxes
     => t sh a
     -> t (ReduceShape xs sh) a
 logSumExpAxes =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (Raw.logSumExpAxes @xs)
-        (\primalInput -> let output = (Raw.logSumExpAxes @xs) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.logSumExpAxes @xs))
+        (Pullback.logSumExpAxes @xs)
 
 -- | Normalize exponentials along one axis without overflowing on large finite inputs.
 softmax
@@ -333,11 +321,10 @@ softmax
     => t sh a
     -> t sh a
 softmax =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (Raw.softmax @axis)
-        (\primalInput -> let output = (Raw.softmax @axis) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.softmax (Proxy @axis)))
+        (Pullback.softmax (Proxy @axis))
 
 -- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
 logSoftmax
@@ -354,8 +341,7 @@ logSoftmax
     => t sh a
     -> t sh a
 logSoftmax =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (Raw.logSoftmax @axis)
-        (\primalInput -> let output = (Raw.logSoftmax @axis) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.logSoftmax (Proxy @axis)))
+        (Pullback.logSoftmax (Proxy @axis))

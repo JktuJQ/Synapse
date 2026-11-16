@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Gated recurrent units with reset-after candidate projection.
@@ -19,8 +22,9 @@ import Synapse.Tensor.Ops.Definition (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
-import Synapse.Tensor.Representation (TensorElement, TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Structure
 
 {- | Packed reset, update and candidate projections, in that order.
 Input weights have shape @'[input, 3 * hidden]@; recurrent weights have shape
@@ -40,7 +44,8 @@ data GRU (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = GRU
     }
     deriving (Generic)
 
-type instance WithTensor t (GRU input hidden T.Tensor a) = GRU input hidden t a
+instance TensorStructure (GRU input hidden T.Tensor a) where
+    type WithTensor t (GRU input hidden T.Tensor a) = GRU input hidden t a
 
 {- | Apply one GRU step, reading and replacing the hidden tensor through 'State'.
 For input projections @(xr, xz, xn)@ and recurrent projections @(hr, hz, hn)@:

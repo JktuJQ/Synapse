@@ -10,9 +10,9 @@
 module Synapse.NN.Optimizers.Adam (Adam (..), AdamW (..)) where
 
 import Control.Monad.Trans.State.Strict (get, put)
-import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
 import qualified Synapse.Tensor as T
+import Synapse.Tensor.Structure (TensorConstraints, TensorStructure)
 
 {- | Adam hyperparameters: learning rate, first and second moment decay, and numerical epsilon.
 The update is @p' = p - lr * mHat / (sqrt vHat + epsilon)@.
@@ -50,7 +50,7 @@ instance T.Shape sh => AdamParameter (T.Tensor sh Float) where
 instance T.Shape sh => AdamParameter (T.Tensor sh Double) where
     correctMoment beta count moment = moment / (1 - realToFrac beta ** T.broadcast (T.fromIntegral count :: T.Tensor '[] Double))
 
-instance (Differentiable p, ParametersConstraints AdamParameter p) => Optimizer Adam p where
+instance (TensorStructure p, TensorConstraints AdamParameter p) => Optimizer Adam p where
     type OptimizerState Adam p = (T.Tensor '[] Int, (p, p))
     initialState _ p =
         let zero = updateParameters @AdamParameter (\_ _ -> 0) p p
@@ -77,7 +77,7 @@ instance (Differentiable p, ParametersConstraints AdamParameter p) => Optimizer 
         put (nextCount, (nextFirst, nextSecond))
         pure updated
 
-instance (Differentiable p, ParametersConstraints AdamParameter p) => Optimizer AdamW p where
+instance (TensorStructure p, TensorConstraints AdamParameter p) => Optimizer AdamW p where
     type OptimizerState AdamW p = OptimizerState Adam p
     initialState (AdamW adam _) = initialState adam
     optimizerStep (AdamW adam decay) p g = do

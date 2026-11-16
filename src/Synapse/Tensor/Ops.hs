@@ -1,6 +1,8 @@
 -- | Tensor arithmetic, indexing, shape transformations, reductions, and random sampling.
 module Synapse.Tensor.Ops
     ( TensorOps (..)
+    , withVJP
+    , withCachedVJP
     , module Synapse.Tensor.Ops.Construction
     , module Synapse.Tensor.Ops.Elementwise
     , module Synapse.Tensor.Ops.Index
@@ -12,7 +14,7 @@ module Synapse.Tensor.Ops
     ) where
 
 import Synapse.Tensor.Ops.Construction
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP, withVJP)
 import Synapse.Tensor.Ops.Elementwise
 import Synapse.Tensor.Ops.Index
 import Synapse.Tensor.Ops.Math

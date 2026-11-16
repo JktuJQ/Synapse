@@ -13,7 +13,9 @@ import qualified AutogradTest.Tensor.Lifting
 import qualified AutogradTest.Tensor.Spatial
 import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
+import qualified Numeric.Backprop.Explicit as BP
 import qualified Synapse.Autograd as AG
+import qualified Synapse.Autograd.Tensor.Representation as Bridge
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Representation as Internal
 import TensorTest.Support (approxList)
@@ -59,6 +61,24 @@ tests =
         , AutogradTest.Tensor.Lifting.tests
         , AutogradTest.Tensor.Elementwise.tests
         , AutogradTest.Tensor.ElementLifting.tests
+        , testProperty "backprop tensor conversions preserve differentiation history" $ H.withTests 1 $ H.property $ do
+            let function x =
+                    Bridge.Tensor $
+                        BP.liftOp1 (BP.AF (+)) (BP.op1 $ \v -> (v * v, \seed -> 2 * v * seed)) $
+                            Bridge.unTensor x
+                (output, gradient) = differentiate function $ T.full @'[] (3 :: Double)
+            values output H.=== [9]
+            values gradient H.=== [6]
+        , testProperty "backprop element conversions preserve differentiation history" $ H.withTests 1 $ H.property $ do
+            let function x =
+                    T.scalar $
+                        Bridge.TensorElement $
+                            BP.liftOp1 (BP.AF (+)) (BP.op1 $ \v -> (v * v, \seed -> 2 * v * seed)) $
+                                Bridge.unTensorElement $
+                                    T.index @'[0] x
+                (output, gradient) = differentiate function $ T.fromList @'[2] [3, 7 :: Double]
+            values output H.=== [9]
+            values gradient H.=== [6, 0]
         , testProperty "one polymorphic computation supports ordinary tensors and autograd" $ H.withTests 1 $ H.property $ do
             let input = T.unsafeFromList [1 .. 6] :: T.Tensor '[2, 3] Double
                 (value, gradient) = differentiate forward input

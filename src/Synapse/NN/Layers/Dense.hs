@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Fully connected layers acting on the last input dimension.
 module Synapse.NN.Layers.Dense (Dense (..), dense) where
@@ -16,11 +17,12 @@ import GHC.TypeLits (KnownNat, Nat)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
-import Synapse.Tensor.Representation (TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
+import Synapse.Tensor.Structure
 
 {- | Parameters of an affine transformation @input * weights + bias@.
 Weights have shape @'[in_features, out_features]@ and bias has shape @'[out_features]@.
@@ -39,7 +41,8 @@ data Dense (in_features :: Nat) (out_features :: Nat) (t :: TensorLike) a = Dens
     }
     deriving (Generic)
 
-type instance WithTensor t (Dense in_features out_features T.Tensor a) = Dense in_features out_features t a
+instance TensorStructure (Dense in_features out_features T.Tensor a) where
+    type WithTensor t (Dense in_features out_features T.Tensor a) = Dense in_features out_features t a
 
 {- | Apply @input * weights + bias@ along the last input dimension.
 The input must have at least one dimension, with @in_features@ elements on the last axis.

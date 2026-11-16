@@ -2,10 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Scaled dot-product and multi-head attention, with boolean attention masks.
@@ -18,7 +21,7 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (Div, KnownNat, Nat, natVal, type (*), type (<=))
 import Synapse.NN.Layers.Dense (Dense, dense)
 import qualified Synapse.Tensor as T
-import Synapse.Tensor.Ops.Definition (TensorOps (customVJP))
+import Synapse.Tensor.Ops.Definition (withCachedVJP)
 import Synapse.Tensor.Shapes.Axes (CanReduceNonEmpty)
 
 {- | Allow each query to attend to keys at the same or earlier position.
@@ -106,9 +109,8 @@ maskedSoftmax
     -> t '[batch, heads, queries, keys] a
     -> t '[batch, heads, queries, keys] a
 maskedSoftmax mask =
-    customVJP
+    withCachedVJP
         (Proxy @(() :: Constraint))
-        normalize
         (\x -> let weights = normalize x in (weights, weights))
         backward
   where
@@ -179,9 +181,8 @@ data MultiHeadAttention (features :: Nat) (heads :: Nat) (t :: T.TensorLike) a =
     }
     deriving (Generic)
 
-type instance
-    T.WithTensor t (MultiHeadAttention features heads T.Tensor a) =
-        MultiHeadAttention features heads t a
+instance T.TensorStructure (MultiHeadAttention features heads T.Tensor a) where
+    type WithTensor t (MultiHeadAttention features heads T.Tensor a) = MultiHeadAttention features heads t a
 
 {- | Apply projected attention to batch-first query, key and value sequences.
 Pass @(input, input, input)@ for self-attention. Cross-attention uses the

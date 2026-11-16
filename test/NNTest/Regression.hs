@@ -4,6 +4,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module NNTest.Regression (tests) where
 
@@ -22,7 +24,8 @@ import Test.Tasty.Hedgehog (testProperty)
 newtype Regression t a = Regression {regressionLayer :: NN.Dense 1 1 t a}
     deriving (Generic)
 
-type instance T.WithTensor t (Regression T.Tensor Double) = Regression t Double
+instance T.TensorStructure (Regression T.Tensor Double) where
+    type WithTensor t (Regression T.Tensor Double) = Regression t Double
 
 forward
     :: (T.TensorOps t Double, Num (t '[4, 1] Double))

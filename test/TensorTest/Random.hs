@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module TensorTest.Random (tests) where
 
@@ -18,7 +21,8 @@ import Test.Tasty.Hedgehog (testProperty)
 data NetworkState t = NetworkState (T.StagedGenerator t) (t '[] Double)
     deriving (Generic)
 
-type instance T.WithTensor t (NetworkState T.Tensor) = NetworkState t
+instance T.TensorStructure (NetworkState T.Tensor) where
+    type WithTensor t (NetworkState T.Tensor) = NetworkState t
 
 tests :: TestTree
 tests =

@@ -1,10 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module Main (main) where
 
@@ -29,7 +32,8 @@ data Parameters t = Parameters
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
+instance T.TensorStructure (Parameters T.Tensor) where
+    type WithTensor t (Parameters T.Tensor) = Parameters t
 
 predict
     :: ( KnownNat batch_size
@@ -81,6 +85,10 @@ trainingStep
     -> (T.Tensor '[] Double, Parameters T.Tensor)
 trainingStep parameters features targets mask =
     let weights = T.select (T.unsqueeze @1 mask) 1 0 :: T.Tensor '[batch_size, 1] Double
+        objective
+            :: AG.Context s
+            => Parameters (AG.Tensor s)
+            -> AG.Tensor s '[] Double
         objective p =
             NN.mse
                 (\errors -> T.sum (errors * AG.constant weights) / AG.constant (T.sum weights))

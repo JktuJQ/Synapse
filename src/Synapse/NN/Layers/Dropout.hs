@@ -1,10 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Dropout with explicit random state or caller-supplied masks.
 module Synapse.NN.Layers.Dropout
@@ -21,8 +24,9 @@ import GHC.Generics (Generic)
 import Synapse.NN.Forward (ForwardMode (..))
 import Synapse.Tensor.Ops.Elementwise (Conditional (..))
 import Synapse.Tensor.Ops.Random (StagedGenerator, bernoulli, initializeGenerator)
-import Synapse.Tensor.Representation (Tensor, WithTensor)
+import Synapse.Tensor.Representation (Tensor)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
+import Synapse.Tensor.Structure
 import System.Random (RandomGen)
 
 {- | Random state for one dropout operation, independent of trainable parameters.
@@ -34,7 +38,8 @@ newtype DropoutState t = DropoutState
     }
     deriving (Generic)
 
-type instance WithTensor t (DropoutState Tensor) = DropoutState t
+instance TensorStructure (DropoutState Tensor) where
+    type WithTensor t (DropoutState Tensor) = DropoutState t
 
 {- | Initialize dropout from a host random generator and return the updated host generator.
 For an explicit seed, use @DropoutState (T.generatorFromSeed seed)@ instead.

@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module NNTest.Gradient (tests) where
 
@@ -26,7 +29,8 @@ data Gradients t = Gradients
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Gradients T.Tensor) = Gradients t
+instance T.TensorStructure (Gradients T.Tensor) where
+    type WithTensor t (Gradients T.Tensor) = Gradients t
 
 gradients :: Gradients T.Tensor
 gradients = Gradients (T.fromList [3, -4, 0, 0]) (T.fromList [12], 0)

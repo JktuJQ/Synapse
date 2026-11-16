@@ -2,10 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module AutogradTest.Tensor.Lifting (tests) where
 
@@ -50,7 +53,8 @@ customIdentity = customVJP (Proxy @(ReverseScale a)) id (,()) (\() -> reverseSca
 
 data Parameters t = Parameters (t '[3] Double) (t '[3] Double) deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
+instance T.TensorStructure (Parameters T.Tensor) where
+    type WithTensor t (Parameters T.Tensor) = Parameters t
 
 recordOperation :: forall t. TensorOps t Double => Parameters t -> (t '[] Double, t '[3] Double)
 recordOperation =
@@ -65,7 +69,8 @@ recordOperation =
 
 data OutputRecord t = OutputRecord (t '[] Double) (t '[3] Double) deriving (Generic)
 
-type instance T.WithTensor t (OutputRecord T.Tensor) = OutputRecord t
+instance T.TensorStructure (OutputRecord T.Tensor) where
+    type WithTensor t (OutputRecord T.Tensor) = OutputRecord t
 
 recordBoth :: forall t. TensorOps t Double => Parameters t -> OutputRecord t
 recordBoth =
@@ -92,7 +97,8 @@ data Ten t
         (t '[1] Double)
     deriving (Generic)
 
-type instance T.WithTensor t (Ten T.Tensor) = Ten t
+instance T.TensorStructure (Ten T.Tensor) where
+    type WithTensor t (Ten T.Tensor) = Ten t
 
 tenOperation :: forall t. TensorOps t Double => Ten t -> t '[1] Double
 tenOperation =

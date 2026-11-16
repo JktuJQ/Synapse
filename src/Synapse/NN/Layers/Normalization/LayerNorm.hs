@@ -2,11 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Normalization over trailing tensor dimensions.
 module Synapse.NN.Layers.Normalization.LayerNorm (LayerNorm (..), layerNorm) where
@@ -17,12 +19,13 @@ import GHC.TypeLits (Nat)
 import Synapse.NN.Layers.Normalization.Statistics (expand, moments)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
 import qualified Synapse.Tensor.Ops.Shape as T
-import Synapse.Tensor.Representation (TensorElement, TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Normalization (LayerNormAxes)
+import Synapse.Tensor.Structure
 
 {- | Per-element scale and bias over the trailing normalized dimensions.
 Initialize weights to ones and bias to zeros.
@@ -35,7 +38,8 @@ data LayerNorm (normalized :: [Nat]) (t :: TensorLike) a = LayerNorm
     }
     deriving (Generic)
 
-type instance WithTensor t (LayerNorm normalized Tensor.Tensor a) = LayerNorm normalized t a
+instance TensorStructure (LayerNorm normalized Tensor.Tensor a) where
+    type WithTensor t (LayerNorm normalized Tensor.Tensor a) = LayerNorm normalized t a
 
 {- | Normalize trailing dimensions with population variance, then apply per-element scale and bias.
 The normalized dimensions are inferred from the parameters and must match the input suffix.

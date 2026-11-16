@@ -9,8 +9,8 @@
 module Synapse.NN.Optimizers.RMSprop (RMSprop (..)) where
 
 import Control.Monad.Trans.State.Strict (get, put)
-import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
+import Synapse.Tensor.Structure (TensorConstraints, TensorStructure)
 
 {- | RMSprop without momentum or centering.
 @v' = alpha * v + (1 - alpha) * gradient^2@ and @p' = p - lr * gradient / (sqrt v' + epsilon)@.
@@ -23,7 +23,7 @@ data RMSprop = RMSprop
     }
     deriving (Eq, Show)
 
-instance (Differentiable p, ParametersConstraints Floating p) => Optimizer RMSprop p where
+instance (TensorStructure p, TensorConstraints Floating p) => Optimizer RMSprop p where
     type OptimizerState RMSprop p = p
     initialState _ p = updateParameters @Floating (\_ _ -> 0) p p
     optimizerStep (RMSprop lr alpha epsilon) p g = do

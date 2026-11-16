@@ -11,21 +11,20 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | Register independently accumulated tensor leaves and structured results.
-module Synapse.Autograd.Tensor.Ops () where
+-- | TensorOps instance for differentiable tensors.
+module Synapse.Autograd.Tensor.Ops (unaryVJP, binaryVJP) where
 
-import qualified Data.Array.Accelerate as A
 import Data.Functor.Identity (Identity (..))
 import Data.Proxy (Proxy)
-import qualified Numeric.Backprop.Explicit as BPE
 import Numeric.Backprop.Op (Rec (..))
-import Synapse.Autograd.Tensor.Type (Tensor (..), TensorElement (..))
-import Synapse.Autograd.Variable (Context, Var (..), add, liftUnary, variableValue)
+
+import Synapse.Autograd.Record (append, split)
+import Synapse.Autograd.Representation (Backpropagatable, Context, add)
+import Synapse.Autograd.Tensor.Representation (Tensor (..), TensorElement (..))
 import Synapse.Tensor.Ops.Definition
     ( Compatible
     , CompatibleInput
@@ -39,76 +38,71 @@ import Synapse.Tensor.Ops.Definition
     , zeroInput
     )
 import Synapse.Tensor.Representation (DType)
+import Synapse.Tensor.Structure (TensorProduct, flatten, rebuild)
+
+import qualified Data.Array.Accelerate as A
+import qualified Numeric.Backprop.Explicit as BPE
+import qualified Numeric.Backprop.Internal as BPI
+
 import qualified Synapse.Tensor.Representation as T
-import Synapse.Tensor.Structure (Flatten (..), Leaves)
+import qualified Synapse.Tensor.Structure as T
 
-type family xs ++ ys where
-    '[] ++ ys = ys
-    (x ': xs) ++ ys = x ': (xs ++ ys)
-
-append
-    :: Rec f xs
-    -> Rec f ys
-    -> Rec f (xs ++ ys)
-append RNil ys = ys
-append (x :& xs) ys = x :& append xs ys
-
-split
-    :: Rec g xs
-    -> Rec f (xs ++ ys)
-    -> (Rec f xs, Rec f ys)
-split RNil values = (RNil, values)
-split (_ :& xs) (v :& values) = let (a, b) = split xs values in (v :& a, b)
-
-data Inputs s input where
-    Inputs
+-- | Existing input variables, accumulation rules, and conversions for one primitive.
+data PrimitiveInputs s input where
+    PrimitiveInputs
         :: Rec BPE.AddFunc xs
         -> Rec (BPE.BVar s) xs
         -> (Rec Identity xs -> input)
         -> (input -> Rec Identity xs)
-        -> Inputs s input
+        -> PrimitiveInputs s input
 
-registerInputs
+-- | Collect existing tensor variables and their gradient accumulation rules.
+preparePrimitiveInputs
     :: forall s a input
      . (T.DType a, Num a, Num (T.TensorElement a))
     => InputTree a input
     -> Wrapped (Tensor s) input
-    -> Inputs s input
-registerInputs InputTensor (Tensor (Var value)) = Inputs (BPE.AF (+) :& RNil) (value :& RNil) (\(Identity x :& RNil) -> x) (\x -> Identity x :& RNil)
-registerInputs (InputPair l r) (a, b) = case (registerInputs l a, registerInputs r b) of
-    (Inputs la lv lr lp, Inputs ra rv rr rp) ->
-        Inputs
-            (append la ra)
-            (append lv rv)
-            (\values -> let (ls, rs) = split la values in (lr ls, rr rs))
-            (\(x, y) -> append (lp x) (rp y))
+    -> PrimitiveInputs s input
+preparePrimitiveInputs InputTensor (Tensor value) =
+    PrimitiveInputs
+        (BPE.AF (+) :& RNil)
+        (value :& RNil)
+        (\(Identity x :& RNil) -> x)
+        (\x -> Identity x :& RNil)
+preparePrimitiveInputs (InputPair l r) (a, b) =
+    case (preparePrimitiveInputs l a, preparePrimitiveInputs r b) of
+        (PrimitiveInputs la lv lr lp, PrimitiveInputs ra rv rr rp) ->
+            PrimitiveInputs
+                (append la ra)
+                (append lv rv)
+                (\values -> let (ls, rs) = split la values in (lr ls, rr rs))
+                (\(x, y) -> append (lp x) (rp y))
 
+-- | Wrap a single result or project a product into differentiable tensor fields.
 wrapResults
     :: forall s a output
      . (Context s, T.DType a, Num a, Num (T.TensorElement a))
     => Result a output
     -> BPE.BVar s output
     -> Wrapped (Tensor s) output
-wrapResults Single = Tensor . Var
+wrapResults Single = Tensor
 wrapResults (Product tree) = wrapProduct tree
 
-{- | Project each output leaf from one shared tape node. Contributions from
-different projections accumulate before the primitive pullback is evaluated.
+{- | Project each output tensor from one shared tape node.
+Contributions from different projections accumulate before the primitive pullback is evaluated.
 -}
 wrapProduct
     :: (Context s, T.DType a, Num a, Num (T.TensorElement a))
     => InputTree a output
     -> BPE.BVar s output
     -> Wrapped (Tensor s) output
-wrapProduct InputTensor value = Tensor $ Var value
+wrapProduct InputTensor value = Tensor value
 wrapProduct tree@(InputPair l r) value =
     let left = BPE.liftOp1 (BPE.AF $ addInput tree) (BPE.op1 $ \(x, _) -> (x, (,zeroInput r))) value
         right = BPE.liftOp1 (BPE.AF $ addInput tree) (BPE.op1 $ \(_, y) -> (y, (zeroInput l,))) value
      in (wrapProduct l left, wrapProduct r right)
 
-{- | Register tensor leaves independently, retaining arbitrary private residuals.
-The output may be a tensor product or a coordinate-local element expression.
--}
+-- | Register input tensors and attach the cached forward calculation and its pullback.
 registerPrimitive
     :: forall s a input output cache
      . (Context s, DType a, Fractional a, Fractional (T.TensorElement a), CompatibleInput (Tensor s) a input)
@@ -117,29 +111,57 @@ registerPrimitive
     -> T.WithTensor (Tensor s) input
     -> BPE.BVar s output
 registerPrimitive forward backward input =
-    case registerInputs @s (inputTree @a @(Leaves T.Tensor input)) (flatten @(Tensor s) input) of
-        Inputs additions variables unpack pack ->
+    case preparePrimitiveInputs @s
+        (inputTree @a @(TensorProduct T.Tensor input))
+        (flatten @input @(Tensor s) input) of
+        PrimitiveInputs additions variables unpack pack ->
             BPE.liftOp
                 additions
                 ( BPE.Op $ \arguments ->
-                    let original = rebuild @T.Tensor $ unpack arguments
+                    let original = rebuild @input @T.Tensor $ unpack arguments
                         (output, cache) = forward original
-                        pullback seed = pack $ flatten @T.Tensor $ backward cache seed
+                        pullback seed = pack $ flatten @input @T.Tensor $ backward cache seed
                      in (output, pullback)
                 )
                 variables
 
+-- | Lift a unary operation, retaining its input and output for the pullback.
+unaryVJP
+    :: (Context s, Backpropagatable a)
+    => (a -> a)
+    -> (a -> a -> a -> a)
+    -> BPE.BVar s a
+    -> BPE.BVar s a
+unaryVJP forward backward = BPE.liftOp1 (BPE.AF add) $ BPE.op1 $ \x ->
+    let output = forward x
+     in (output, backward x output)
+
+-- | Lift a binary operation with one gradient contribution per input.
+binaryVJP
+    :: (Context s, Backpropagatable a)
+    => (a -> a -> a)
+    -> (a -> a -> a -> a -> (a, a))
+    -> BPE.BVar s a
+    -> BPE.BVar s a
+    -> BPE.BVar s a
+binaryVJP forward backward = BPE.liftOp2 (BPE.AF add) (BPE.AF add) $ BPE.op2 $ \x y ->
+    let output = forward x y
+     in (output, backward x y output)
+
 instance (Context s, DType a, Fractional a, Fractional (T.TensorElement a)) => TensorOps (Tensor s) a where
+    type Element (Tensor s) = TensorElement s
     type BackwardConstraints (Tensor s) c = c
-    fromTensor = Tensor . Var . BPE.auto
-    toTensor = variableValue . unTensor
+    fromTensor = Tensor . BPE.auto
+    toTensor = BPI._bvVal . unTensor
     fromElement (TensorElement x) =
         Tensor $
-            liftUnary
-                add
-                (\(T.TensorElement value) -> (T.Tensor (A.unit value), \(T.Tensor seed) -> T.TensorElement (A.the seed)))
+            BPE.liftOp1
+                (BPE.AF add)
+                ( BPE.op1 $ \(T.TensorElement value) ->
+                    (T.Tensor (A.unit value), \(T.Tensor seed) -> T.TensorElement (A.the seed))
+                )
                 x
-    customElementVJP _ _ forward backward = TensorElement . Var . registerPrimitive forward backward
+    customElementVJP _ _ forward backward = TensorElement . registerPrimitive forward backward
     customVJP
         :: forall input output cache c
          . (Compatible (Tensor s) a input output, BackwardConstraints (Tensor s) c)
@@ -150,6 +172,13 @@ instance (Context s, DType a, Fractional a, Fractional (T.TensorElement a)) => T
         -> T.WithTensor (Tensor s) input
         -> T.WithTensor (Tensor s) output
     customVJP _ _ forward backward input =
-        let cached arguments = let (output, cache) = forward arguments in (flatten @T.Tensor output, cache)
-            result = registerPrimitive cached (\cache seed -> backward cache $ rebuild @T.Tensor seed) input
-         in rebuild @(Tensor s) $ wrapResults @s (resultTree @a @(Leaves T.Tensor output)) result
+        let cached arguments =
+                let (output, cache) = forward arguments
+                 in (flatten @output @T.Tensor output, cache)
+            result =
+                registerPrimitive
+                    cached
+                    (\cache seed -> backward cache $ rebuild @output @T.Tensor seed)
+                    input
+         in rebuild @output @(Tensor s) $
+                wrapResults @s (resultTree @a @(TensorProduct T.Tensor output)) result

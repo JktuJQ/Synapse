@@ -1,8 +1,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | A single tanh recurrent layer and its stateful sequence traversal.
 module Synapse.NN.Layers.Recurrent.RNN (RNN (..), rnnCell, rnn) where
@@ -15,8 +18,9 @@ import Synapse.Tensor.Ops.Definition (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
-import Synapse.Tensor.Representation (TensorElement, TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Structure
 
 {- | Input and recurrent projections for one recurrent layer.
 Weights use @[input, hidden]@ and @[hidden, hidden]@ order.
@@ -34,7 +38,8 @@ data RNN (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = RNN
     }
     deriving (Generic)
 
-type instance WithTensor t (RNN input hidden T.Tensor a) = RNN input hidden t a
+instance TensorStructure (RNN input hidden T.Tensor a) where
+    type WithTensor t (RNN input hidden T.Tensor a) = RNN input hidden t a
 
 {- | Apply @h' = tanh (x * W_input + b_input + h * W_hidden + b_hidden)@.
 Read and replace the hidden state through 'State'. The returned output is @h'@.

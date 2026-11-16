@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module AutogradTest.Differentiable (tests) where
 
@@ -15,14 +18,16 @@ import Test.Tasty.Hedgehog (testProperty)
 
 newtype Single (t :: T.TensorLike) = Single {singleValue :: t '[] Double} deriving (Generic)
 
-type instance T.WithTensor t (Single T.Tensor) = Single t
+instance T.TensorStructure (Single T.Tensor) where
+    type WithTensor t (Single T.Tensor) = Single t
 
 data Wide (t :: T.TensorLike) = Wide
     { first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh, twelfth :: t '[] Double
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Wide T.Tensor) = Wide t
+instance T.TensorStructure (Wide T.Tensor) where
+    type WithTensor t (Wide T.Tensor) = Wide t
 
 components :: Wide t -> [t '[] Double]
 components p =
@@ -83,9 +88,11 @@ tests =
         , testProperty "autograd requires a custom reverse capability" $
             H.withTests 1 $
                 Compiler.rejects (fixtures ++ "BackwardCapability.hs") "ReverseCapability"
-        , testProperty "integer tensor arithmetic requires fractional gradient elements" $
-            H.withTests 1 $
-                Compiler.rejects (fixtures ++ "IntegerArithmetic.hs") "Fractional"
+        , testProperty "integer polynomial arithmetic produces integer gradients" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[3] [-3, 0, 4 :: Int]
+                (output, gradient) = T.run T.CPU $ AG.backprop (\x -> x * x + x) input
+            T.toList output H.=== [6, 0, 20]
+            T.toList gradient H.=== [-5, 1, 9]
         , testProperty "integer tensor reshaping requires fractional gradient elements" $
             H.withTests 1 $
                 Compiler.rejects (fixtures ++ "IntegerReshape.hs") "Fractional"

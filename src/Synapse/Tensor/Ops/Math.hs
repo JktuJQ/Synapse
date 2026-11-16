@@ -14,8 +14,8 @@ module Synapse.Tensor.Ops.Math (dot, matmul) where
 
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Math as Pullback
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Math as Pullback
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import Synapse.Tensor.Ops.Raw.Construction (full)
 import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import qualified Synapse.Tensor.Ops.Raw.Math as Raw
@@ -64,14 +64,10 @@ dot
     -> t '[] a
 dot =
     curry $
-        customVJP
+        withVJP
             (Proxy @(() :: Constraint))
             (uncurry Raw.dot)
-            ( \(left, right) ->
-                let output = Raw.dot left right
-                 in (output, ((left, right), output))
-            )
-            (\((left, right), output) -> Pullback.dot left right output)
+            (\(left, right) output -> Pullback.dot left right output)
 
 -- | Multiply vectors or matrices, broadcasting leading batch dimensions.
 matmul
@@ -82,11 +78,7 @@ matmul
     -> t (MatmulShape lhs rhs) a
 matmul =
     curry $
-        customVJP
+        withVJP
             (Proxy @(() :: Constraint))
             (uncurry Raw.matmul)
-            ( \(left, right) ->
-                let output = Raw.matmul left right
-                 in (output, ((left, right), output))
-            )
-            (\((left, right), output) -> Pullback.matmul left right output)
+            (\(left, right) output -> Pullback.matmul left right output)

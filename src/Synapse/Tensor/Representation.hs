@@ -25,8 +25,6 @@ module Synapse.Tensor.Representation
 
       -- * Representation correspondence
     , TensorLike
-    , Element
-    , WithTensor
     ) where
 
 import Data.Int (Int32, Int64)
@@ -104,70 +102,6 @@ newtype TensorData (sh :: [Nat]) a = TensorData
 
 deriving stock instance Show (A.Array (ShapeToDIM sh) a) => Show (TensorData sh a)
 
-{- | Replace staged tensors in a structure with the selected tensor representation.
-
-Shapes, element types, and the surrounding structure are preserved.
-Use @TensorData@ for materialized values or @AG.Tensor s@ for differentiable tensors.
-The result uniquely determines both the selected representation and the original staged type,
-allowing execution and differentiation to infer their input types.
-
-Instances are provided for individual tensors and tuples of 2 through 9 components.
-User-defined structures provide an instance describing their representation correspondence:
-
-@
-type instance WithTensor t (Parameters Tensor a) = Parameters t a
-@
-
-Execution and differentiation impose their own requirements on the structure's fields.
--}
-type family WithTensor (t :: TensorLike) a = (result :: Type) | result -> t a
-
-type instance WithTensor t (Tensor sh a) = t sh a
-type instance WithTensor t (a1, a2) = (WithTensor t a1, WithTensor t a2)
-type instance WithTensor t (a1, a2, a3) = (WithTensor t a1, WithTensor t a2, WithTensor t a3)
-type instance
-    WithTensor t (a1, a2, a3, a4) =
-        (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4)
-type instance
-    WithTensor t (a1, a2, a3, a4, a5) =
-        (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5)
-type instance
-    WithTensor t (a1, a2, a3, a4, a5, a6) =
-        (WithTensor t a1, WithTensor t a2, WithTensor t a3, WithTensor t a4, WithTensor t a5, WithTensor t a6)
-type instance
-    WithTensor t (a1, a2, a3, a4, a5, a6, a7) =
-        ( WithTensor t a1
-        , WithTensor t a2
-        , WithTensor t a3
-        , WithTensor t a4
-        , WithTensor t a5
-        , WithTensor t a6
-        , WithTensor t a7
-        )
-type instance
-    WithTensor t (a1, a2, a3, a4, a5, a6, a7, a8) =
-        ( WithTensor t a1
-        , WithTensor t a2
-        , WithTensor t a3
-        , WithTensor t a4
-        , WithTensor t a5
-        , WithTensor t a6
-        , WithTensor t a7
-        , WithTensor t a8
-        )
-type instance
-    WithTensor t (a1, a2, a3, a4, a5, a6, a7, a8, a9) =
-        ( WithTensor t a1
-        , WithTensor t a2
-        , WithTensor t a3
-        , WithTensor t a4
-        , WithTensor t a5
-        , WithTensor t a6
-        , WithTensor t a7
-        , WithTensor t a8
-        , WithTensor t a9
-        )
-
 {- | An element expression within a staged array computation.
 
 Expressions may depend on the current element or its coordinates.
@@ -182,17 +116,6 @@ deriving stock instance Show (A.Exp a) => Show (TensorElement a)
 deriving newtype instance Num (A.Exp a) => Num (TensorElement a)
 deriving newtype instance Fractional (A.Exp a) => Fractional (TensorElement a)
 deriving newtype instance Floating (A.Exp a) => Floating (TensorElement a)
-
-{- | Element-expression constructor associated with a tensor representation.
-
-For ordinary tensors, @Element Tensor@ is t'TensorElement'.
-Custom tensor representations define instances of this open family.
-The result determines its tensor representation,
-so distinct tensor constructors need distinct element constructors.
--}
-type family Element (t :: TensorLike) = (e :: Type -> Type) | e -> t
-
-type instance Element Tensor = TensorElement
 
 {- | A complete multidimensional index for shape @sh@.
 

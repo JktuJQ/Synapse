@@ -10,7 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
@@ -19,6 +19,8 @@
 module Synapse.Tensor.Ops.Definition
     ( -- * Tensor primitives
       TensorOps (..)
+    , withVJP
+    , withCachedVJP
 
       -- * Input and output structures
     , CompatibleInput
@@ -35,7 +37,7 @@ module Synapse.Tensor.Ops.Definition
     ) where
 
 import qualified Data.Array.Accelerate as A
-import Data.Kind (Constraint)
+import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy)
 import Synapse.Tensor.Ops.Elementwise ()
 import qualified Synapse.Tensor.Ops.Raw.Construction as RawConstruction
@@ -43,18 +45,10 @@ import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import Synapse.Tensor.Representation (DType)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Structure (Flatten (..), Leaves)
+import Synapse.Tensor.Structure (ProductFields, TensorProduct, TensorStructure)
+import qualified Synapse.Tensor.Structure as T
 
-type family Wrapped t a where
-    Wrapped t (T.Tensor sh a) = t sh a
-    Wrapped t (a, b) = (Wrapped t a, Wrapped t b)
-
--- The tensor wrappers may change while the product of fields stays the same.
-type View t a =
-    ( Flatten T.Tensor a
-    , Flatten t (T.WithTensor t a)
-    , Leaves t (T.WithTensor t a) ~ Wrapped t (Leaves T.Tensor a)
-    )
+type Wrapped t a = ProductFields t a
 
 -- All registered input leaves share the TensorOps scalar type.
 data InputTree a input where
@@ -105,7 +99,8 @@ instance (InputType a l, InputType a r) => ResultType a (l, r) where
 {- | Tensor input structures accepted by primitive computations.
 Resolved automatically for tensors, tuples, and generic tensor records.
 -}
-type CompatibleInput t a input = (View t input, InputType a (Leaves T.Tensor input))
+type CompatibleInput (t :: T.TensorLike) a input =
+    (TensorStructure input, InputType a (TensorProduct T.Tensor input))
 
 {- | Tensor-only input and output structures accepted by 'customVJP'.
 Resolved automatically for individual tensors, tuples, and generic records
@@ -114,13 +109,16 @@ type. Multiple outputs use that same element type; a single tensor result
 may use another element type.
 -}
 type Compatible t a input output =
-    (CompatibleInput t a input, View t output, ResultType a (Leaves T.Tensor output))
+    (CompatibleInput t a input, TensorStructure output, ResultType a (TensorProduct T.Tensor output))
 
 -- | Tensor representations supporting custom vector-Jacobian products.
 class
     (DType a, BackwardConstraints t (), BackwardConstraints t (Num (T.TensorElement a))) =>
     TensorOps (t :: T.TensorLike) a
     where
+    -- | Element-expression constructor corresponding to the tensor representation.
+    type Element t = (e :: Type -> Type) | e -> t
+
     {- | Requirements of an individual reverse rule for this tensor representation.
     Ordinary tensors ignore the constraint; differentiable tensors require it.
     Every representation supports the empty request and a request for numeric element cotangents,
@@ -141,7 +139,7 @@ class
 
     -- | Convert an element expression to a scalar tensor.
     fromElement
-        :: T.Element t a
+        :: Element t a
         -> t '[] a
 
     -- | Apply an element-valued primitive with a custom vector-Jacobian product.
@@ -152,7 +150,7 @@ class
         -> (input -> (T.TensorElement b, cache))
         -> (c => cache -> T.TensorElement b -> input)
         -> T.WithTensor t input
-        -> T.Element t b
+        -> Element t b
 
     -- | Apply a primitive with a custom vector-Jacobian product, retaining the cache needed by that product.
     customVJP
@@ -165,13 +163,38 @@ class
         -> T.WithTensor t input
         -> T.WithTensor t output
 
+-- | Define a reverse rule using the original input, forward output, and output gradient.
+withVJP
+    :: forall t a input output c
+     . (TensorOps t a, Compatible t a input output, BackwardConstraints t c)
+    => Proxy c
+    -> (input -> output)
+    -> (c => input -> output -> output -> input)
+    -> T.WithTensor t input
+    -> T.WithTensor t output
+withVJP constraints forward backward =
+    customVJP @t @a
+        constraints
+        forward
+        (\input -> let output = forward input in (output, (input, output)))
+        (\(input, output) seed -> backward input output seed)
+
+-- | Define a reverse rule using an explicit cache and the output gradient.
+withCachedVJP
+    :: forall t a input output cache c
+     . (TensorOps t a, Compatible t a input output, BackwardConstraints t c)
+    => Proxy c
+    -> (input -> (output, cache))
+    -> (c => cache -> output -> input)
+    -> T.WithTensor t input
+    -> T.WithTensor t output
+withCachedVJP constraints forward = customVJP @t @a constraints (fst . forward) forward
+
 instance T.DType a => TensorOps T.Tensor a where
+    type Element T.Tensor = T.TensorElement
     type BackwardConstraints T.Tensor c = ()
     fromTensor = id
     toTensor = id
     fromElement (T.TensorElement x) = T.Tensor (A.unit x)
-    customElementVJP _ forward _ _ input =
-        forward $ rebuild @T.Tensor $ flatten @T.Tensor input
-    customVJP _ forward _ _ input =
-        let original = rebuild @T.Tensor $ flatten @T.Tensor input
-         in rebuild @T.Tensor $ flatten @T.Tensor $ forward original
+    customElementVJP _ forward _ _ = forward
+    customVJP _ forward _ _ = forward

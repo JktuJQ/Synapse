@@ -2,10 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module Main (main) where
 
@@ -32,7 +35,8 @@ data Parameters t = Parameters
     }
     deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
+instance T.TensorStructure (Parameters T.Tensor) where
+    type WithTensor t (Parameters T.Tensor) = Parameters t
 
 data ModelState t = ModelState
     { statistics :: NN.BatchNormState 2 t Double
@@ -40,7 +44,8 @@ data ModelState t = ModelState
     }
     deriving (Generic)
 
-type instance T.WithTensor t (ModelState T.Tensor) = ModelState t
+instance T.TensorStructure (ModelState T.Tensor) where
+    type WithTensor t (ModelState T.Tensor) = ModelState t
 
 statisticsLens
     :: Functor f

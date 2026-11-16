@@ -9,8 +9,8 @@
 module Synapse.NN.Optimizers.SGD (SGD (..), Momentum (..)) where
 
 import Control.Monad.Trans.State.Strict (get, put)
-import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import Synapse.NN.Optimizers.Type
+import Synapse.Tensor.Structure (TensorConstraints, TensorStructure)
 
 {- | Stochastic gradient descent: @p' = p - learningRate * gradient@.
 The caller supplies a finite, nonnegative learning rate.
@@ -22,7 +22,7 @@ newtype SGD = SGD
     }
     deriving (Eq, Show)
 
-instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer SGD p where
+instance (TensorStructure p, TensorConstraints Fractional p) => Optimizer SGD p where
     type OptimizerState SGD p = ()
     initialState _ _ = ()
     optimizerStep (SGD lr) parameters gradients =
@@ -39,7 +39,7 @@ data Momentum = Momentum
     }
     deriving (Eq, Show)
 
-instance (Differentiable p, ParametersConstraints Fractional p) => Optimizer Momentum p where
+instance (TensorStructure p, TensorConstraints Fractional p) => Optimizer Momentum p where
     type OptimizerState Momentum p = p
     initialState _ p = updateParameters @Fractional (\_ _ -> 0) p p
     optimizerStep (Momentum lr coefficient nesterov) p g = do

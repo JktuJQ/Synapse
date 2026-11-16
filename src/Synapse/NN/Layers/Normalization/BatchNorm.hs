@@ -2,11 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 -- | Per-channel normalization with explicit running statistics.
 module Synapse.NN.Layers.Normalization.BatchNorm (BatchNorm (..), BatchNormState (..), initialBatchNormState, batchNorm) where
@@ -19,11 +21,12 @@ import Synapse.NN.Layers.Normalization.Statistics (expand, moments)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
 import Synapse.Tensor.Ops.Math ()
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
-import Synapse.Tensor.Representation (TensorElement, TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, AxisSize, CanReduce, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Synapse.Tensor.Shapes.Normalization (BatchNormAxes)
+import Synapse.Tensor.Structure
 
 {- | Per-channel scale and bias for batch normalization.
 Initialize weights to ones and bias to zeros.
@@ -36,7 +39,8 @@ data BatchNorm (channels :: Nat) (t :: TensorLike) a = BatchNorm
     }
     deriving (Generic)
 
-type instance WithTensor t (BatchNorm channels Tensor.Tensor a) = BatchNorm channels t a
+instance TensorStructure (BatchNorm channels Tensor.Tensor a) where
+    type WithTensor t (BatchNorm channels Tensor.Tensor a) = BatchNorm channels t a
 
 -- | Running per-channel statistics, independent of the trainable parameters.
 data BatchNormState (channels :: Nat) (t :: TensorLike) a = BatchNormState
@@ -47,7 +51,8 @@ data BatchNormState (channels :: Nat) (t :: TensorLike) a = BatchNormState
     }
     deriving (Generic)
 
-type instance WithTensor t (BatchNormState channels Tensor.Tensor a) = BatchNormState channels t a
+instance TensorStructure (BatchNormState channels Tensor.Tensor a) where
+    type WithTensor t (BatchNormState channels Tensor.Tensor a) = BatchNormState channels t a
 
 -- | Initialize running means to zero and running variances to one.
 initialBatchNormState

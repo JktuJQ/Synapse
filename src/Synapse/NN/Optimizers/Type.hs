@@ -21,11 +21,8 @@ module Synapse.NN.Optimizers.Type
 where
 
 import Control.Monad.Trans.State.Strict (State)
-import Synapse.Autograd.Execution.Variable (ValueTree (..), Values (..))
-import Synapse.Autograd.Tensor ()
-import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
-import qualified Synapse.Tensor.Representation as T
-import Synapse.Tensor.Structure (Flatten (..), Leaves)
+
+import Synapse.Tensor.Structure (TensorConstraints, TensorStructure, zipWithTensorStructure)
 
 {- | Optimizers for a parameter structure.
 The initial state is constructed before the first step.
@@ -65,7 +62,7 @@ updateParameters \@Fractional (\parameter gradient -> parameter - 0.01 * gradien
 -}
 updateParameters
     :: forall c parameters
-     . (Differentiable parameters, ParametersConstraints c parameters)
+     . (TensorStructure parameters, TensorConstraints c parameters)
     => (forall a. c a => a -> a -> a)
     -- ^ Update formula taking the current parameter component first and its gradient second.
     -> parameters
@@ -74,19 +71,4 @@ updateParameters
     -- ^ Corresponding gradients.
     -> parameters
     -- ^ Updated parameters with the same structure and tensor shapes.
-updateParameters formula =
-    let applyUpdate
-            :: ValueTree c p
-            -> p
-            -> p
-            -> p
-        applyUpdate TensorValues = formula
-        applyUpdate (PairValues left right) = \(p1, p2) (g1, g2) ->
-            (applyUpdate left p1 g1, applyUpdate right p2 g2)
-     in \parameters gradients ->
-            rebuild @T.Tensor
-                ( applyUpdate
-                    (values @(Leaves T.Tensor parameters) @c)
-                    (flatten @T.Tensor parameters)
-                    (flatten @T.Tensor gradients)
-                )
+updateParameters = zipWithTensorStructure @parameters @c

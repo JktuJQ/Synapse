@@ -32,10 +32,10 @@ module Synapse.Tensor.Ops.Index
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import qualified Synapse.Tensor.Ops.Raw.Index as Raw
-import Synapse.Tensor.Representation (Element, Tensor, TensorElement, TensorIndex)
+import Synapse.Tensor.Representation (Tensor, TensorElement, TensorIndex)
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, LookupRowsShape, Slice, SliceShape)
@@ -106,13 +106,10 @@ unsafeGather
     -> Tensor indices Int
     -> t indices a
 unsafeGather tensor indices =
-    customVJP
+    withVJP
         (Proxy @(Num (TensorElement a)))
         (\input -> Raw.unsafeGather @axis input indices)
-        ( \primalInput ->
-            let output = (\input -> Raw.unsafeGather @axis input indices) primalInput in (output, (primalInput, output))
-        )
-        (uncurry (Pullback.gather @axis False indices))
+        (Pullback.gather @axis False indices)
         tensor
 
 -- | Select elements along an axis, returning the fallback for out-of-bounds indices.
@@ -129,14 +126,10 @@ gatherOr
     -> Tensor indices Int
     -> t indices a
 gatherOr fallback tensor indices =
-    customVJP
+    withVJP
         (Proxy @(Num (TensorElement a)))
         (\input -> Raw.gatherOr @axis fallback input indices)
-        ( \primalInput ->
-            let output = (\input -> Raw.gatherOr @axis fallback input indices) primalInput
-             in (output, (primalInput, output))
-        )
-        (uncurry (Pullback.gather @axis True indices))
+        (Pullback.gather @axis True indices)
         tensor
 
 -- | Select table rows using an index tensor. Row indices must be within the table bounds.
@@ -151,11 +144,10 @@ unsafeLookupRows
     -> Tensor indices Int
     -> t (LookupRowsShape indices width) a
 unsafeLookupRows table indices =
-    customVJP
+    withVJP
         (Proxy @(Num (TensorElement a)))
         (`Raw.unsafeLookupRows` indices)
-        (\primalInput -> let output = (`Raw.unsafeLookupRows` indices) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.lookupRows indices))
+        (Pullback.lookupRows indices)
         table
 
 -- | Select the specified coordinates and ranges along each axis.
@@ -170,11 +162,10 @@ slice
     => t sh a
     -> t (SliceShape spec sh) a
 slice =
-    customVJP
+    withVJP
         (Proxy @(Num (TensorElement a)))
         (Raw.slice @spec)
-        (\primalInput -> let output = (Raw.slice @spec) primalInput in (output, (primalInput, output)))
-        (uncurry (Pullback.slice (Proxy @spec)))
+        (Pullback.slice (Proxy @spec))
 
 {- | Read a coordinate or tensor element using a shape-checked index.
 Use @ix !! Proxy \@0@ for a coordinate and @tensor !! Proxy \@'[1, 2]@ for a static element.

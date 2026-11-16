@@ -16,8 +16,7 @@ module Synapse.Tensor.Backend
       Backend (..)
 
       -- * Supported tensor structures
-    , BackendTree (..)
-    , Computation (..)
+    , Computation
 
       -- * Closed computations
     , run
@@ -34,9 +33,9 @@ module Synapse.Tensor.Backend
     , run9
     ) where
 
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..), WithTensor)
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
-import Synapse.Tensor.Structure (Flatten (..), Leaves)
+import Synapse.Tensor.Structure
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.LLVM.Native as CPU
@@ -59,7 +58,7 @@ data Backend
 
 {- | Convert a tensor or a binary product of tensors to its backend array representation.
 
-'Leaves' decomposes records into tensors and nested pairs before these conversions are applied.
+'flatten' decomposes records into tensors and nested pairs before these conversions are applied.
 Each tensor becomes an Accelerate array; each pair becomes a pair of backend representations.
 Conversions preserve shapes, element types, and contents.
 
@@ -123,27 +122,26 @@ Instances are inferred for tensors and supported tensor records; no explicit ins
 'WithTensor' replaces each staged tensor with its materialized counterpart.
 The structure may contain tensors with different shapes and element types.
 -}
-class (Flatten Tensor a, BackendTree (Leaves Tensor a)) => Computation a where
+class (TensorStructure a, BackendTree (TensorProduct Tensor a)) => Computation a where
     -- | Convert a tensor data structure to its array product.
     inputData
         :: WithTensor TensorData a
-        -> BackendLeaves (Leaves Tensor a)
+        -> BackendLeaves (TensorProduct Tensor a)
 
     -- | Reconstruct a tensor data structure from its array product.
     outputData
-        :: BackendLeaves (Leaves Tensor a)
+        :: BackendLeaves (TensorProduct Tensor a)
         -> WithTensor TensorData a
 
 instance
-    ( Flatten Tensor a
-    , BackendTree (Leaves Tensor a)
-    , Flatten TensorData (WithTensor TensorData a)
-    , Leaves TensorData (WithTensor TensorData a) ~ MaterialLeaves (Leaves Tensor a)
+    ( TensorStructure a
+    , BackendTree (TensorProduct Tensor a)
+    , TensorProduct TensorData a ~ MaterialLeaves (TensorProduct Tensor a)
     )
     => Computation a
     where
-    inputData = toBackend @(Leaves Tensor a) . flatten @TensorData
-    outputData = rebuild @TensorData . fromBackend @(Leaves Tensor a)
+    inputData = toBackend @(TensorProduct Tensor a) . flatten @a @TensorData
+    outputData = rebuild @a @TensorData . fromBackend @(TensorProduct Tensor a)
 
 -- | Evaluate a tensor computation and return its tensor data.
 run
@@ -152,7 +150,7 @@ run
     => Backend
     -> a
     -> WithTensor TensorData a
-run backend = outputData @a . execute . pack . flatten @Tensor
+run backend = outputData @a . execute . pack . flatten @_ @Tensor
   where
     execute = case backend of
         CPU -> CPU.runN
@@ -172,7 +170,7 @@ run1
     -> WithTensor TensorData result
 run1 backend f = outputData @result . execute . inputData @a1
   where
-    program x1 = pack $ flatten @Tensor $ f $ rebuild @Tensor $ unpack x1
+    program x1 = pack $ flatten @_ @Tensor $ f $ rebuild @_ @Tensor $ unpack x1
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -198,10 +196,10 @@ run2 backend f = \x1 x2 ->
   where
     program x1 x2 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -229,11 +227,11 @@ run3 backend f = \x1 x2 x3 ->
   where
     program x1 x2 x3 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -263,12 +261,12 @@ run4 backend f = \x1 x2 x3 x4 ->
   where
     program x1 x2 x3 x4 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -300,13 +298,13 @@ run5 backend f = \x1 x2 x3 x4 x5 ->
   where
     program x1 x2 x3 x4 x5 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
-                    (rebuild @Tensor $ unpack x5)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x5)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -347,14 +345,14 @@ run6 backend f = \x1 x2 x3 x4 x5 x6 ->
   where
     program x1 x2 x3 x4 x5 x6 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
-                    (rebuild @Tensor $ unpack x5)
-                    (rebuild @Tensor $ unpack x6)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x5)
+                    (rebuild @_ @Tensor $ unpack x6)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -398,15 +396,15 @@ run7 backend f = \x1 x2 x3 x4 x5 x6 x7 ->
   where
     program x1 x2 x3 x4 x5 x6 x7 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
-                    (rebuild @Tensor $ unpack x5)
-                    (rebuild @Tensor $ unpack x6)
-                    (rebuild @Tensor $ unpack x7)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x5)
+                    (rebuild @_ @Tensor $ unpack x6)
+                    (rebuild @_ @Tensor $ unpack x7)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -453,16 +451,16 @@ run8 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 ->
   where
     program x1 x2 x3 x4 x5 x6 x7 x8 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
-                    (rebuild @Tensor $ unpack x5)
-                    (rebuild @Tensor $ unpack x6)
-                    (rebuild @Tensor $ unpack x7)
-                    (rebuild @Tensor $ unpack x8)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x5)
+                    (rebuild @_ @Tensor $ unpack x6)
+                    (rebuild @_ @Tensor $ unpack x7)
+                    (rebuild @_ @Tensor $ unpack x8)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU
@@ -512,17 +510,17 @@ run9 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 x9 ->
   where
     program x1 x2 x3 x4 x5 x6 x7 x8 x9 =
         pack $
-            flatten @Tensor $
+            flatten @_ @Tensor $
                 f
-                    (rebuild @Tensor $ unpack x1)
-                    (rebuild @Tensor $ unpack x2)
-                    (rebuild @Tensor $ unpack x3)
-                    (rebuild @Tensor $ unpack x4)
-                    (rebuild @Tensor $ unpack x5)
-                    (rebuild @Tensor $ unpack x6)
-                    (rebuild @Tensor $ unpack x7)
-                    (rebuild @Tensor $ unpack x8)
-                    (rebuild @Tensor $ unpack x9)
+                    (rebuild @_ @Tensor $ unpack x1)
+                    (rebuild @_ @Tensor $ unpack x2)
+                    (rebuild @_ @Tensor $ unpack x3)
+                    (rebuild @_ @Tensor $ unpack x4)
+                    (rebuild @_ @Tensor $ unpack x5)
+                    (rebuild @_ @Tensor $ unpack x6)
+                    (rebuild @_ @Tensor $ unpack x7)
+                    (rebuild @_ @Tensor $ unpack x8)
+                    (rebuild @_ @Tensor $ unpack x9)
     execute = case backend of
         CPU -> CPU.runN program
 #ifdef SYNAPSE_GPU

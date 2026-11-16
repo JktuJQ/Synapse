@@ -104,8 +104,9 @@ library
                     , Synapse.NN.Optimizers.RMSprop
                     , Synapse.Autograd
                     , Synapse.Autograd.Tensor
-                    , Synapse.Autograd.Type
+                    , Synapse.Autograd.Tensor.Representation
                     , Synapse.Autograd.Execution
+                    , Synapse.Autograd.Representation
                     , Synapse.Tensor
                     , Synapse.Tensor.Backend
                     , Synapse.Tensor.Ops.Construction
@@ -126,34 +127,31 @@ library
                     , Synapse.Tensor.Shapes.Matmul
                     , Synapse.Tensor.Shapes.Window
                     , Synapse.Tensor.Representation
+                    , Synapse.Tensor.Structure
                     , Synapse.Tensor.Ops.Random
 
-    other-modules:    Synapse.Tensor.Ops.Raw.Random
+    other-modules:    Synapse.Autograd.Record
+                    , Synapse.Tensor.Ops.Raw.Random
                     , Synapse.Tensor.Ops.Definition
                     , Synapse.NN.Layers.Recurrent.Gates
                     , Synapse.NN.Layers.Recurrent.Sequence
-                    , Synapse.Tensor.Structure
                     , Synapse.NN.Layers.Normalization.Statistics
                     , Synapse.Tensor.Ops.Raw.Window
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Window
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Convolution
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Window
                     , Synapse.Tensor.Ops.Raw.Construction
                     , Synapse.Tensor.Ops.Raw.Index
-                    , Synapse.Autograd.Execution.Variable
                     , Synapse.Tensor.Ops.Raw.Math
                     , Synapse.Tensor.Ops.Raw.Shape
                     , Synapse.Tensor.Ops.Raw.Reduction
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Elementwise
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Math
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Index
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Shape
-                    , Synapse.Autograd.Tensor.Ops.Primitives.Reduction
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Elementwise
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Math
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Index
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Shape
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
                     , Synapse.Tensor.Ops.Raw.Elementwise
-                    , Synapse.Autograd.Variable
-                    , Synapse.Autograd.Execution.Reverse
-                    , Synapse.Autograd.Tensor.Type
                     , Synapse.Autograd.Tensor.Ops
                     , Synapse.Autograd.Tensor.Ops.Elementwise
+                    , Synapse.Autograd.Tensor.Ops.Math
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU

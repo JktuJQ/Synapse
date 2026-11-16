@@ -1,8 +1,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module AutogradTest.Execution (tests) where
 
@@ -16,11 +19,13 @@ import Test.Tasty.Hedgehog (testProperty)
 
 data Parameters t = Parameters {weights :: t '[2, 3] Double, bias :: t '[3] Double} deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor) = Parameters t
+instance T.TensorStructure (Parameters T.Tensor) where
+    type WithTensor t (Parameters T.Tensor) = Parameters t
 
 newtype Wrapped t = Wrapped (Parameters t) deriving (Generic)
 
-type instance T.WithTensor t (Wrapped T.Tensor) = Wrapped t
+instance T.TensorStructure (Wrapped T.Tensor) where
+    type WithTensor t (Wrapped T.Tensor) = Wrapped t
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU

@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module NNTest.Optimizer (tests) where
 
@@ -24,11 +25,12 @@ import Test.Tasty.Hedgehog (testProperty)
 
 data Parameters t a = Parameters {projection :: NN.Dense 1 1 t a, scale :: t '[] a} deriving (Generic)
 
-type instance T.WithTensor t (Parameters T.Tensor a) = Parameters t a
+instance T.TensorStructure (Parameters T.Tensor a) where
+    type WithTensor t (Parameters T.Tensor a) = Parameters t a
 
 newtype Ascent = Ascent Double
 
-instance (AG.Differentiable p, AG.ParametersConstraints Fractional p) => O.Optimizer Ascent p where
+instance (AG.Differentiable p, T.TensorConstraints Fractional p) => O.Optimizer Ascent p where
     type OptimizerState Ascent p = ()
     initialState _ _ = ()
     optimizerStep (Ascent lr) parameters gradients =

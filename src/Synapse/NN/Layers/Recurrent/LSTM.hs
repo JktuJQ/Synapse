@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Long short-term memory cells and time-major sequence traversal.
@@ -19,8 +22,9 @@ import Synapse.Tensor.Ops.Definition (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
-import Synapse.Tensor.Representation (TensorElement, TensorLike, WithTensor)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Structure
 
 {- | Packed input, forget, candidate and output projections, in that order.
 Input weights have shape @'[input, 4 * hidden]@ and recurrent weights have
@@ -38,7 +42,8 @@ data LSTM (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = LSTM
     }
     deriving (Generic)
 
-type instance WithTensor t (LSTM input hidden T.Tensor a) = LSTM input hidden t a
+instance TensorStructure (LSTM input hidden T.Tensor a) where
+    type WithTensor t (LSTM input hidden T.Tensor a) = LSTM input hidden t a
 
 {- | Hidden and cell tensors for one layer and one batch.
 Both tensors remain differentiable when represented by autograd tensors.
@@ -53,7 +58,8 @@ data LSTMState (batch :: Nat) (hidden :: Nat) (t :: TensorLike) a = LSTMState
     }
     deriving (Generic)
 
-type instance WithTensor t (LSTMState batch hidden T.Tensor a) = LSTMState batch hidden t a
+instance TensorStructure (LSTMState batch hidden T.Tensor a) where
+    type WithTensor t (LSTMState batch hidden T.Tensor a) = LSTMState batch hidden t a
 
 {- | Apply one LSTM step and update both state tensors.
 Split the affine projection into gates @(i, f, g, o)@, then compute:

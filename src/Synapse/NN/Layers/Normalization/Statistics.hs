@@ -10,8 +10,8 @@ module Synapse.NN.Layers.Normalization.Statistics (expand, moments) where
 
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Shape as S
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Shape as S
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import Synapse.Tensor.Ops.Math ()
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
@@ -27,13 +27,10 @@ expand
     -> t (ReduceShape xs sh) a
     -> t sh a
 expand reference =
-    customVJP
+    withVJP
         (Proxy @(() :: Constraint))
         (S.expandReduced (axes @xs) (toTensor reference))
-        ( \primalInput ->
-            let output = S.expandReduced (axes @xs) (toTensor reference) primalInput in (output, (primalInput, output))
-        )
-        (uncurry (\_ _ seed -> Raw.sumAxes @xs seed))
+        (\_ _ seed -> Raw.sumAxes @xs seed)
 
 -- | Compute the mean and population variance independently in each reduction region.
 moments

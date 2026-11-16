@@ -5,8 +5,9 @@
 {-# LANGUAGE TypeApplications #-}
 
 -- | Vector-Jacobian products for arithmetic, elementary functions, and matrix computations.
-module Synapse.Autograd.Tensor.Ops.Primitives.Math
-    ( add
+module Synapse.Autograd.Tensor.Ops.Pullback.Math
+    ( -- * Arithmetic
+      add
     , subtract
     , multiply
     , negate
@@ -14,38 +15,34 @@ module Synapse.Autograd.Tensor.Ops.Primitives.Math
     , signum
     , divide
     , recip
+
+      -- * Exponentials and powers
     , exp
     , log
     , sqrt
     , power
+
+      -- * Trigonometric functions
     , sin
     , cos
     , tan
     , asin
     , acos
     , atan
+
+      -- * Hyperbolic functions
     , sinh
     , cosh
     , tanh
     , asinh
     , acosh
     , atanh
+
+      -- * Products
     , dot
     , matmul
     ) where
 
-import qualified Data.Array.Accelerate as A
-import Synapse.Tensor.Ops.Raw.Elementwise (map)
-import Synapse.Tensor.Ops.Raw.Math
-    ( broadcastBatchIndex
-    , broadcastCopies
-    , broadcastDimensions
-    , contract
-    , matrixDimensions
-    )
-import qualified Synapse.Tensor.Ops.Raw.Math as Raw
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 import Prelude hiding
     ( abs
     , acos
@@ -69,7 +66,22 @@ import Prelude hiding
     , tan
     , tanh
     )
+
+import Synapse.Tensor.Ops.Raw.Elementwise (map)
+import Synapse.Tensor.Ops.Raw.Math
+    ( broadcastBatchIndex
+    , broadcastCopies
+    , broadcastDimensions
+    , contract
+    , matrixDimensions
+    )
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
+
+import qualified Data.Array.Accelerate as A
 import qualified Prelude as P
+
+import qualified Synapse.Tensor.Ops.Raw.Math as Raw
 
 -- | Send the seed unchanged to both operands.
 add
@@ -120,12 +132,12 @@ abs x _ seed = seed * P.signum x
 
 -- | Discard the seed using a zero with the input's structure.
 signum
-    :: (a -> a)
+    :: a
     -> a
     -> a
     -> a
     -> a
-signum zeros x _ _ = zeros x
+signum zeros _ _ _ = zeros
 
 -- | Differentiate both numerator and denominator.
 divide

@@ -26,9 +26,9 @@ module Synapse.NN.Loss
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Index as Pullback
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
 import Synapse.NN.Activation (softplus)
-import Synapse.Tensor.Ops.Definition (TensorOps (customVJP))
+import Synapse.Tensor.Ops.Definition (TensorOps, withVJP)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Raw.Index as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
@@ -157,11 +157,10 @@ binaryCrossEntropy
 binaryCrossEntropy reduce probabilities targets =
     reduce $
         ( curry $
-            customVJP
+            withVJP
                 (Proxy @(() :: Constraint))
                 (uncurry forward)
-                (\(left, right) -> let output = forward left right in (output, ((left, right), output)))
-                (\((left, right), output) -> backward left right output)
+                (\(left, right) output -> backward left right output)
         )
             probabilities
             targets
@@ -269,14 +268,10 @@ unsafeNegativeLogLikelihood
 unsafeNegativeLogLikelihood reduce logProbabilities targets =
     reduce
         ( negate
-            ( customVJP
+            ( withVJP
                 (Proxy @(Num (TensorElement a)))
                 (\input -> Raw.unsafeGatherReduced @axis input targets)
-                ( \primalInput ->
-                    let output = (\input -> Raw.unsafeGatherReduced @axis input targets) primalInput
-                     in (output, (primalInput, output))
-                )
-                (uncurry (Pullback.gatherReduced @axis targets))
+                (Pullback.gatherReduced @axis targets)
                 logProbabilities
             )
         )

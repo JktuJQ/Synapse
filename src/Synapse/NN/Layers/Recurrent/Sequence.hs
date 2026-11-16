@@ -17,7 +17,6 @@ import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, natVal)
 import qualified Synapse.Autograd.Execution as AG
-import Synapse.Tensor.Backend (BackendTree (..))
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math ()
@@ -38,6 +37,37 @@ type Result t time batch hidden memory a =
     (t '[time, batch, hidden] a, Memory t batch hidden memory a)
 
 type History a = (A.Matrix a, A.Matrix a)
+
+packState
+    :: DType a
+    => Memory Tensor batch hidden memory a
+    -> A.Acc (A.Matrix a, A.Matrix a)
+packState (Tensor hidden, Tensor memory) = A.lift (hidden, memory)
+
+unpackState
+    :: DType a
+    => A.Acc (A.Matrix a, A.Matrix a)
+    -> Memory Tensor batch hidden memory a
+unpackState value = let (hidden, memory) = A.unlift value in (Tensor hidden, Tensor memory)
+
+packWeights
+    :: DType a
+    => Weights Tensor input hidden gates a
+    -> A.Acc ((A.Matrix a, A.Matrix a), (A.Vector a, A.Vector a))
+packWeights ((Tensor w, Tensor r), (Tensor b, Tensor c)) =
+    A.lift ((w, r), (b, c))
+
+unpackWeights
+    :: forall input hidden gates a
+     . DType a
+    => A.Acc ((A.Matrix a, A.Matrix a), (A.Vector a, A.Vector a))
+    -> Weights Tensor input hidden gates a
+unpackWeights value =
+    let (matrices, biases) =
+            A.unlift value :: (A.Acc (A.Matrix a, A.Matrix a), A.Acc (A.Vector a, A.Vector a))
+        (w, r) = A.unlift matrices
+        (b, c) = A.unlift biases
+     in ((Tensor w, Tensor r), (Tensor b, Tensor c))
 
 -- Select or replace one time step. Output ranges of different steps are disjoint.
 item
@@ -123,20 +153,20 @@ traverseSequence retainHistory step (parameters, (inputs, initial)) =
         body value =
             let (index, current, outputs, history) = unliftLoop value
                 i = A.the index
-                (output, next@(h, c)) = step parameters (item i inputs) $ unpack current
+                (output, next@(h, c)) = step parameters (item i inputs) $ unpackState current
                 Tensor nextOutputs = writeItem i output (Tensor outputs :: Tensor '[time, batch, hidden] a)
                 (hs, cs) = A.unlift history
                 nextHistory =
                     if retainHistory
                         then A.lift (saveHistory i h hs, saveHistory i c cs)
                         else history
-             in A.lift (A.map (+ 1) index, pack next, nextOutputs, nextHistory)
+             in A.lift (A.map (+ 1) index, packState next, nextOutputs, nextHistory)
         (_, final, result, finalHistory) =
             unliftLoop $
                 A.awhile condition body $
                     A.lift
                         ( A.unit $ A.constant (0 :: Int)
-                        , pack initial
+                        , packState initial
                         , unTensor $ full @'[time, batch, hidden] 0
                         , A.lift
                             ( emptyHistory $ shapeSize @'[batch, hidden]
@@ -144,7 +174,7 @@ traverseSequence retainHistory step (parameters, (inputs, initial)) =
                             )
                             :: A.Acc (History a)
                         )
-     in ((Tensor result, unpack final), finalHistory)
+     in ((Tensor result, unpackState final), finalHistory)
 
 -- Recompute each cell's intermediates from its saved input state.
 backward
@@ -185,19 +215,19 @@ backward step ((parameters, (inputs, initial)), history) (seeds, finalSeed) =
                 i = A.the index - 1
                 (hs, cs) = A.unlift history
                 previous =
-                    A.acond (i A.== 0) (pack initial) $
-                        pack
+                    A.acond (i A.== 0) (packState initial) $
+                        packState
                             ( readHistory @'[batch, hidden] (i - 1) hs
                             , readHistory @'[batch, memory] (i - 1) cs
                             )
                 (((dw, dr), (db, dc)), (dx, ds)) =
-                    step (parameters, (item i inputs, unpack previous)) (item i seeds, unpack stateSeed)
-                ((w, r), (b, c)) = unpack parameterSeed
+                    step (parameters, (item i inputs, unpackState previous)) (item i seeds, unpackState stateSeed)
+                ((w, r), (b, c)) = unpackWeights parameterSeed
                 Tensor nextInputs = writeItem i dx (Tensor inputSeeds :: Tensor '[time, batch, input] a)
              in A.lift
                     ( A.map (subtract 1) index
-                    , pack ds
-                    , pack ((w + dw, r + dr), (b + db, c + dc))
+                    , packState ds
+                    , packWeights ((w + dw, r + dr), (b + db, c + dc))
                     , nextInputs
                     )
         (_, stateGradient, parameterGradient, inputGradient) =
@@ -205,14 +235,14 @@ backward step ((parameters, (inputs, initial)), history) (seeds, finalSeed) =
                 A.awhile condition body $
                     A.lift
                         ( A.unit $ A.constant count
-                        , pack finalSeed
-                        , pack
+                        , packState finalSeed
+                        , packWeights
                             ( (full @'[input, gates] 0, full @'[hidden, gates] 0)
                             , (full @'[gates] 0, full @'[gates] 0)
                             )
                         , unTensor $ full @'[time, batch, input] 0
                         )
-     in (unpack parameterGradient, (Tensor inputGradient, unpack stateGradient))
+     in (unpackWeights parameterGradient, (Tensor inputGradient, unpackState stateGradient))
 
 sequenceMemory
     :: forall time batch input hidden gates memory t a

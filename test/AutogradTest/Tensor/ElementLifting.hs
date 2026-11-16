@@ -2,9 +2,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoDeepSubsumption #-}
 
 module AutogradTest.Tensor.ElementLifting (tests) where
 
@@ -24,7 +27,8 @@ import Test.Tasty.Hedgehog (testProperty)
 -- Differently shaped inputs exercise independent registration and reconstruction.
 data Inputs t = Inputs (t '[2] Double) (t '[3] Double) deriving (Generic)
 
-type instance T.WithTensor t (Inputs T.Tensor) = Inputs t
+instance T.TensorStructure (Inputs T.Tensor) where
+    type WithTensor t (Inputs T.Tensor) = Inputs t
 
 -- Neither the element residuals nor host metadata are differentiable inputs.
 data Cache = Cache (T.TensorElement Double) (T.TensorElement Double) Int

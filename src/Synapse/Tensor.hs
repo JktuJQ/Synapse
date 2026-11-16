@@ -119,7 +119,15 @@ module Synapse.Tensor
     , TensorLike
     , TensorOps
     , BackwardConstraints
-    , WithTensor
+    , TensorStructure
+        ( WithTensor
+        , TensorConstraints
+        , flatten
+        , rebuild
+        , mapTensorStructure
+        )
+    , TensorProduct
+    , zipWithTensorStructure
     , DType
     , Float32
     , Float64
@@ -317,7 +325,7 @@ import Synapse.Tensor.Ops.Construction
     , zerosLike
     )
 import Synapse.Tensor.Ops.Definition
-    ( TensorOps (BackwardConstraints)
+    ( TensorOps (BackwardConstraints, Element)
     )
 import Synapse.Tensor.Ops.Elementwise
     ( Boolean
@@ -424,7 +432,6 @@ import Synapse.Tensor.Ops.Window
     )
 import Synapse.Tensor.Representation
     ( DType
-    , Element
     , Float32
     , Float64
     , Tensor
@@ -432,7 +439,6 @@ import Synapse.Tensor.Representation
     , TensorElement
     , TensorIndex
     , TensorLike
-    , WithTensor
     )
 import Synapse.Tensor.Shapes
     ( Shape
@@ -443,6 +449,7 @@ import Synapse.Tensor.Shapes
 import Synapse.Tensor.Shapes.Index
     ( SliceAxis (..)
     )
+import Synapse.Tensor.Structure
 import Prelude hiding
     ( Eq
     , Integral

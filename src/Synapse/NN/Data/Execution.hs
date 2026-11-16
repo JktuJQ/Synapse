@@ -28,8 +28,9 @@ import GHC.TypeNats (KnownNat, SomeNat (..), natVal, sameNat, someNatVal)
 import Numeric.Natural (Natural)
 import Synapse.NN.Data (Batch (..), BatchPlan, SomeBatch, batchMask, batchSizes, withBatch)
 import Synapse.Tensor.Backend (Backend, Computation, run4)
-import Synapse.Tensor.Representation (DType, Tensor, TensorData, WithTensor)
+import Synapse.Tensor.Representation (DType, Tensor, TensorData)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
+import Synapse.Tensor.Structure
 
 {- | An immutable executor with a prepared function for each planned batch size.
 Retain it across batches and epochs to reuse backend preparation. The executor

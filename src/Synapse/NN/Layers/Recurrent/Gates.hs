@@ -14,8 +14,8 @@ module Synapse.NN.Layers.Recurrent.Gates (split3, split4) where
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, type (*))
-import qualified Synapse.Autograd.Tensor.Ops.Primitives.Shape as Pullback
-import Synapse.Tensor.Ops.Definition (TensorOps (customVJP))
+import qualified Synapse.Autograd.Tensor.Ops.Pullback.Shape as Pullback
+import Synapse.Tensor.Ops.Definition (TensorOps, withCachedVJP)
 import qualified Synapse.Tensor.Ops.Raw.Shape as Raw
 import qualified Synapse.Tensor.Representation as T
 
@@ -30,9 +30,8 @@ split3
     => t '[batch, 3 * hidden] a
     -> (t '[batch, hidden] a, t '[batch, hidden] a, t '[batch, hidden] a)
 split3 =
-    customVJP
+    withCachedVJP
         (Proxy @(Num (T.TensorElement a)))
-        forward
         (\input -> (forward input, ()))
         (\() (r, z, n) -> Pullback.joinMatrixChunks @3 @hidden [r, z, n])
   where
@@ -49,9 +48,8 @@ split4
     => t '[batch, 4 * hidden] a
     -> (t '[batch, hidden] a, t '[batch, hidden] a, t '[batch, hidden] a, t '[batch, hidden] a)
 split4 =
-    customVJP
+    withCachedVJP
         (Proxy @(Num (T.TensorElement a)))
-        forward
         (\input -> (forward input, ()))
         (\() (i, f, g, o) -> Pullback.joinMatrixChunks @4 @hidden [i, f, g, o])
   where

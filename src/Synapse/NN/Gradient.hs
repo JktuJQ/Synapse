@@ -21,11 +21,16 @@ where
 
 import qualified Data.Array.Accelerate as A
 import Data.Bifunctor (bimap)
-import Synapse.Autograd.Execution.Variable (ValueTree (..), Values (..))
-import Synapse.Autograd.Type (Differentiable, ParametersConstraints)
 import qualified Synapse.Tensor as T
 import Synapse.Tensor.Representation (Tensor (..))
-import Synapse.Tensor.Structure (Flatten (..), Leaves)
+import Synapse.Tensor.Structure
+    ( TensorConstraints
+    , TensorStructure
+    , ValueTree (..)
+    , flatten
+    , rebuild
+    , tensorConstraints
+    )
 
 -- | Tensor fields supported by global gradient operations.
 class GradientTensor tensor where
@@ -50,7 +55,7 @@ instance T.Shape sh => GradientTensor (Tensor sh Float) where
 -- | Fold tensor fields without requiring numeric instances for their records.
 foldGradients
     :: forall p
-     . (Differentiable p, ParametersConstraints GradientTensor p)
+     . (TensorStructure p, TensorConstraints GradientTensor p)
     => (forall tensor. GradientTensor tensor => tensor -> Tensor '[] Double)
     -> (Tensor '[] Double -> Tensor '[] Double -> Tensor '[] Double)
     -> p
@@ -62,12 +67,12 @@ foldGradients reduce combine =
             -> Tensor '[] Double
         visit TensorValues = reduce
         visit (PairValues left right) = \(x, y) -> combine (visit left x) (visit right y)
-     in visit (values @(Leaves Tensor p) @GradientTensor) . flatten @Tensor
+     in visit (tensorConstraints @p @GradientTensor) . flatten @p @Tensor
 
 -- | Apply one shared clipping factor while preserving all tensor shapes and dtypes.
 clipGradNorm
     :: forall p
-     . (Differentiable p, ParametersConstraints GradientTensor p)
+     . (TensorStructure p, TensorConstraints GradientTensor p)
     => (p -> Tensor '[] Double)
     -> Double
     -> p
@@ -83,15 +88,15 @@ clipGradNorm norm maxNorm gradients =
             -> fields
         visit TensorValues = scaleGradient factor
         visit (PairValues left right) = bimap (visit left) (visit right)
-     in rebuild @Tensor $ visit (values @(Leaves Tensor p) @GradientTensor) $ flatten @Tensor gradients
+     in rebuild @p @Tensor $ visit (tensorConstraints @p @GradientTensor) $ flatten @p @Tensor gradients
 
 {- | L1 norm of all gradient elements across every tensor field.
-Supports single tensors, tuples and nested differentiable records with Float
+Supports single tensors, tuples and nested tensor records with Float
 or Double leaves. Accumulation and the scalar result use Double precision,
 including for mixed-precision records. Empty tensor fields contribute zero.
 -}
 gradientNormL1
-    :: (Differentiable p, ParametersConstraints GradientTensor p)
+    :: (TensorStructure p, TensorConstraints GradientTensor p)
     => p
     -> Tensor '[] Double
 gradientNormL1 = foldGradients (reduceGradient T.normL1) (+)
@@ -102,7 +107,7 @@ to Double, and partial norms are combined with scaling to avoid intermediate
 overflow and underflow. The result is a scalar Double tensor.
 -}
 gradientNormL2
-    :: (Differentiable p, ParametersConstraints GradientTensor p)
+    :: (TensorStructure p, TensorConstraints GradientTensor p)
     => p
     -> Tensor '[] Double
 gradientNormL2 =
@@ -122,7 +127,7 @@ limit and all-zero gradients are preserved. Nonfinite gradients are not repaired
 Tensor dtypes and the containing record structure are preserved.
 -}
 clipGradNormL1
-    :: (Differentiable p, ParametersConstraints GradientTensor p)
+    :: (TensorStructure p, TensorConstraints GradientTensor p)
     => Double
     -> p
     -> p
@@ -142,7 +147,7 @@ let (loss, gradients) = AG.backprop objective parameters
 @
 -}
 clipGradNormL2
-    :: (Differentiable p, ParametersConstraints GradientTensor p)
+    :: (TensorStructure p, TensorConstraints GradientTensor p)
     => Double
     -> p
     -> p

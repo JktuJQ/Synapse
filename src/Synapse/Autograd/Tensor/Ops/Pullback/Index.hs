@@ -6,15 +6,24 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Scatter selected-element and slice seeds back into the input shape.
-module Synapse.Autograd.Tensor.Ops.Primitives.Index (index, indexAt, dynamicIndexOr, gather, gatherReduced, lookupRows, slice) where
+module Synapse.Autograd.Tensor.Ops.Pullback.Index
+    ( -- * Element indexing
+      index
+    , indexAt
+    , dynamicIndexOr
 
-import qualified Data.Array.Accelerate as A
+      -- * Gathering and slicing
+    , gather
+    , slice
+    , gatherReduced
+    , lookupRows
+    ) where
+
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
-import Synapse.Autograd.Tensor.Ops.Primitives.Shape (shapeOf)
-import qualified Synapse.Tensor.Ops.Raw.Index as Raw
+
+import Synapse.Autograd.Tensor.Ops.Pullback.Shape (shapeOf)
 import Synapse.Tensor.Representation (DType)
-import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Axes (RemoveAxis)
 import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape, strides)
 import Synapse.Tensor.Shapes.Index
@@ -26,6 +35,11 @@ import Synapse.Tensor.Shapes.Index
     , coordinates
     , sliceAxes
     )
+
+import qualified Data.Array.Accelerate as A
+
+import qualified Synapse.Tensor.Ops.Raw.Index as Raw
+import qualified Synapse.Tensor.Representation as T
 
 -- | Scatter a scalar seed to one statically selected input element.
 index
