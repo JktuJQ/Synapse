@@ -1,49 +1,48 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module NNTest.Weights.Public
-    ( Settings (..)
-    , Manual (..)
-    , GenericParameters (..)
-    , Choice (..)
+    ( Manual (..)
     , CodecError (..)
     , encode
     , decode
-    )
-where
+    ) where
 
-import Data.Typeable (cast)
+import qualified Data.Map.Strict as Map
+import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import qualified Synapse.NN as NN
 import qualified Synapse.NN.Weights as Weights
 import qualified Synapse.Tensor as T
+import qualified Synapse.Tensor.Structure as Structure
 import Text.Read (readEither)
 
-newtype Settings = Settings (Int -> Int)
+viewToList :: Weights.WeightTensorView a -> [a]
+viewToList view = map (Weights.weightTensorViewAt view) [0 .. product (Weights.weightTensorViewShape view) - 1]
 
-instance Weights.TensorFields Settings where
-    traverseTensors _ = pure
+fromList :: (T.DType a, Typeable a) => [Int] -> [a] -> Either CodecError Weights.WeightTensor
+fromList dimensions values
+    | any (< 0) dimensions || product (map toInteger dimensions) /= toInteger (length values) =
+        Left $ InvalidText "element count does not match shape"
+    | otherwise =
+        either (Left . InvalidWeights) Right $
+            Weights.weightTensorFromView $
+                Weights.WeightTensorView dimensions (values !!)
 
-data Manual = Manual (NN.Dense 2 1 T.TensorData Double) (T.TensorData '[] Bool) Settings
-
-instance Weights.TensorFields Manual where
-    traverseTensors visit (Manual layer enabled settings) =
-        Manual
-            <$> Weights.traverseTensors (\path -> visit ("projection" : path)) layer
-            <*> visit ["enabled"] enabled
-            <*> pure settings
-
-data GenericParameters = GenericParameters
-    { genericLayer :: NN.Dense 2 1 T.TensorData Double
-    , genericSettings :: Settings
-    }
+data Manual t = Manual (NN.Dense 2 1 t Double) (t '[] Bool)
     deriving (Generic)
 
-data Choice = Disabled Settings | Enabled (T.TensorData '[1] Double) Settings
-
-instance Weights.TensorFields Choice where
-    traverseTensors _ (Disabled settings) = pure (Disabled settings)
-    traverseTensors visit (Enabled tensor settings) = (`Enabled` settings) <$> visit ["enabled"] tensor
+instance Structure.TensorStructure (Manual T.Tensor) where
+    type WithTensor t (Manual T.Tensor) = Manual t
+    flatten (Manual (NN.Dense weights bias) enabled) =
+        (
+            ( Structure.TensorField ["projection", "denseWeights"] weights
+            , Structure.TensorField ["projection", "denseBias"] bias
+            )
+        , Structure.TensorField ["enabled"] enabled
+        )
 
 data Payload = Doubles [Int] [Double] | Booleans [Int] [Bool] deriving (Read, Show)
 
@@ -51,13 +50,14 @@ data CodecError = UnsupportedElement | InvalidText String | InvalidWeights Weigh
     deriving (Show)
 
 encode :: Weights.Weights -> Either CodecError String
-encode dictionary = show <$> traverse encodeEntry (Weights.weightsToList dictionary)
+encode dictionary = show <$> traverse encodeEntry ((Map.toAscList . Weights.weightsEntries) dictionary)
   where
-    encodeEntry (path, tensor) = Weights.withWeightTensor tensor $ \dimensions values ->
-        let payload = case cast values :: Maybe (Weights.TensorValues Double) of
-                Just doubles -> Right (Doubles dimensions (Weights.valuesToList doubles))
-                Nothing -> case cast values :: Maybe (Weights.TensorValues Bool) of
-                    Just booleans -> Right (Booleans dimensions (Weights.valuesToList booleans))
+    encodeEntry (path, tensor) = Weights.withWeightTensor tensor $ \values ->
+        let dimensions = Weights.weightTensorViewShape values
+            payload = case cast values :: Maybe (Weights.WeightTensorView Double) of
+                Just doubles -> Right (Doubles dimensions (viewToList doubles))
+                Nothing -> case cast values :: Maybe (Weights.WeightTensorView Bool) of
+                    Just booleans -> Right (Booleans dimensions (viewToList booleans))
                     Nothing -> Left UnsupportedElement
          in (,) path <$> payload
 
@@ -66,8 +66,8 @@ decode input = do
     entries <- either (Left . InvalidText) Right (readEither input)
     let decodeEntry (path, payload) =
             let tensor = case payload of
-                    Doubles dimensions values -> Weights.weightTensorFromList dimensions values
-                    Booleans dimensions values -> Weights.weightTensorFromList dimensions values
-             in (,) path <$> either (Left . InvalidWeights) Right tensor
+                    Doubles dimensions values -> fromList dimensions values
+                    Booleans dimensions values -> fromList dimensions values
+             in (,) path <$> tensor
     decoded <- traverse decodeEntry entries
-    either (Left . InvalidWeights) Right (Weights.weightsFromList decoded)
+    pure $ Weights.Weights $ Map.fromList decoded

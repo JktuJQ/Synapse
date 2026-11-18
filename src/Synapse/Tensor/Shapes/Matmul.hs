@@ -8,8 +8,8 @@ module Synapse.Tensor.Shapes.Matmul (MatmulShape) where
 
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), Nat, TypeError)
 
+import Synapse.Tensor.Shapes.Backend (Reverse)
 import Synapse.Tensor.Shapes.Broadcast (BroadcastShape)
-import Synapse.Tensor.Shapes.Dimensions (Reverse)
 
 -- | Append the matrix result dimensions to the common broadcast batch shape.
 type family Append (lhs :: [Nat]) (rhs :: [Nat]) :: [Nat] where

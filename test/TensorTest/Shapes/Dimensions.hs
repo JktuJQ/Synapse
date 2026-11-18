@@ -8,6 +8,7 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (natVal)
 import qualified Hedgehog as H
 import qualified Synapse.Tensor as T
+import qualified Synapse.Tensor.Shapes.Backend as B
 import qualified Synapse.Tensor.Shapes.Dimensions as D
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -50,11 +51,11 @@ propDimensionEdges = H.property $ do
 propDimensionOrder :: H.Property
 propDimensionOrder = H.property $ do
     D.shape @'[2, 3, 4] H.=== [2, 3, 4]
-    D.backendShape (Proxy @'[2, 3, 4]) H.=== (A.Z A.:. (2 :: Int) A.:. (3 :: Int) A.:. (4 :: Int))
+    B.backendShape (Proxy @'[2, 3, 4]) H.=== (A.Z A.:. (2 :: Int) A.:. (3 :: Int) A.:. (4 :: Int))
 
 propTypeDimensions :: H.Property
 propTypeDimensions = H.property $ do
     natVal (Proxy @(D.ShapeSize '[2, 3, 4])) H.=== 24
     natVal (Proxy @(D.ShapeSize '[])) H.=== 1
     natVal (Proxy @(D.ShapeSize '[2, 0, 3])) H.=== 0
-    D.shape @(D.Reverse '[2, 3, 4]) H.=== [4, 3, 2]
+    D.shape @(B.Reverse '[2, 3, 4]) H.=== [4, 3, 2]

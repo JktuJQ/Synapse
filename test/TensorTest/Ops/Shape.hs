@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module TensorTest.Ops.Shape (tests) where
@@ -7,6 +8,7 @@ import qualified Data.Array.Accelerate as A
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import qualified Synapse.Autograd as AG
 import qualified Synapse.Tensor as T
 import qualified Synapse.Tensor.Representation as Internal
 import Test.Tasty (TestTree, testGroup)
@@ -17,6 +19,18 @@ tests =
     testGroup
         "shape operations"
         [ testProperty "concat joins outer and inner axes" propConcat
+        , testProperty "matrix splits preserve values and gradients" $ H.withTests 1 $ H.property $ do
+            let source = T.fromList @'[2, 6] [1 .. 12 :: Double] :: T.Tensor '[2, 6] Double
+                (a, b, c) = T.split3 @2 source
+                (x, y, z) = T.run T.CPU (a, b, c)
+                loss :: AG.Context s => AG.Tensor s '[2, 6] Double -> AG.Tensor s '[] Double
+                loss tensor = let (p, q, r) = T.split3 @2 tensor in T.sum (p + 2 * q + 3 * r)
+                (_, gradient) = AG.backprop loss source
+            map T.toList [x, y, z] H.=== [[1, 2, 7, 8], [3, 4, 9, 10], [5, 6, 11, 12]]
+            T.toList (T.run T.CPU gradient) H.=== [1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3]
+            let (i, j, k, l) = T.split4 @1 $ T.fromList @'[1, 4] [5, 6, 7, 8 :: Double]
+                (i', j', k', l') = T.run T.CPU (i, j, k, l)
+            map T.toList [i', j', k', l'] H.=== [[5], [6], [7], [8]]
         , testProperty "concat joins a middle axis" (H.withTests 1 propConcatMiddle)
         , testProperty "stack inserts the requested axis" propStack
         , testProperty "joins support empty dimensions and scalars" (H.withTests 1 propJoinEdges)

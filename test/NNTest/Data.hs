@@ -170,21 +170,21 @@ tests =
                     NN.Indexed
                         count
                         (\i -> modifyIORef' requests (i :) >> pure (T.fromListData @'[] [i], T.fromListData @'[] [i :: Int]))
-                (shuffled, _) = NN.shuffle dataset (mkStdGen seed)
+                (shuffled, _) = NN.runState (NN.shuffle dataset) (mkStdGen seed)
             NN.datasetSize shuffled H.=== count
             before <- H.evalIO $ readIORef requests
             before H.=== []
-            values <- H.evalIO $ mapM (NN.getSample shuffled) [0 .. count - 1]
+            values <- H.evalIO $ mapM (NN.fetchSample shuffled) [0 .. count - 1]
             sort (concatMap (T.toList . fst) values) H.=== [0 .. count - 1]
             after <- H.evalIO $ readIORef requests
             reverse after H.=== concatMap (T.toList . fst) values
         , testProperty "shuffle is reproducible and advances the generator for subsequent epochs" $ H.withTests 1 $ H.property $ do
             let dataset = NN.Indexed 32 (\i -> pure (T.fromListData @'[] [i], T.fromListData @'[] [i :: Int]))
                 generator = mkStdGen 19
-                (first, next) = NN.shuffle dataset generator
-                (repeated, repeatedNext) = NN.shuffle dataset generator
-                (second, _) = NN.shuffle dataset next
-                order source = concatMap (T.toList . fst) <$> mapM (NN.getSample source) [0 .. NN.datasetSize source - 1]
+                (first, next) = NN.runState (NN.shuffle dataset) generator
+                (repeated, repeatedNext) = NN.runState (NN.shuffle dataset) generator
+                (second, _) = NN.runState (NN.shuffle dataset) next
+                order source = concatMap (T.toList . fst) <$> mapM (NN.fetchSample source) [0 .. NN.datasetSize source - 1]
             firstOrder <- H.evalIO $ order first
             repeatedOrder <- H.evalIO $ order repeated
             secondOrder <- H.evalIO $ order second
@@ -195,14 +195,14 @@ tests =
         , testProperty "shuffle supports empty and singleton datasets" $ H.withTests 1 $ H.property $ do
             forM_ [0, 1] $ \count -> do
                 let (dataset, _) =
-                        NN.shuffle
-                            (NN.Indexed count (\i -> pure (T.fromListData @'[] [i], T.fromListData @'[] [i :: Int])))
+                        NN.runState
+                            (NN.shuffle $ NN.Indexed count (\i -> pure (T.fromListData @'[] [i], T.fromListData @'[] [i :: Int])))
                             (mkStdGen 1)
-                values <- H.evalIO $ mapM (NN.getSample dataset) [0 .. count - 1]
+                values <- H.evalIO $ mapM (NN.fetchSample dataset) [0 .. count - 1]
                 concatMap (T.toList . fst) values H.=== [0 .. count - 1]
         , testProperty "shuffling and loading batches preserves paired examples" $ H.withTests 1 $ H.property $ do
             let dataset = NN.Indexed 17 (\i -> pure (T.fromListData @'[] [i], T.fromListData @'[] [100 + i :: Int]))
-                (shuffled, _) = NN.shuffle dataset (mkStdGen 23)
+                (shuffled, _) = NN.runState (NN.shuffle dataset) (mkStdGen 23)
             loaded <- H.evalIO $ sequence (NN.loadBatches 4 NN.KeepLast shuffled)
             let batches = map summary loaded
                 inputs = concat [xs | (xs, _, _, _, _) <- batches]
@@ -307,15 +307,15 @@ tests =
                     , T.toList (NN.batchMask batch)
                     )
             forM_ [NN.KeepLast, NN.DropLast, NN.PadLast (-1) (-2)] $ \policy -> do
-                let (left, _) = NN.shuffle indexed (mkStdGen seed)
-                    (right, _) = NN.shuffle grouped (mkStdGen seed)
+                let (left, _) = NN.runState (NN.shuffle indexed) (mkStdGen seed)
+                    (right, _) = NN.runState (NN.shuffle grouped) (mkStdGen seed)
                 map (contents . runIdentity) (NN.loadBatches limit policy left)
                     H.=== map (contents . runIdentity) (NN.loadBatches limit policy right)
         , testProperty "shuffle remaps grouped requests together without reading examples" $ H.withTests 1 $ H.property $ do
             requests <- H.evalIO $ newIORef []
             let sample i = (T.fromListData @'[] [i], T.fromListData @'[] [100 + i :: Int])
                 source = NN.Grouped 5 (\indices -> modifyIORef' requests (indices :) >> pure (map sample indices))
-                (shuffled, _) = NN.shuffle source (mkStdGen 19)
+                (shuffled, _) = NN.runState (NN.shuffle source) (mkStdGen 19)
                 loads = NN.loadBatches 2 NN.KeepLast shuffled
             length loads H.=== 3
             before <- H.evalIO $ readIORef requests
@@ -331,7 +331,7 @@ tests =
                 grouped = NN.Grouped 4 (pure . map (* 10)) :: NN.Dataset Identity Int
             forM_ [indexed, grouped] $ \source -> do
                 NN.datasetSize source H.=== 4
-                runIdentity (NN.getSample source 2) H.=== 20
+                runIdentity (NN.fetchSample source 2) H.=== 20
             runIdentity (NN.readSamples grouped [3, 1, 3]) H.=== [30, 10, 30]
         , testProperty "grouped sources support zero-sized samples and empty datasets" $ H.withTests 1 $ H.property $ do
             let sample _ = (T.fromListData @'[0] ([] :: [Int]), T.fromListData @'[] [True])
@@ -369,7 +369,7 @@ tests =
             approxList (T.toList (NN.denseBias trained)) [expectedBias]
         , testProperty "grouped length checks stop at the first excess example" $ H.withTests 1 $ H.property $ do
             let source = NN.Grouped 1 (\_ -> pure (1 : 2 : error "unexpected traversal")) :: NN.Dataset Identity Int
-            result <- H.evalIO $ try @ErrorCall $ evaluate (runIdentity (NN.getSample source 0))
+            result <- H.evalIO $ try @ErrorCall $ evaluate (runIdentity (NN.fetchSample source 0))
             case result of
                 Left err -> H.assert ("grouped reader" `isInfixOf` displayException err)
                 Right _ -> H.failure

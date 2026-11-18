@@ -1,67 +1,117 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-{- | Load paired tensor examples on demand and form batches with a runtime-selected leading dimension.
-Sources may read from memory or disk without loading the entire dataset in advance.
+{- | Load examples by index, shuffle their order, and assemble input and target tensors into minibatches.
+A 'Dataset' supplies examples in a context chosen by the caller, such as @Identity@ or @IO@.
+'loadBatches' returns loading actions; execute each action when its batch is needed.
+
+'LastBatch' selects whether to keep, discard, or pad an incomplete final batch.
+Each 'SomeBatch' hides its leading dimension until 'withBatch' introduces it into scope.
+Padding is recorded by 'validCount' and 'batchMask'; losses must exclude padded examples explicitly.
+
+A 'BatchPlan' additionally records the expected batch sizes, without loading examples.
+'prepareBatchStep' uses this information to prepare a computation for each size.
 -}
 module Synapse.NN.Data
-    ( Dataset (..)
-    , getSample
+    ( -- * Sources
+      Dataset (..)
+    , fetchSample
+    , shuffle
+
+      -- * Batches
+    , LastBatch (..)
+    , Batch (..)
+    , SomeBatch (..)
+    , withBatch
+    , batchSize
+    , batchMask
     , loadBatches
+
+      -- * Loading plans
     , BatchPlan
     , batchPlan
     , planBatches
     , batchSizes
     , batchLoads
-    , LastBatch (..)
-    , Batch (..)
-    , SomeBatch (..)
-    , shuffle
-    , withBatch
-    , batchSize
-    , batchMask
+
+      -- * Prepared computations
+    , BatchStep (..)
+    , UnexpectedSize (..)
+    , prepareBatchStep
     )
 where
+
+import Control.Monad.Trans.State.Strict (State, state)
+import Data.Proxy (Proxy (..))
+import Data.Type.Equality ((:~:) (Refl))
+import GHC.TypeNats (KnownNat, SomeNat (..), natVal, sameNat, someNatVal)
+import System.Random (RandomGen, uniformShuffleList)
+
+import Synapse.Tensor.Backend (Backend, Computation, run4)
+import Synapse.Tensor.Representation (DType, Tensor, TensorData (..))
+import Synapse.Tensor.Shapes.Backend (backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
+import Synapse.Tensor.Structure (WithTensor)
 
 import qualified Data.Array as Array
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Unboxed as Unboxed
-import Data.Proxy (Proxy (..))
+import qualified Data.Map.Lazy as Map
 import qualified Data.Set as Set
-import GHC.TypeNats (KnownNat, SomeNat (..), natVal, someNatVal)
-import Numeric.Natural (Natural)
-import Synapse.Tensor.Representation (DType, TensorData (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
-import System.Random (RandomGen, uniformShuffleList)
+
+-- | A prepared function paired with evidence of its batch dimension.
+data Prepared args in_sh out_sh features targets result
+    = forall batch. KnownNat batch => Prepared
+        (Proxy batch)
+        (args -> Batch batch in_sh out_sh features targets -> result)
+
+-- | Fill host storage by linear index, then attach the requested tensor shape without copying its contents.
+generateData
+    :: forall sh element
+     . (Shape sh, DType element)
+    => (Int -> element)
+    -> TensorData sh element
+generateData element =
+    let values = A.fromFunction (A.Z A.:. shapeSize @sh) (\(A.Z A.:. index) -> element index)
+     in TensorData (A.arrayReshape (backendShape (Proxy @sh)) values)
 
 {- | A finite collection of examples loaded by index, individually or in groups.
+-
 The size must be nonnegative, and valid indices range from zero to 'datasetSize' minus one.
+Readers must return the requested examples in order, including repeated indices.
+A grouped reader must return exactly one example per requested index.
 Pure sources can use @Identity@ from "Data.Functor.Identity"; disk sources typically use @IO@.
 -}
 data Dataset m sample
     = Indexed
         { datasetSize :: Int
-        -- ^ Number of examples available without loading them.
         , readSample :: Int -> m sample
-        -- ^ Read one example, decoding or transforming it as needed.
         }
     | Grouped
         { datasetSize :: Int
         , readSamples :: [Int] -> m [sample]
-        {- ^ Read a group of examples in the requested order, preserving repeated indices.
-        Return exactly one example for each supplied index.
-        The loader assembles these examples into a batch afterwards.
-        -}
         }
 
--- | Obtain examples using the source's individual or grouped reader.
+-- | Read one example from either source type.
+fetchSample
+    :: Applicative m
+    => Dataset m sample
+    -> Int
+    -> m sample
+fetchSample source index = extract <$> fetchSamples source [index]
+  where
+    extract [sample] = sample
+    extract _ = error "Synapse.NN.fetchSample: expected one example"
+
+-- | Read multiple examples from either source type.
 fetchSamples
     :: Applicative m
     => Dataset m sample
@@ -75,45 +125,38 @@ fetchSamples (Grouped _ reader) indices = checkCount <$> reader indices
     sameCount _ _ = False
     checkCount samples
         | sameCount indices samples = samples
-        | otherwise = error "Synapse.NN.loadBatches: grouped reader must return one example per requested index"
+        | otherwise =
+            error "Synapse.NN.loadBatches: grouped reader must return one example per requested index"
 
-{- | Read one example from either source type.
-A grouped source receives a singleton list of indices.
+{- | Uniformly permute source indices without loading any examples.
+Only an index permutation occupies additional memory proportional to 'datasetSize'.
 -}
-getSample
-    :: Applicative m
+shuffle
+    :: RandomGen g
     => Dataset m sample
-    -> Int
-    -> m sample
-getSample source index = extract <$> fetchSamples source [index]
-  where
-    extract [sample] = sample
-    extract _ = error "Synapse.NN.getSample: expected one example"
+    -> State g (Dataset m sample)
+shuffle dataset = state $ \generator ->
+    let count = datasetSize dataset
+        (indices, next) = uniformShuffleList [0 .. count - 1] generator
+        order :: Unboxed.UArray Int Int
+        order = Unboxed.listArray (0, count - 1) indices
+        reordered = case dataset of
+            Indexed _ reader -> Indexed count (reader . (order Unboxed.!))
+            Grouped _ reader -> Grouped count (reader . map (order Unboxed.!))
+     in (reordered, next)
 
 -- | Treatment of a final batch smaller than the requested size.
 data LastBatch features targets
-    = -- | Retain the remaining examples with their actual batch size.
-      KeepLast
-    | -- | Discard the remaining examples without loading them.
-      DropLast
-    | {- | Fill missing examples with the supplied input and target element values.
-      All elements of each added example receive the corresponding fill value.
-      -}
-      PadLast features targets
+    = KeepLast
+    | DropLast
+    | PadLast features targets
     deriving (Eq, Show)
 
-{- | Paired batches with a shared leading dimension.
-'loadBatches' produces batches containing at least one real example.
--}
+-- | Paired batches with a shared leading dimension.
 data Batch batch in_sh out_sh features targets = Batch
     { batchInputs :: TensorData (batch ': in_sh) features
-    -- ^ Input examples, including any padding, along the leading axis.
     , batchTargets :: TensorData (batch ': out_sh) targets
-    -- ^ Target examples in the same order as the inputs, including any padding.
     , validCount :: Int
-    {- ^ Number of real examples, occupying the first positions of the leading axis.
-    When constructing a batch, this must be between zero and its 'batchSize'.
-    -}
     }
 
 {- | A batch whose leading dimension is determined at runtime.
@@ -124,60 +167,7 @@ data SomeBatch in_sh out_sh features targets
         (KnownNat batch, Shape (batch ': in_sh), Shape (batch ': out_sh)) =>
       SomeBatch (Batch batch in_sh out_sh features targets)
 
--- | Number of examples along the leading axis, including padding.
-batchSize
-    :: forall batch in_sh out_sh features targets
-     . KnownNat batch
-    => Batch batch in_sh out_sh features targets
-    -> Int
-batchSize _ = fromIntegral (natVal (Proxy @batch))
-
--- | Fill host storage by linear index, then attach the requested tensor shape without copying its contents.
-generateData
-    :: forall sh element
-     . (Shape sh, DType element)
-    => (Int -> element)
-    -> TensorData sh element
-generateData element =
-    let values = A.fromFunction (A.Z A.:. shapeSize @sh) (\(A.Z A.:. index) -> element index)
-     in TensorData (A.arrayReshape (backendShape (Proxy @sh)) values)
-
-{- | Uniformly permute source indices without loading any examples.
-Returns a reordered source and the next random generator.
-Only an index permutation occupies additional memory proportional to 'datasetSize'.
-A grouped source still receives one request per batch, with all indices remapped together.
-For a new epoch, shuffle the original source with the returned generator.
--}
-shuffle
-    :: RandomGen g
-    => Dataset m sample
-    -> g
-    -> (Dataset m sample, g)
-shuffle dataset generator =
-    let count = datasetSize dataset
-        (indices, next) = uniformShuffleList [0 .. count - 1] generator
-        order
-            :: Unboxed.UArray Int Int
-        order = Unboxed.listArray (0, count - 1) indices
-        reordered = case dataset of
-            Indexed _ reader -> Indexed count (reader . (order Unboxed.!))
-            Grouped _ reader -> Grouped count (reader . map (order Unboxed.!))
-     in (reordered, next)
-
-{- | One boolean per example, with 'True' for real examples and 'False' for padding.
-The mask is constructed on demand and does not automatically affect losses or other computations.
-Broadcast it explicitly when selecting values with additional feature axes.
--}
-batchMask
-    :: forall batch in_sh out_sh features targets
-     . KnownNat batch
-    => Batch batch in_sh out_sh features targets
-    -> TensorData '[batch] Bool
-batchMask batch = generateData @'[batch] (< validCount batch)
-
-{- | Process a batch with its runtime-selected dimension available at the type level.
-The result type must not depend on the hidden batch dimension.
--}
+-- | Process a batch with its runtime-selected dimension available at the type level.
 withBatch
     :: SomeBatch in_sh out_sh features targets
     -> ( forall batch
@@ -188,91 +178,39 @@ withBatch
     -> r
 withBatch (SomeBatch batch) handler = handler batch
 
-{- | Expected leading dimensions and lazy loading actions for a source.
-A plan describes loading; it does not read examples or compile computations.
-The constructor is hidden. Use 'planBatches' for a 'Dataset', or 'batchPlan'
-for a custom source.
+-- | Number of examples along the leading axis, including padding.
+batchSize
+    :: forall batch in_sh out_sh features targets
+     . KnownNat batch
+    => Batch batch in_sh out_sh features targets
+    -> Int
+batchSize _ = fromIntegral (natVal (Proxy @batch))
+
+{- | One boolean per example, with 'True' for real examples and 'False' for padding.
+-
+The mask is constructed on demand and does not automatically affect losses or other computations.
+Broadcast it explicitly when selecting values with additional feature axes.
 -}
-data BatchPlan m in_sh out_sh features targets
-    = BatchPlan
-        (Set.Set Natural)
-        [m (SomeBatch in_sh out_sh features targets)]
-
-{- | Describe a custom source with a finite collection of expected batch sizes.
-Duplicate sizes are ignored. Loading actions are neither traversed nor executed;
-each action should produce a batch with one of the declared sizes.
-Extra declared sizes are allowed, even if no action produces them.
--}
-batchPlan
-    :: [Natural]
-    -> [m (SomeBatch in_sh out_sh features targets)]
-    -> BatchPlan m in_sh out_sh features targets
-batchPlan sizes = BatchPlan $ Set.fromList sizes
-
--- | Concatenate loading schedules and combine their expected sizes.
-instance Semigroup (BatchPlan m in_sh out_sh features targets) where
-    BatchPlan firstSizes firstLoads <> BatchPlan secondSizes secondLoads =
-        BatchPlan (Set.union firstSizes secondSizes) (firstLoads ++ secondLoads)
-
-instance Monoid (BatchPlan m in_sh out_sh features targets) where
-    mempty = BatchPlan Set.empty []
-
--- | Distinct expected batch sizes in ascending order, including padding.
-batchSizes
-    :: BatchPlan m in_sh out_sh features targets
-    -> [Natural]
-batchSizes (BatchPlan sizes _) = Set.toAscList sizes
-
-{- | Lazy loading actions in source order. Execute them one at a time to avoid
-retaining an entire epoch in memory.
--}
-batchLoads
-    :: BatchPlan m in_sh out_sh features targets
-    -> [m (SomeBatch in_sh out_sh features targets)]
-batchLoads (BatchPlan _ loads) = loads
-
-{- | Plan one pass over a dataset using the same size and remainder policy as
-'loadBatches'. Expected sizes are calculated from 'datasetSize' without
-traversing the loading actions or reading examples.
-Shuffling a source preserves its expected sizes, so its new plan can use
-an executor prepared for the original plan.
--}
-planBatches
-    :: ( Applicative m
-       , Shape in_sh
-       , Shape out_sh
-       , forall batch. KnownNat batch => Shape (batch ': in_sh)
-       , forall batch. KnownNat batch => Shape (batch ': out_sh)
-       , DType features
-       , DType targets
-       )
-    => Int
-    -> LastBatch features targets
-    -> Dataset m (TensorData in_sh features, TensorData out_sh targets)
-    -> BatchPlan m in_sh out_sh features targets
-planBatches limit policy source
-    | limit <= 0 = error "Synapse.NN.planBatches: requested size must be positive"
-    | datasetSize source < 0 = error "Synapse.NN.planBatches: dataset size must be nonnegative"
-    | otherwise =
-        let (full, remainder) = datasetSize source `quotRem` limit
-            sizes = case policy of
-                KeepLast -> [fromIntegral limit | full > 0] ++ [fromIntegral remainder | remainder > 0]
-                DropLast -> [fromIntegral limit | full > 0]
-                PadLast _ _ -> [fromIntegral limit | datasetSize source > 0]
-         in batchPlan sizes $ loadBatches limit policy source
+batchMask
+    :: forall batch in_sh out_sh features targets
+     . KnownNat batch
+    => Batch batch in_sh out_sh features targets
+    -> TensorData '[batch] Bool
+batchMask batch = generateData @'[batch] (< validCount batch)
 
 {- | Create loading actions for one pass over a source in its current order.
+-
 Each action obtains only its own batch; constructing or traversing the action list does not load examples.
 Discarded final examples are not read when using 'DropLast'.
 Execute and consume batches one at a time to avoid retaining an entire epoch in memory.
-Indexed sources read each example separately; grouped sources receive one request per batch.
-Returned examples are copied into the destination arrays without converting tensor elements to lists.
+The requested size must be positive, and the dataset size must be nonnegative.
+An empty source produces no actions.
 
 @
-let (epoch, nextGenerator) = shuffle dataset generator
-forM_ (loadBatches 32 KeepLast epoch) $ \load -> do
+let (epoch, nextGenerator) = runState (shuffle dataset) generator
+forM_ (loadBatches 32 KeepLast epoch) $ \\load -> do
   someBatch <- load
-  withBatch someBatch $ \batch -> ...
+  withBatch someBatch $ \\batch -> ...
 @
 
 For pure sources, @map runIdentity (loadBatches 32 KeepLast dataset)@ yields a lazy list of batches.
@@ -328,9 +266,148 @@ loadBatches limit policy dataset
                                     )
                      in collate <$> fetchSamples dataset indices
 
+    -- Produce one loading action per retained chunk.
     emit offset remaining
         | remaining <= 0 = []
         | DropLast <- policy, remaining < limit = []
         | otherwise =
             let valid = min limit remaining
              in loadChunk valid [offset .. offset + valid - 1] : emit (offset + valid) (remaining - valid)
+
+-- | Expected leading dimensions and lazy loading actions for a source.
+data BatchPlan m in_sh out_sh features targets = BatchPlan
+    { plannedBatchSizes :: Set.Set Int
+    , batchLoads :: [m (SomeBatch in_sh out_sh features targets)]
+    }
+
+-- | Concatenate loading schedules and combine their expected sizes.
+instance Semigroup (BatchPlan m in_sh out_sh features targets) where
+    first <> second =
+        BatchPlan
+            { plannedBatchSizes = Set.union (plannedBatchSizes first) (plannedBatchSizes second)
+            , batchLoads = batchLoads first ++ batchLoads second
+            }
+
+instance Monoid (BatchPlan m in_sh out_sh features targets) where
+    mempty =
+        BatchPlan
+            { plannedBatchSizes = Set.empty
+            , batchLoads = []
+            }
+
+{- | Describe a custom source with a finite collection of expected batch sizes.
+Sizes must be nonnegative; duplicate sizes are ignored.
+-}
+batchPlan
+    :: [Int]
+    -> [m (SomeBatch in_sh out_sh features targets)]
+    -> BatchPlan m in_sh out_sh features targets
+batchPlan sizes loads
+    | any (< 0) sizes = error "Synapse.NN.batchPlan: batch sizes must be nonnegative"
+    | otherwise =
+        BatchPlan
+            { plannedBatchSizes = Set.fromList sizes
+            , batchLoads = loads
+            }
+
+-- | Plan one pass over a dataset using the same size and remainder policy as 'loadBatches'.
+planBatches
+    :: ( Applicative m
+       , Shape in_sh
+       , Shape out_sh
+       , forall batch. KnownNat batch => Shape (batch ': in_sh)
+       , forall batch. KnownNat batch => Shape (batch ': out_sh)
+       , DType features
+       , DType targets
+       )
+    => Int
+    -> LastBatch features targets
+    -> Dataset m (TensorData in_sh features, TensorData out_sh targets)
+    -> BatchPlan m in_sh out_sh features targets
+planBatches limit policy source
+    | limit <= 0 = error "Synapse.NN.planBatches: requested size must be positive"
+    | datasetSize source < 0 = error "Synapse.NN.planBatches: dataset size must be nonnegative"
+    | otherwise =
+        let (full, remainder) = datasetSize source `quotRem` limit
+            sizes = case policy of
+                KeepLast -> [limit | full > 0] ++ [remainder | remainder > 0]
+                DropLast -> [limit | full > 0]
+                PadLast _ _ -> [limit | datasetSize source > 0]
+         in batchPlan sizes $ loadBatches limit policy source
+
+-- | Distinct expected batch sizes in ascending order, including padding.
+batchSizes
+    :: BatchPlan m in_sh out_sh features targets
+    -> [Int]
+batchSizes = Set.toAscList . plannedBatchSizes
+
+{- | An immutable executor with a prepared function for each planned batch size.
+Retain it across batches and epochs to reuse the prepared functions.
+-}
+newtype BatchStep args batch result = BatchStep
+    { runBatch :: args -> batch -> Either UnexpectedSize result
+    }
+
+{- | The actual leading dimension was not included in the preparation plan.
+The caller retains the original batch and can choose another execution path.
+The stored value is the actual batch size.
+-}
+newtype UnexpectedSize = UnexpectedSize Int deriving (Eq, Show)
+
+{- | Prepare one computation for all expected sizes in a loading plan to be executed on a specified backend.
+
+The returned 'BatchStep' retains one function prepared by 'run4' for each planned batch size.
+Bind it outside the batch loop and reuse it across epochs to share preparation and compiled operations
+between calls of the same size, including a smaller final batch.
+Preparation is lazy; compilation may occur when a specialization is first used.
+
+An unplanned size returns @Left (UnexpectedSize size)@ without preparing another specialization;
+you may do that yourself if needed.
+
+@
+let plan = planBatches 32 KeepLast dataset
+    step = prepareBatchStep CPU plan trainingStep
+forM_ (batchLoads plan) $ \\load -> do
+  batch <- load
+  case runBatch step parameters batch of
+    Left unexpected -> ...
+    Right result -> ...
+@
+-}
+prepareBatchStep
+    :: forall args result m in_sh out_sh features targets
+     . ( Computation args
+       , Computation result
+       , forall batch. KnownNat batch => Shape (batch ': in_sh)
+       , forall batch. KnownNat batch => Shape (batch ': out_sh)
+       , DType features
+       , DType targets
+       )
+    => Backend
+    -> BatchPlan m in_sh out_sh features targets
+    -> ( forall batch
+          . KnownNat batch
+         => args
+         -> Tensor (batch ': in_sh) features
+         -> Tensor (batch ': out_sh) targets
+         -> Tensor '[batch] Bool
+         -> result
+       )
+    -> BatchStep
+        (WithTensor TensorData args)
+        (SomeBatch in_sh out_sh features targets)
+        (WithTensor TensorData result)
+prepareBatchStep backend plan operation =
+    let specialize size = case someNatVal $ fromIntegral size of
+            SomeNat (proxy :: Proxy batch) ->
+                let execute = run4 backend $ operation @batch
+                 in Prepared proxy $ \args batch ->
+                        execute args (batchInputs batch) (batchTargets batch) (batchMask batch)
+        entries = Map.fromDistinctAscList [(size, specialize size) | size <- batchSizes plan]
+     in BatchStep $ \args packed -> withBatch packed $ \(batch :: Batch n in_sh out_sh features targets) ->
+            let size = fromIntegral $ natVal $ Proxy @n
+             in case Map.lookup size entries of
+                    Just (Prepared proxy execute) -> case sameNat (Proxy @n) proxy of
+                        Just Refl -> Right $ execute args batch
+                        Nothing -> Left $ UnexpectedSize size
+                    Nothing -> Left $ UnexpectedSize size

@@ -18,6 +18,7 @@ import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.NN.Optimizers as O
 import qualified Synapse.Tensor as T
+import qualified Synapse.Tensor.Structure as Structure
 import qualified TensorTest.Compiler as Compiler
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
@@ -30,11 +31,11 @@ instance T.TensorStructure (Parameters T.Tensor a) where
 
 newtype Ascent = Ascent Double
 
-instance (AG.Differentiable p, T.TensorConstraints Fractional p) => O.Optimizer Ascent p where
+instance (AG.Differentiable p, Structure.FieldConstraints Fractional p) => O.Optimizer Ascent p where
     type OptimizerState Ascent p = ()
     initialState _ _ = ()
     optimizerStep (Ascent lr) parameters gradients =
-        pure $ O.updateParameters @Fractional (\p g -> p + realToFrac lr * g) parameters gradients
+        pure $ Structure.zipWithFields @Fractional (\_ p g -> p + realToFrac lr * g) parameters gradients
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
 values = T.toList . T.run T.CPU
@@ -45,7 +46,7 @@ tests =
         "optimizers"
         [ testProperty "momentum and Nesterov follow successive analytic updates" $ H.withTests 1 $ H.property $ do
             let run nesterov =
-                    let optimizer = NN.Momentum 0.1 0.9 nesterov
+                    let optimizer = NN.MomentumSGD 0.1 0.9 nesterov
                         p = T.full @'[] (5 :: Double)
                         (p1, v1) = runState (NN.optimizerStep optimizer p 2) (NN.initialState optimizer p)
                         (p2, v2) = runState (NN.optimizerStep optimizer p1 3) v1
@@ -103,19 +104,19 @@ tests =
             approxList (values $ NN.denseWeights $ projection updated) [2 - 0.1 / (1 + 1e-8)]
             approxList (values $ NN.denseBias $ projection updated) [3 - 0.2 / (2 + 1e-8)]
             approxList (values $ scale updated) [4 - 0.3 / (3 + 1e-8)]
-        , testProperty "updateParameters passes parameters before gradients" $ H.withTests 1 $ H.property $ do
+        , testProperty "zipWithFields passes parameters before gradients" $ H.withTests 1 $ H.property $ do
             let parameters :: Parameters T.Tensor Double
                 parameters = Parameters (NN.Dense 6 12) 20
                 gradients = Parameters (NN.Dense 2 4) 5
-                updated = NN.updateParameters @Fractional (/) parameters gradients
+                updated = Structure.zipWithFields @Fractional (\_ -> (/)) parameters gradients
             values (NN.denseWeights (projection updated)) H.=== [3]
             values (NN.denseBias (projection updated)) H.=== [3]
             values (scale updated) H.=== [4]
-        , testProperty "updateParameters supplies Floating operations to every tensor" $ H.withTests 1 $ H.property $ do
+        , testProperty "zipWithFields supplies Floating operations to every tensor" $ H.withTests 1 $ H.property $ do
             let parameters :: Parameters T.Tensor Double
                 parameters = Parameters (NN.Dense 8 12) 20
                 gradients = Parameters (NN.Dense 4 9) 16
-                updated = NN.updateParameters @Floating (\p g -> p - sqrt g) parameters gradients
+                updated = Structure.zipWithFields @Floating (\_ p g -> p - sqrt g) parameters gradients
             values (NN.denseWeights (projection updated)) H.=== [6]
             values (NN.denseBias (projection updated)) H.=== [9]
             values (scale updated) H.=== [16]

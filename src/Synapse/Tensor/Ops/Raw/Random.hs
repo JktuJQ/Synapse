@@ -37,8 +37,9 @@ import Synapse.Tensor.Data (fromList)
 import Synapse.Tensor.Ops.Elementwise (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Construction (element)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Shapes.Backend (backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.Data.Bits as B

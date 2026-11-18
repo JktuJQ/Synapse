@@ -1,6 +1,4 @@
-{- | Neural network layers, their parameters and functional computations.
-Parameters support execution, differentiation and weight serialization through their tensor representation.
--}
+-- | Neural network layers, their parameters and functional computations.
 module Synapse.NN.Layers
     ( module Synapse.NN.Layers.Dense
     , module Synapse.NN.Layers.Convolution

@@ -20,31 +20,25 @@ import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
 import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Input and recurrent projections for one recurrent layer.
+
 Weights use @[input, hidden]@ and @[hidden, hidden]@ order.
 Biases are separate and both have shape @'[hidden]@.
 -}
 data RNN (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = RNN
     { rnnInputWeights :: t '[input, hidden] a
-    -- ^ Input features mapped to the packed output projections.
     , rnnHiddenWeights :: t '[hidden, hidden] a
-    -- ^ Previous hidden features mapped to the packed output projections.
     , rnnInputBias :: t '[hidden] a
-    -- ^ Bias of the input projection.
     , rnnHiddenBias :: t '[hidden] a
-    -- ^ Bias of the recurrent projection.
     }
     deriving (Generic)
 
 instance TensorStructure (RNN input hidden T.Tensor a) where
     type WithTensor t (RNN input hidden T.Tensor a) = RNN input hidden t a
 
-{- | Apply @h' = tanh (x * W_input + b_input + h * W_hidden + b_hidden)@.
-Read and replace the hidden state through 'State'. The returned output is @h'@.
-State tensors participate in differentiation just like the input and weights.
--}
+-- | Apply @h' = tanh (x * W_input + b_input + h * W_hidden + b_hidden)@.
 rnnCell
     :: forall input hidden batch t a
      . ( KnownNat input

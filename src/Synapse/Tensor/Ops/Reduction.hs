@@ -45,14 +45,14 @@ import qualified Synapse.Autograd.Tensor.Ops.Pullback.Reduction as Pullback
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
-import Synapse.Tensor.Representation (Tensor, TensorElement)
+import Synapse.Tensor.Representation (Tensor, TensorElement, TensorLike)
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, CanReduceNonEmpty, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Prelude hiding (all, any, maximum, minimum, sum)
 
 -- | Sum all elements, returning zero for an empty tensor.
 sum
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (TensorOps t a, Num (TensorElement a), Shape sh)
     => t sh a
     -> t '[] a
@@ -64,7 +64,7 @@ sum =
 
 -- | Sum over selected axes and remove them from the output shape.
 sumAxes
-    :: forall {t} xs sh a
+    :: forall {t :: TensorLike} xs sh a
      . (TensorOps t a, Num (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh)
     => t sh a
     -> t (ReduceShape xs sh) a
@@ -76,7 +76,7 @@ sumAxes =
 
 -- | Mean of all floating point elements, returning NaN for an empty tensor.
 mean
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (TensorOps t a, RealFloat a, Fractional (TensorElement a), Shape sh)
     => t sh a
     -> t '[] a
@@ -88,7 +88,7 @@ mean =
 
 -- | Compute means over the selected axes.
 meanAxes
-    :: forall {t} xs sh a
+    :: forall {t :: TensorLike} xs sh a
      . ( TensorOps t a
        , RealFloat a
        , Fractional (TensorElement a)
@@ -107,7 +107,7 @@ meanAxes =
 
 -- | Sum the absolute values of all elements.
 normL1
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (TensorOps t a, BackwardConstraints t (Num a), Num (TensorElement a), Shape sh)
     => t sh a
     -> t '[] a
@@ -119,7 +119,7 @@ normL1 =
 
 -- | Compute the square root of the sum of squared elements.
 normL2
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . ( TensorOps t a
        , BackwardConstraints t (Fractional a)
        , Floating (TensorElement a)
@@ -137,7 +137,7 @@ normL2 =
 
 -- | Minimum of all elements of a statically nonempty tensor.
 minimum
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . ( TensorOps t a
        , BackwardConstraints t (Fractional a, Fractional (TensorElement a))
        , E.Ord (TensorElement a)
@@ -154,7 +154,7 @@ minimum =
 
 -- | Minimum over selected axes, removing them from the output shape.
 minimumAxes
-    :: forall {t} xs sh a
+    :: forall {t :: TensorLike} xs sh a
      . ( TensorOps t a
        , BackwardConstraints t (Fractional a, Fractional (TensorElement a))
        , E.Ord (TensorElement a)
@@ -173,7 +173,7 @@ minimumAxes =
 
 -- | Position of the minimum along one nonempty axis, removing that axis.
 argmin
-    :: forall {t} axis sh a
+    :: forall {t :: TensorLike} axis sh a
      . ( TensorOps t a
        , E.Ord (TensorElement a)
        , Shape sh
@@ -187,7 +187,7 @@ argmin = Raw.argmin @axis . toTensor
 
 -- | Maximum of all elements of a statically nonempty tensor.
 maximum
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . ( TensorOps t a
        , BackwardConstraints t (Fractional a, Fractional (TensorElement a))
        , E.Ord (TensorElement a)
@@ -204,7 +204,7 @@ maximum =
 
 -- | Maximum over selected axes, removing them from the output shape.
 maximumAxes
-    :: forall {t} xs sh a
+    :: forall {t :: TensorLike} xs sh a
      . ( TensorOps t a
        , BackwardConstraints t (Fractional a, Fractional (TensorElement a))
        , E.Ord (TensorElement a)
@@ -223,7 +223,7 @@ maximumAxes =
 
 -- | Position of the maximum along one nonempty axis, removing that axis.
 argmax
-    :: forall {t} axis sh a
+    :: forall {t :: TensorLike} axis sh a
      . ( TensorOps t a
        , E.Ord (TensorElement a)
        , Shape sh
@@ -237,7 +237,7 @@ argmax = Raw.argmax @axis . toTensor
 
 -- | Test whether every element is true, returning True for an empty tensor.
 all
-    :: forall {t} sh
+    :: forall {t :: TensorLike} sh
      . (TensorOps t Bool, Shape sh)
     => t sh Bool
     -> t '[] Bool
@@ -245,7 +245,7 @@ all = fromTensor . Raw.all . toTensor
 
 -- | Test conjunction along selected axes, removing them from the result.
 allAxes
-    :: forall {t} xs sh
+    :: forall {t :: TensorLike} xs sh
      . (TensorOps t Bool, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh)
     => t sh Bool
     -> t (ReduceShape xs sh) Bool
@@ -253,7 +253,7 @@ allAxes = fromTensor . Raw.allAxes @xs . toTensor
 
 -- | Test whether any element is true, returning False for an empty tensor.
 any
-    :: forall {t} sh
+    :: forall {t :: TensorLike} sh
      . (TensorOps t Bool, Shape sh)
     => t sh Bool
     -> t '[] Bool
@@ -261,7 +261,7 @@ any = fromTensor . Raw.any . toTensor
 
 -- | Test disjunction along selected axes, removing them from the result.
 anyAxes
-    :: forall {t} xs sh
+    :: forall {t :: TensorLike} xs sh
      . (TensorOps t Bool, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh)
     => t sh Bool
     -> t (ReduceShape xs sh) Bool
@@ -269,7 +269,7 @@ anyAxes = fromTensor . Raw.anyAxes @xs . toTensor
 
 -- | Logarithm of the sum of exponentials, using maximum subtraction for finite inputs.
 logSumExp
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . ( TensorOps t a
        , RealFloat a
        , Floating (TensorElement a)
@@ -287,7 +287,7 @@ logSumExp =
 
 -- | Logarithm of summed exponentials over selected axes, removing those axes.
 logSumExpAxes
-    :: forall {t} xs sh a
+    :: forall {t :: TensorLike} xs sh a
      . ( TensorOps t a
        , RealFloat a
        , Floating (TensorElement a)
@@ -308,7 +308,7 @@ logSumExpAxes =
 
 -- | Normalize exponentials along one axis without overflowing on large finite inputs.
 softmax
-    :: forall {t} axis sh a
+    :: forall {t :: TensorLike} axis sh a
      . ( TensorOps t a
        , Floating a
        , Floating (TensorElement a)
@@ -328,7 +328,7 @@ softmax =
 
 -- | Logarithm of softmax along one nonempty axis, computed without taking the log of small probabilities.
 logSoftmax
-    :: forall {t} axis sh a
+    :: forall {t :: TensorLike} axis sh a
      . ( TensorOps t a
        , Floating a
        , Floating (TensorElement a)

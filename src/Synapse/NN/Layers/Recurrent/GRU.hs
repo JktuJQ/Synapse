@@ -16,17 +16,17 @@ import Control.Monad.Trans.State.Strict (State, state)
 import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, type (*))
 import Synapse.NN.Activation (sigmoid)
-import Synapse.NN.Layers.Recurrent.Gates (split3)
 import Synapse.NN.Layers.Recurrent.Sequence (sequenceHidden)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
-import Synapse.Tensor.Ops.Shape (broadcast)
+import Synapse.Tensor.Ops.Shape (broadcast, split3)
 import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Packed reset, update and candidate projections, in that order.
+
 Input weights have shape @'[input, 3 * hidden]@; recurrent weights have shape
 @'[hidden, 3 * hidden]@. Both biases have shape @'[3 * hidden]@.
 The recurrent candidate bias is multiplied by the reset gate, so it cannot
@@ -34,13 +34,9 @@ be merged with the input candidate bias.
 -}
 data GRU (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = GRU
     { gruInputWeights :: t '[input, 3 * hidden] a
-    -- ^ Input features mapped to the packed output projections.
     , gruHiddenWeights :: t '[hidden, 3 * hidden] a
-    -- ^ Previous hidden features mapped to the packed output projections.
     , gruInputBias :: t '[3 * hidden] a
-    -- ^ Bias of the input projection.
     , gruHiddenBias :: t '[3 * hidden] a
-    -- ^ Bias of the recurrent projection.
     }
     deriving (Generic)
 
@@ -48,6 +44,7 @@ instance TensorStructure (GRU input hidden T.Tensor a) where
     type WithTensor t (GRU input hidden T.Tensor a) = GRU input hidden t a
 
 {- | Apply one GRU step, reading and replacing the hidden tensor through 'State'.
+
 For input projections @(xr, xz, xn)@ and recurrent projections @(hr, hz, hn)@:
 
 @
@@ -56,8 +53,6 @@ z  = sigmoid (xz + hz)
 n  = tanh (xn + r * hn)
 h' = (1 - z) * n + z * h
 @
-
-This reset-after form matches <https://docs.pytorch.org/docs/stable/generated/torch.nn.GRUCell.html PyTorch's GRUCell>. The output is the new hidden state.
 -}
 gruCell
     :: forall input hidden batch t a
@@ -83,11 +78,7 @@ gruCell parameters input = state $ \previous ->
         next = (1 - update) * candidate + update * previous
      in (next, next)
 
-{- | Apply one GRU layer to @'[time, batch, input]@, returning every hidden output
-with shape @'[time, batch, hidden]@ and preserving the final hidden tensor in 'State'.
-The cell and sequence functions use the same parameters. An empty sequence
-preserves the initial state; callers choose whether to carry it across chunks.
--}
+-- | Apply one GRU layer to @'[time, batch, input]@.
 gru
     :: forall input hidden batch time t a
      . ( KnownNat input

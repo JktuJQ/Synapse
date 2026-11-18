@@ -8,12 +8,10 @@ Use @constant@ to introduce fixed tensors and @stopGrad@ to detach a computed va
 Both functions are provided by "Synapse.Autograd.Execution".
 -}
 module Synapse.Autograd.Tensor
-    ( -- * Tensors and structures
-      Tensor
-    , WithGrad
+    ( module Synapse.Autograd.Tensor.Representation
     ) where
 
 import Synapse.Autograd.Tensor.Ops ()
 import Synapse.Autograd.Tensor.Ops.Elementwise ()
 import Synapse.Autograd.Tensor.Ops.Math ()
-import Synapse.Autograd.Tensor.Representation (Tensor, WithGrad)
+import Synapse.Autograd.Tensor.Representation (Tensor, TensorElement, WithGrad)

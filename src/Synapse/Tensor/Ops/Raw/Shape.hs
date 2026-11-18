@@ -27,17 +27,9 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.Representation (DType, Tensor (..))
 import Synapse.Tensor.Shapes.Axes (Axes (..), ConcatShape, InsertAxis, PermuteAxes, TransposeShape)
+import Synapse.Tensor.Shapes.Backend (backendCoordinates, backendIndex, backendShape, strides)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
-import Synapse.Tensor.Shapes.Dimensions
-    ( Shape
-    , backendCoordinates
-    , backendIndex
-    , backendShape
-    , shape
-    , shapeRank
-    , shapeSize
-    , strides
-    )
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeRank, shapeSize)
 import Prelude hiding (concat)
 
 -- | Change the shape without changing element order.
@@ -164,7 +156,7 @@ stack _ = joinBlocks @(InsertAxis axis 2 sh) outer inner inner
     outer = product (take axis dims)
     inner = product (drop axis dims)
 
--- | Read a statically selected contiguous gate from a packed projection.
+-- | Read a contiguous group of columns from a matrix.
 matrixChunk
     :: forall hidden batch width a
      . (KnownNat batch, KnownNat hidden, DType a)

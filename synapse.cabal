@@ -75,14 +75,17 @@ library
                     , Synapse.NN.Weights
                     , Synapse.NN.Weights.Safetensors
                     , Synapse.NN.Data
-                    , Synapse.NN.Data.Execution
                     , Synapse.NN.Gradient
                     , Synapse.NN.Loss
+                    , Synapse.NN.Loss.Regression
+                    , Synapse.NN.Loss.Classification
                     , Synapse.NN.Activation
                     , Synapse.NN.Layers.Position
                     , Synapse.NN.Layers.Attention
                     , Synapse.NN.Initialization
                     , Synapse.NN.Metrics
+                    , Synapse.NN.Metrics.Regression
+                    , Synapse.NN.Metrics.Classification
                     , Synapse.NN.Layers
                     , Synapse.NN.Layers.Convolution
                     , Synapse.NN.Forward
@@ -98,7 +101,7 @@ library
                     , Synapse.NN.Layers.Recurrent.GRU
                     , Synapse.NN.Layers.Recurrent.LSTM
                     , Synapse.NN.Optimizers
-                    , Synapse.NN.Optimizers.Type
+                    , Synapse.NN.Optimizers.Optimizer
                     , Synapse.NN.Optimizers.SGD
                     , Synapse.NN.Optimizers.Adam
                     , Synapse.NN.Optimizers.RMSprop
@@ -122,6 +125,7 @@ library
                     , Synapse.Tensor.Shapes.Axes
                     , Synapse.Tensor.Shapes.Broadcast
                     , Synapse.Tensor.Shapes.Dimensions
+                    , Synapse.Tensor.Shapes.Backend
                     , Synapse.Tensor.Shapes.Index
                     , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Shapes.Matmul
@@ -130,10 +134,11 @@ library
                     , Synapse.Tensor.Structure
                     , Synapse.Tensor.Ops.Random
 
-    other-modules:    Synapse.Autograd.Record
+    other-modules:    Synapse.Tensor.Structure.Product
+                    , Synapse.Tensor.Structure.Constraints
+                    , Synapse.Autograd.Record
                     , Synapse.Tensor.Ops.Raw.Random
                     , Synapse.Tensor.Ops.Definition
-                    , Synapse.NN.Layers.Recurrent.Gates
                     , Synapse.NN.Layers.Recurrent.Sequence
                     , Synapse.NN.Layers.Normalization.Statistics
                     , Synapse.Tensor.Ops.Raw.Window
@@ -303,6 +308,7 @@ test-suite synapse-test
     build-depends:    base >= 4.19 && < 4.22
                     , transformers >= 0.6 && < 0.7
                     , bytestring >= 0.11 && < 0.13
+                    , containers >= 0.6 && < 0.9
                     , synapse
                     , accelerate >= 1.3 && < 1.5
                     , backprop >= 0.2.7.2 && < 0.3

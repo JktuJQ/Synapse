@@ -14,7 +14,7 @@ where
 import Data.Kind (Constraint)
 import GHC.TypeLits (ErrorMessage (ShowType, Text, (:<>:)), Nat, TypeError)
 
-import Synapse.Tensor.Shapes.Dimensions (Reverse)
+import Synapse.Tensor.Shapes.Backend (Reverse)
 
 -- Common broadcast shape
 

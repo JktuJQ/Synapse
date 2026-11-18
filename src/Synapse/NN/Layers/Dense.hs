@@ -8,7 +8,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoDeepSubsumption #-}
 
--- | Fully connected layers acting on the last input dimension.
+-- | Fully connected layers.
 module Synapse.NN.Layers.Dense (Dense (..), dense) where
 
 import Control.Arrow (Arrow, arr)
@@ -22,22 +22,16 @@ import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Parameters of an affine transformation @input * weights + bias@.
+
 Weights have shape @'[in_features, out_features]@ and bias has shape @'[out_features]@.
 'dense' preserves leading input dimensions and replaces the last dimension with @out_features@.
-
-@
-parameters :: Dense 2 3 T.Tensor Float
-parameters = Dense (NN.xavierUniform \@'[2, 3] 2 3 1 generator) (T.zeros \@'[3])
-@
 -}
 data Dense (in_features :: Nat) (out_features :: Nat) (t :: TensorLike) a = Dense
     { denseWeights :: t '[in_features, out_features] a
-    -- ^ Weights mapping input features to output features.
     , denseBias :: t '[out_features] a
-    -- ^ Bias added to every output feature vector.
     }
     deriving (Generic)
 
@@ -45,6 +39,7 @@ instance TensorStructure (Dense in_features out_features T.Tensor a) where
     type WithTensor t (Dense in_features out_features T.Tensor a) = Dense in_features out_features t a
 
 {- | Apply @input * weights + bias@ along the last input dimension.
+
 The input must have at least one dimension, with @in_features@ elements on the last axis.
 Leading input dimensions are preserved, and the last dimension becomes @out_features@.
 -}

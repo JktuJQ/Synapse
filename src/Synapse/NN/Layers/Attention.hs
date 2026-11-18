@@ -22,6 +22,7 @@ import GHC.TypeNats (Div, KnownNat, Nat, natVal, type (*), type (<=))
 import Synapse.NN.Layers.Dense (Dense, dense)
 import qualified Synapse.Tensor as T
 import Synapse.Tensor.Ops.Definition (withCachedVJP)
+import Synapse.Tensor.Representation (TensorLike)
 import Synapse.Tensor.Shapes.Axes (CanReduceNonEmpty)
 
 {- | Allow each query to attend to keys at the same or earlier position.
@@ -56,7 +57,7 @@ let query = NN.splitHeads \@2 $ NN.dense queryProjection input
 @
 -}
 splitHeads
-    :: forall heads {t} batch time features a
+    :: forall heads {t :: TensorLike} batch time features a
      . ( KnownNat batch
        , KnownNat heads
        , KnownNat time
@@ -76,7 +77,7 @@ This is the inverse of 'splitHeads'; no type arguments are needed when
 the input shape is known. Both operations support tensor differentiation.
 -}
 mergeHeads
-    :: forall {t} batch heads time depth a
+    :: forall {t :: TensorLike} batch heads time depth a
      . ( KnownNat batch
        , KnownNat heads
        , KnownNat time

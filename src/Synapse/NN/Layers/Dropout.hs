@@ -26,10 +26,11 @@ import Synapse.Tensor.Ops.Elementwise (Conditional (..))
 import Synapse.Tensor.Ops.Random (StagedGenerator, bernoulli, initializeGenerator)
 import Synapse.Tensor.Representation (Tensor)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 import System.Random (RandomGen)
 
 {- | Random state for one dropout operation, independent of trainable parameters.
+
 Initialize separate states for independently sampled dropout operations.
 The state can be a field of a user-defined record passed through a prepared computation.
 -}
@@ -53,6 +54,7 @@ initializeDropout generator =
      in (DropoutState randomState, next)
 
 {- | Retain elements selected by a mask and scale them by @1 / (1 - probability)@.
+
 The caller supplies a probability in @[0, 1]@ and a mask whose entries are independently true with probability @1 - probability@.
 Evaluation returns the input without inspecting the probability or mask.
 Probabilities zero and one return the input and zeros respectively without inspecting the mask.
@@ -71,6 +73,7 @@ dropoutWithMask Train probability mask
     | otherwise = arr $ \input -> select mask (input / realToFrac (1 - probability)) 0
 
 {- | Independently zero each element with the given probability during training.
+
 Retained elements are scaled by @1 / (1 - probability)@ to preserve their expected value.
 The caller supplies a finite probability in @[0, 1]@.
 Updates the random state and returns the output.

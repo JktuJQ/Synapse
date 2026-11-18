@@ -31,7 +31,8 @@ import Data.Proxy (Proxy (..))
 import Synapse.Tensor.Ops.Raw.Elementwise (zipWith)
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Reduction
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shape, strides)
+import Synapse.Tensor.Shapes.Backend (backendShape, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Prelude hiding (zipWith)
 import qualified Prelude as P

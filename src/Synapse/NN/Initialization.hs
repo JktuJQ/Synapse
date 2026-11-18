@@ -1,27 +1,51 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-{- | Pure tensor initialization with explicit random generators.
-The same parameters and generator reproduce the same tensor.
-Split generators with <https://hackage.haskell.org/package/random/docs/System-Random.html#v:splitGen splitGen> before initializing independent parameters.
-Fan counts are supplied explicitly and need not match dimensions of the result.
+{- | Initialize tensors with uniformly or normally distributed values.
+
+@
+import Control.Monad.Trans.State.Strict (runState)
+import System.Random (mkStdGen)
+import qualified Synapse.NN.Initialization as I
+
+let initialize = do
+        weights <- I.xavierUniform \@'[2, 3] \@Double 2 3 1
+        bias <- I.uniform \@'[3] \@Double (-0.1) 0.1
+        pure (weights, bias)
+    ((weights, bias), nextGenerator) = runState initialize (mkStdGen 42)
+@
+
+The same initial generator reproduces the same sequence of tensors and final generator.
+An empty tensor or a constant distribution leaves the generator unchanged.
+
+Xavier initializers take explicit input and output fan counts and a gain.
+Kaiming initializers take one fan count and the negative-input slope of a leaky ReLU.
 -}
 module Synapse.NN.Initialization
-    ( uniform
+    ( -- * Distributions
+      uniform
     , normal
+
+      -- * Xavier initialization
     , xavierUniform
     , xavierNormal
+
+      -- * Kaiming initialization
     , kaimingUniform
     , kaimingNormal
     )
 where
 
+import Control.Monad.Trans.State.Strict (State)
+import System.Random (RandomGen, UniformRange)
+import System.Random.Stateful (StateGenM (..), uniformListRM, uniformRM)
+
 import Synapse.Tensor.Data (unsafeFromList)
 import Synapse.Tensor.Ops.Construction (full)
 import Synapse.Tensor.Representation (DType, Tensor)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
-import System.Random (RandomGen, UniformRange, uniformR, uniformRs)
 
+-- | Checks whether a supplied float value is finite.
 finite
     :: RealFloat a
     => a
@@ -30,37 +54,20 @@ finite x = not (isNaN x || isInfinite x)
 
 {- | Initialize elements uniformly between the supplied lower and upper bounds.
 Bounds must be finite and ordered; equal bounds produce a constant tensor.
-Invalid parameters raise an error.
+Invalid bounds raise an error.
 -}
 uniform
     :: forall sh a g
      . (Shape sh, DType a, RealFloat a, UniformRange a, RandomGen g)
     => a
     -> a
-    -> g
-    -> Tensor sh a
-uniform lower upper generator
+    -> State g (Tensor sh a)
+uniform lower upper
     | not (finite lower && finite upper) || lower > upper =
         error "Synapse.NN.uniform: bounds must be finite and ordered"
-    | lower == upper = full @sh lower
-    | otherwise = unsafeFromList @sh $ take (shapeSize @sh) $ uniformRs (lower, upper) generator
-
-{- | Generate standard normal pairs using the Marsaglia polar method.
-Rejected pairs exclude the origin and the boundary of the unit disk.
--}
-normalSamples
-    :: RandomGen g
-    => g
-    -> [Double]
-normalSamples generator =
-    let (u, next) = uniformR (-1, 1) generator
-        (v, rest) = uniformR (-1, 1) next
-        radius = u * u + v * v
-     in if radius <= 0 || radius >= 1
-            then normalSamples rest
-            else
-                let scale = sqrt (((-2) * log radius) / radius)
-                 in u * scale : v * scale : normalSamples rest
+    | lower == upper = pure $ full @sh lower
+    | otherwise =
+        unsafeFromList @sh <$> uniformListRM (shapeSize @sh) (lower, upper) (StateGenM :: StateGenM g)
 
 {- | Initialize elements from a normal distribution with the supplied mean and standard deviation.
 Both parameters must be finite and the standard deviation must be nonnegative.
@@ -71,15 +78,30 @@ normal
      . (Shape sh, DType a, RealFloat a, RandomGen g)
     => a
     -> a
-    -> g
-    -> Tensor sh a
-normal mean std generator
+    -> State g (Tensor sh a)
+normal mean std
     | not (finite mean && finite std) || std < 0 =
         error "Synapse.NN.normal: mean must be finite and standard deviation must be finite and nonnegative"
-    | std == 0 = full @sh mean
-    | otherwise =
-        unsafeFromList @sh $ take (shapeSize @sh) $ map (\z -> mean + std * realToFrac z) $ normalSamples generator
+    | std == 0 = pure $ full @sh mean
+    | otherwise = unsafeFromList @sh . map (\z -> mean + std * realToFrac z) <$> samples (shapeSize @sh) []
+  where
+    -- Marsaglia polar sampling consumes both draws even when a pair is rejected.
+    samples 0 acc = pure $ reverse acc
+    samples count acc = do
+        u <- uniformRM (-1, 1) (StateGenM :: StateGenM g)
+        v <- uniformRM (-1, 1) (StateGenM :: StateGenM g)
+        let radius = u * u + v * v
+        if radius <= 0 || radius >= 1
+            then samples count acc
+            else
+                let scale = sqrt (((-2) * log radius) / radius)
+                    first = u * scale :: Double
+                    second = v * scale
+                 in if count == 1
+                        then pure $ reverse $ first : acc
+                        else samples (count - 2) (second : first : acc)
 
+-- | Compute the standard deviation for Xavier initialization.
 xavierScale
     :: RealFloat a
     => Int
@@ -91,6 +113,7 @@ xavierScale fanIn fanOut gain
     | not (finite gain) || gain < 0 = error "Synapse.NN.xavier: gain must be finite and nonnegative"
     | otherwise = gain * sqrt (2 / (fromIntegral fanIn + fromIntegral fanOut))
 
+-- | Compute the standard deviation for Kaiming initialization.
 kaimingScale
     :: RealFloat a
     => Int
@@ -102,10 +125,9 @@ kaimingScale fan slope
     | abs slope <= 1 = sqrt (2 / (1 + slope * slope)) / sqrt (fromIntegral fan)
     | otherwise = (sqrt (2 / (1 + recip slope * recip slope)) / abs slope) / sqrt (fromIntegral fan)
 
-{- | Apply Xavier initialization with a uniform distribution on @[-bound, bound]@.
-Arguments are @fanIn@, @fanOut@, @gain@, then the generator, with @bound = gain * sqrt (6 / (fanIn + fanOut))@.
+{- | Initialize uniformly on @[-bound, bound]@, where @bound = gain * sqrt (6 / (fanIn + fanOut))@.
 Fan counts must be positive and gain must be finite and nonnegative.
-Use a gain of one for linear and sigmoid activations.
+Use a gain of one for linear or sigmoid activations.
 -}
 xavierUniform
     :: forall sh a g
@@ -113,14 +135,13 @@ xavierUniform
     => Int
     -> Int
     -> a
-    -> g
-    -> Tensor sh a
+    -> State g (Tensor sh a)
 xavierUniform fanIn fanOut gain =
     let bound = sqrt 3 * xavierScale fanIn fanOut gain
      in uniform @sh (-bound) bound
 
-{- | Apply Xavier initialization with mean zero and @std = gain * sqrt (2 / (fanIn + fanOut))@.
-Arguments and parameter requirements are the same as for 'xavierUniform'.
+{- | Initialize normally with mean zero and @std = gain * sqrt (2 / (fanIn + fanOut))@.
+Fan counts and gain have the same requirements as for 'xavierUniform'.
 -}
 xavierNormal
     :: forall sh a g
@@ -128,34 +149,31 @@ xavierNormal
     => Int
     -> Int
     -> a
-    -> g
-    -> Tensor sh a
+    -> State g (Tensor sh a)
 xavierNormal fanIn fanOut gain = normal @sh 0 (xavierScale fanIn fanOut gain)
 
-{- | Apply Kaiming initialization with a uniform distribution on @[-bound, bound]@.
-Arguments are @fan@, @slope@, then the generator, with @bound = sqrt (6 / ((1 + slope²) * fan))@.
+{- | Initialize uniformly on @[-bound, bound]@, where @bound = sqrt (6 / ((1 + slope²) * fan))@.
 Supply fan-in to preserve forward variance or fan-out to preserve backward variance.
-Fan must be positive and slope must be finite; use zero for ReLU or the negative-input slope for leaky ReLU.
+Fan must be positive and slope must be finite.
+Use zero for ReLU or the negative-input slope for leaky ReLU.
 -}
 kaimingUniform
     :: forall sh a g
      . (Shape sh, DType a, RealFloat a, UniformRange a, RandomGen g)
     => Int
     -> a
-    -> g
-    -> Tensor sh a
+    -> State g (Tensor sh a)
 kaimingUniform fan slope =
     let bound = sqrt 3 * kaimingScale fan slope
      in uniform @sh (-bound) bound
 
-{- | Apply Kaiming initialization with mean zero and @std = sqrt (2 / ((1 + slope²) * fan))@.
-Arguments and parameter requirements are the same as for 'kaimingUniform'.
+{- | Initialize normally with mean zero and @std = sqrt (2 / ((1 + slope²) * fan))@.
+Fan and slope have the same requirements as for 'kaimingUniform'.
 -}
 kaimingNormal
     :: forall sh a g
      . (Shape sh, DType a, RealFloat a, RandomGen g)
     => Int
     -> a
-    -> g
-    -> Tensor sh a
+    -> State g (Tensor sh a)
 kaimingNormal fan slope = normal @sh 0 (kaimingScale fan slope)

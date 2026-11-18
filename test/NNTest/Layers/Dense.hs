@@ -70,7 +70,9 @@ tests =
             values inferred H.=== [0, 0, 0]
             values evaluated H.=== values inferred
         , testProperty "dense supports externally initialized single-precision parameters" $ H.withTests 1 $ H.property $ do
-            let layer = NN.Dense (NN.xavierNormal @'[2, 3] 2 3 1 (mkStdGen64 2026)) (T.zeros @'[3]) :: NN.Dense 2 3 T.Tensor Float
+            let layer =
+                    NN.Dense (NN.evalState (NN.xavierNormal @'[2, 3] 2 3 1) (mkStdGen64 2026)) (T.zeros @'[3])
+                        :: NN.Dense 2 3 T.Tensor Float
                 output = T.toList (T.run T.CPU (NN.dense layer (T.ones @'[2])))
             length output H.=== 3
             H.assert (all (\x -> not (isNaN x || isInfinite x)) output)

@@ -9,11 +9,16 @@
 module Synapse.NN.Optimizers.RMSprop (RMSprop (..)) where
 
 import Control.Monad.Trans.State.Strict (get, put)
-import Synapse.NN.Optimizers.Type
-import Synapse.Tensor.Structure (TensorConstraints, TensorStructure)
+
+import Synapse.NN.Optimizers.Optimizer (Optimizer (..))
+import Synapse.Tensor.Structure (FieldConstraints, TensorStructure)
+
+import qualified Synapse.Tensor.Structure as Structure
 
 {- | RMSprop without momentum or centering.
+
 @v' = alpha * v + (1 - alpha) * gradient^2@ and @p' = p - lr * gradient / (sqrt v' + epsilon)@.
+Supply a finite, nonnegative learning rate, @alpha@ in @[0, 1)@, and a positive epsilon.
 Typical values are @RMSprop 0.01 0.99 1e-8@.
 -}
 data RMSprop = RMSprop
@@ -23,16 +28,17 @@ data RMSprop = RMSprop
     }
     deriving (Eq, Show)
 
-instance (TensorStructure p, TensorConstraints Floating p) => Optimizer RMSprop p where
+instance (TensorStructure p, FieldConstraints Floating p) => Optimizer RMSprop p where
     type OptimizerState RMSprop p = p
-    initialState _ p = updateParameters @Floating (\_ _ -> 0) p p
+    initialState _ p = Structure.zipWithFields @Floating (\_ _ _ -> 0) p p
     optimizerStep (RMSprop lr alpha epsilon) p g = do
         previous <- get
         let square =
-                updateParameters @Floating
-                    (\v gradient -> realToFrac alpha * v + realToFrac (1 - alpha) * gradient * gradient)
+                Structure.zipWithFields @Floating
+                    (\_ v gradient -> realToFrac alpha * v + realToFrac (1 - alpha) * gradient * gradient)
                     previous
                     g
-            direction = updateParameters @Floating (\gradient v -> gradient / (sqrt v + realToFrac epsilon)) g square
+            direction =
+                Structure.zipWithFields @Floating (\_ gradient v -> gradient / (sqrt v + realToFrac epsilon)) g square
         put square
-        pure $ updateParameters @Floating (\parameter delta -> parameter - realToFrac lr * delta) p direction
+        pure $ Structure.zipWithFields @Floating (\_ parameter delta -> parameter - realToFrac lr * delta) p direction

@@ -82,33 +82,11 @@ Compositions of existing tensor operations are differentiated automatically.
 To supply a custom reverse rule, use @withVJP@, @withCachedVJP@, or @customVJP@ from "Synapse.Tensor.Ops".
 -}
 module Synapse.Autograd
-    ( -- * Differentiable tensors and structures
-      Context
-    , Tensor
-    , Differentiable
-    , WithGrad
-
-      -- * Evaluation and differentiation
-    , evaluate
-    , backprop
-    , gradient
-    , pullback
-
-      -- * Gradient boundaries
-    , stopGrad
-    , constant
-    )
-where
+    ( module Synapse.Autograd.Representation
+    , module Synapse.Autograd.Tensor
+    , module Synapse.Autograd.Execution
+    ) where
 
 import Synapse.Autograd.Execution
-    ( Differentiable
-    , backprop
-    , constant
-    , evaluate
-    , gradient
-    , pullback
-    -- \* Gradient boundaries
-    , stopGrad
-    )
-import Synapse.Autograd.Representation (Context)
-import Synapse.Autograd.Tensor (Tensor, WithGrad)
+import Synapse.Autograd.Representation
+import Synapse.Autograd.Tensor

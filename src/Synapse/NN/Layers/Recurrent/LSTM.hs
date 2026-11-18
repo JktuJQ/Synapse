@@ -16,45 +16,35 @@ import Control.Monad.Trans.State.Strict (State, runState, state)
 import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, type (*))
 import Synapse.NN.Activation (sigmoid)
-import Synapse.NN.Layers.Recurrent.Gates (split4)
 import Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
-import Synapse.Tensor.Ops.Shape (broadcast)
+import Synapse.Tensor.Ops.Shape (broadcast, split4)
 import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import qualified Synapse.Tensor.Representation as T
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Packed input, forget, candidate and output projections, in that order.
+
 Input weights have shape @'[input, 4 * hidden]@ and recurrent weights have
 shape @'[hidden, 4 * hidden]@. Each bias has shape @'[4 * hidden]@.
 -}
 data LSTM (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = LSTM
     { lstmInputWeights :: t '[input, 4 * hidden] a
-    -- ^ Input features mapped to the packed output projections.
     , lstmHiddenWeights :: t '[hidden, 4 * hidden] a
-    -- ^ Previous hidden features mapped to the packed output projections.
     , lstmInputBias :: t '[4 * hidden] a
-    -- ^ Bias of the input projection.
     , lstmHiddenBias :: t '[4 * hidden] a
-    -- ^ Bias of the recurrent projection.
     }
     deriving (Generic)
 
 instance TensorStructure (LSTM input hidden T.Tensor a) where
     type WithTensor t (LSTM input hidden T.Tensor a) = LSTM input hidden t a
 
-{- | Hidden and cell tensors for one layer and one batch.
-Both tensors remain differentiable when represented by autograd tensors.
-Initialize them explicitly, commonly with zeros; the library does not reset
-or detach them between calls.
--}
+-- | Hidden and cell tensors for one layer and one batch.
 data LSTMState (batch :: Nat) (hidden :: Nat) (t :: TensorLike) a = LSTMState
     { lstmHiddenState :: t '[batch, hidden] a
-    -- ^ Hidden output passed to the next step.
     , lstmCellState :: t '[batch, hidden] a
-    -- ^ Cell memory passed to the next step.
     }
     deriving (Generic)
 
@@ -62,15 +52,13 @@ instance TensorStructure (LSTMState batch hidden T.Tensor a) where
     type WithTensor t (LSTMState batch hidden T.Tensor a) = LSTMState batch hidden t a
 
 {- | Apply one LSTM step and update both state tensors.
+
 Split the affine projection into gates @(i, f, g, o)@, then compute:
 
 @
 c' = sigmoid f * c + sigmoid i * tanh g
 h' = sigmoid o * tanh c'
 @
-
-The returned output is @h'@. Both the initial hidden and cell tensors
-receive gradients when included in the differentiation inputs.
 -}
 lstmCell
     :: forall input hidden batch t a
@@ -98,12 +86,7 @@ lstmCell parameters input = state $ \(LSTMState previous memory) ->
         nextHidden = sigmoid o * tanh nextMemory
      in (nextHidden, LSTMState nextHidden nextMemory)
 
-{- | Apply one LSTM layer to @'[time, batch, input]@, returning hidden outputs
-of shape @'[time, batch, hidden]@ and the final hidden/cell tensors through 'State'.
-Parameters are shared across steps. An empty sequence preserves the initial
-state. Carrying state between calls retains its differentiation history;
-apply @AG.stopGrad@ explicitly at a truncated backpropagation boundary.
--}
+-- | Apply one LSTM layer to @'[time, batch, input]@.
 lstm
     :: forall input hidden batch time t a
      . ( KnownNat input

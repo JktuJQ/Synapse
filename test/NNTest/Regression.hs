@@ -66,12 +66,12 @@ materialize :: Regression T.Tensor Double -> Regression T.TensorData Double
 materialize = T.run T.CPU
 
 initialParameters :: Regression T.TensorData Double
-initialParameters =
-    materialize $
-        Regression $
-            NN.Dense
-                (NN.xavierUniform @'[1, 1] 1 1 1 (mkStdGen 19))
-                (NN.uniform @'[1] (-0.25) 0.25 (mkStdGen 23))
+initialParameters = materialize $ NN.evalState initialize $ mkStdGen 19
+  where
+    initialize = do
+        weights <- NN.xavierUniform @'[1, 1] 1 1 1
+        bias <- NN.uniform @'[1] (-0.25) 0.25
+        pure $ Regression $ NN.Dense weights bias
 
 trainingInputs :: T.TensorData '[4, 1] Double
 trainingInputs = T.run T.CPU (T.fromList @'[4, 1] [-1.5, -0.5, 0.5, 1.5])

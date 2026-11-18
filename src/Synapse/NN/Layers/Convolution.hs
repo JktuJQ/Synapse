@@ -10,7 +10,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoDeepSubsumption #-}
 
--- | Channels-first convolution parameters and their functional application.
+-- | Convolution layers.
 module Synapse.NN.Layers.Convolution
     ( Convolution (..)
     , TransposedConvolution (..)
@@ -40,18 +40,16 @@ import Synapse.Tensor.Shapes.Window
     , ConvTranspose2dShape
     , ConvTranspose3dShape
     )
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Weights and per-output-channel bias for an ordinary spatial convolution.
+
 The kernel is a list of one, two or three spatial sizes; each filter consumes @in_channels / groups@ channels.
 Stride, padding and dilation are supplied when applying the layer.
-Initialize the fields explicitly, as with "Synapse.NN.Layers.Dense".
 -}
 data Convolution (in_channels :: Nat) (out_channels :: Nat) (kernel :: [Nat]) (groups :: Nat) (t :: TensorLike) a = Convolution
     { convolutionWeights :: t (out_channels ': Div in_channels groups ': kernel) a
-    -- ^ Weights in output-channel, input-channel-per-group, spatial order.
     , convolutionBias :: t '[out_channels] a
-    -- ^ Bias shared across batches and spatial positions.
     }
     deriving (Generic)
 
@@ -61,6 +59,7 @@ instance TensorStructure (Convolution cin cout kernel groups Tensor.Tensor a) wh
             Convolution cin cout kernel groups t a
 
 {- | Weights and bias for a transposed spatial convolution.
+
 Each input channel has @out_channels / groups@ spatial filters; input and output channels are split into the same number of groups.
 Output padding is supplied when applying the layer and selects among compatible output shapes.
 -}
@@ -74,9 +73,7 @@ data
         a
     = TransposedConvolution
     { transposedWeights :: t (in_channels ': Div out_channels groups ': kernel) a
-    -- ^ Weights in input-channel, output-channel-per-group, spatial order.
     , transposedBias :: t '[out_channels] a
-    -- ^ Bias shared across batches and spatial positions.
     }
     deriving (Generic)
 
@@ -86,6 +83,7 @@ instance TensorStructure (TransposedConvolution cin cout kernel groups Tensor.Te
             TransposedConvolution cin cout kernel groups t a
 
 {- | Apply a 1D convolution and add bias to every output channel in NCL layout.
+
 Type arguments specify stride, @[left, right]@ padding and dilation.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -100,7 +98,7 @@ conv1d
         {groups}
         {batch}
         {length}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}
@@ -133,6 +131,7 @@ conv1d parameters = arr $ \input ->
         + broadcast (reshape @'[out_channels, 1] (convolutionBias parameters))
 
 {- | Apply a 2D convolution and add bias to every output channel in NCHW layout.
+
 Type arguments specify stride, @[top, bottom, left, right]@ padding and dilation.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -148,7 +147,7 @@ conv2d
         {batch}
         {height}
         {width}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}
@@ -181,6 +180,7 @@ conv2d parameters = arr $ \input ->
         + broadcast (reshape @'[out_channels, 1, 1] (convolutionBias parameters))
 
 {- | Apply a 3D convolution and add bias to every output channel in NCDHW layout.
+
 Type arguments specify stride, @[front, back, top, bottom, left, right]@ padding and dilation.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -197,7 +197,7 @@ conv3d
         {depth}
         {height}
         {width}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}
@@ -230,6 +230,7 @@ conv3d parameters = arr $ \input ->
         + broadcast (reshape @'[out_channels, 1, 1, 1] (convolutionBias parameters))
 
 {- | Apply a 1D transposed convolution and add bias to every output channel in NCL layout.
+
 Type arguments specify stride, @[left, right]@ padding and dilation, then @[extra_length]@ output padding.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -245,7 +246,7 @@ convTranspose1d
         {groups}
         {batch}
         {length}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}
@@ -280,6 +281,7 @@ convTranspose1d parameters = arr $ \input ->
         + broadcast (reshape @'[out_channels, 1] (transposedBias parameters))
 
 {- | Apply a 2D transposed convolution and add bias to every output channel in NCHW layout.
+
 Type arguments specify stride, @[top, bottom, left, right]@ padding and dilation, then @[extra_height, extra_width]@ output padding.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -296,7 +298,7 @@ convTranspose2d
         {batch}
         {height}
         {width}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}
@@ -331,6 +333,7 @@ convTranspose2d parameters = arr $ \input ->
         + broadcast (reshape @'[out_channels, 1, 1] (transposedBias parameters))
 
 {- | Apply a 3D transposed convolution and add bias to every output channel in NCDHW layout.
+
 Type arguments specify stride, @[front, back, top, bottom, left, right]@ padding and dilation, then @[extra_depth, extra_height, extra_width]@ output padding.
 Channel counts, kernel sizes and groups are inferred from the parameter record.
 -}
@@ -348,7 +351,7 @@ convTranspose3d
         {depth}
         {height}
         {width}
-        {t}
+        {t :: TensorLike}
         a
         out_sh
         {arrow}

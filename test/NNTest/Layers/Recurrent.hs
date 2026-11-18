@@ -8,6 +8,7 @@ module NNTest.Layers.Recurrent (tests) where
 
 import Control.Arrow (arr)
 import Control.Monad.Trans.State.Strict (runState)
+import qualified Data.Map.Strict as Map
 import qualified Hedgehog as H
 import qualified NNTest.Layers.Recurrent.Reference as Ref
 import qualified Synapse.Autograd as AG
@@ -322,7 +323,7 @@ tests =
         , testProperty "recurrent parameters materialize and round-trip through weight dictionaries" $ H.withTests 1 $ H.property $ do
             let p = T.run T.CPU (rnnParameters, gruParameters, lstmParameters)
                 dictionary = NN.extractWeights p
-            length (Weights.weightsToList dictionary) H.=== 12
+            length ((Map.toAscList . Weights.weightsEntries) dictionary) H.=== 12
             (_, _, restored) <- H.evalEither $ NN.loadWeights dictionary p
             T.toList (NN.lstmInputWeights restored) H.=== T.toList (NN.lstmInputWeights $ let (_, _, l) = p in l)
         , testProperty "LSTM state actions compose through Forward and standard arrows" $ H.withTests 1 $ H.property $ do

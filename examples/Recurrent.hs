@@ -21,7 +21,7 @@ import GHC.TypeNats (KnownNat)
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
-import System.Random (mkStdGen, randomRs, splitGen)
+import System.Random (mkStdGen, randomRs)
 import Text.Printf (printf)
 
 data Parameters t = Parameters
@@ -69,11 +69,16 @@ dataset count offset = NN.Indexed count $ \index ->
 initialParameters
     :: Parameters T.Tensor
 initialParameters =
-    let (first, rest) = splitGen $ mkStdGen 7
-        (second, third) = splitGen rest
-     in Parameters
-            (NN.LSTM (NN.xavierUniform 1 32 1 first) (NN.xavierUniform 8 32 1 second) 0 0)
-            (NN.Dense (NN.xavierUniform 8 1 1 third) 0)
+    NN.evalState initialize $ mkStdGen 7
+  where
+    initialize = do
+        inputWeights <- NN.xavierUniform 1 32 1
+        recurrentWeights <- NN.xavierUniform 8 32 1
+        outputWeights <- NN.xavierUniform 8 1 1
+        pure $
+            Parameters
+                (NN.LSTM inputWeights recurrentWeights 0 0)
+                (NN.Dense outputWeights 0)
 
 optimizer
     :: NN.Adam
@@ -119,7 +124,7 @@ main = do
     forM_ [0 .. 100 :: Int] $ \epoch -> do
         when (epoch > 0) $ do
             random <- readIORef generator
-            let (source, nextGenerator) = NN.shuffle training random
+            let (source, nextGenerator) = NN.runState (NN.shuffle training) random
             writeIORef generator nextGenerator
             forM_ (NN.batchLoads $ NN.planBatches 16 NN.DropLast source) $ \load -> do
                 current <- readIORef model

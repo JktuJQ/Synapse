@@ -10,6 +10,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
 import Data.Int (Int32, Int64)
 import Data.List (isInfixOf)
+import qualified Data.Map.Strict as Map
 import Data.Typeable (Typeable)
 import Data.Word (Word32, Word64)
 import GHC.Float (castDoubleToWord64, castFloatToWord32)
@@ -20,6 +21,9 @@ import qualified Synapse.NN.Weights.Safetensors as S
 import qualified Synapse.Tensor as T
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
+
+viewToList :: W.WeightTensorView a -> [a]
+viewToList view = map (W.weightTensorViewAt view) [0 .. product (W.weightTensorViewShape view) - 1]
 
 fixture :: String -> B.Builder -> LBS.ByteString
 fixture header body =
@@ -43,9 +47,9 @@ roundTrip weights = do
 
 elements :: forall a. Typeable a => W.FieldPath -> W.Weights -> H.PropertyT IO [a]
 elements path weights = do
-    tensor <- H.evalMaybe (W.lookupWeight path weights)
-    values <- H.evalMaybe (W.weightTensorValues @a tensor)
-    pure (W.valuesToList values)
+    tensor <- H.evalMaybe (Map.lookup path (W.weightsEntries weights))
+    values <- H.evalMaybe (W.weightTensorView @a tensor)
+    pure (viewToList values)
 
 reject :: LBS.ByteString -> H.PropertyT IO ()
 reject bytes = case S.decodeSafetensors bytes of
@@ -95,14 +99,15 @@ tests =
             weights <- roundTrip $ NN.extractWeights (T.fromListData @'[] [True], T.fromListData @'[2, 0] ([] :: [Float]))
             elements @Bool ["0"] weights >>= (H.=== [True])
             elements @Float ["1"] weights >>= (H.=== [])
-            empty <- roundTrip (NN.extractWeights ())
-            map fst (W.weightsToList empty) H.=== []
+            let emptyDictionary = W.Weights Map.empty
+            empty <- roundTrip emptyDictionary
+            map fst ((Map.toAscList . W.weightsEntries) empty) H.=== []
         , testProperty "arbitrary paths and Unicode names survive repeated encoding" $ H.withTests 1 $ H.property $ do
             let paths = [[], [""], ["a.b"], ["a", "b"], ["a/b", "~", ""], ["__metadata__"], ["веса", "\x1f600"]]
-                tensor = W.weightTensor (T.fromListData @'[] [1 :: Double])
-            source <- H.evalEither $ W.weightsFromList $ map (,tensor) paths
+                tensor = W.weightTensorFromTensorData (T.fromListData @'[] [1 :: Double])
+            let source = W.Weights $ Map.fromList $ map (,tensor) paths
             weights <- roundTrip source >>= roundTrip
-            map fst (W.weightsToList weights) H.=== map fst (W.weightsToList source)
+            map fst ((Map.toAscList . W.weightsEntries) weights) H.=== map fst ((Map.toAscList . W.weightsEntries) source)
         , testProperty "valid escaped surrogate pairs decode to the same Unicode name" $ H.withTests 1 $ H.property $ do
             let header =
                     "{\"\\uD83D\\uDE00\":{\"dtype\":\"F32\",\"shape\":[],\"data_offsets\":[0,4]},\"__metadata__\":{\"note\":\"\\uD83D\\uDE00\"}}"
@@ -134,6 +139,9 @@ tests =
         , testProperty "unsupported dtypes and tuple elements report explicit errors" $ H.withTests 1 $ H.property $ do
             case S.decodeSafetensors $ fixture ("{" ++ entry "x" "F16" "[0]" "[0,0]" ++ "}") mempty of
                 Left (S.UnsupportedDType "F16") -> pure ()
+                _ -> H.failure
+            case S.decodeSafetensors $ fixture ("{" ++ entry "x" " F32" "[0]" "[0,0]" ++ "}") mempty of
+                Left (S.UnsupportedDType " F32") -> pure ()
                 _ -> H.failure
             case S.encodeSafetensors (NN.extractWeights (T.fromListData @'[] [(1 :: Double, True)])) of
                 Left (S.UnsupportedElementType _) -> pure ()
@@ -170,16 +178,20 @@ tests =
                     "{" ++ entry "hidden.weight" "F64" "[2,3]" "[0,48]" ++ "," ++ entry "hidden.bias" "F64" "[2]" "[48,64]" ++ "}"
             foreignWeights <-
                 H.evalEither $ S.decodeSafetensors $ fixture header $ foldMap B.doubleLE [1, 2, 3, 4, 5, 6, 10, 20]
-            renamed <-
-                H.evalEither $
-                    W.renameWeights
-                        (\path -> case path of ["hidden", "weight"] -> ["denseWeights"]; ["hidden", "bias"] -> ["denseBias"]; _ -> path)
-                        foreignWeights
+            let rename path = case path of ["hidden", "weight"] -> ["denseWeights"]; ["hidden", "bias"] -> ["denseBias"]; _ -> path
+                renamed = W.Weights $ Map.mapKeys rename $ W.weightsEntries foreignWeights
             adapted <-
                 H.evalEither $
-                    W.traverseWeights
-                        (\path tensor -> if path == ["denseWeights"] then W.permuteWeightTensor [1, 0] tensor else Right tensor)
-                        renamed
+                    fmap W.Weights $
+                        Map.traverseWithKey
+                            ( \path tensor ->
+                                if path == ["denseWeights"]
+                                    then do
+                                        matrix <- W.weightTensorToTensorData @'[2, 3] @Double tensor
+                                        pure $ W.weightTensorFromTensorData $ T.run T.CPU $ T.transpose $ T.fromData matrix
+                                    else Right tensor
+                            )
+                            (W.weightsEntries renamed)
             let template = NN.Dense (T.fromListData @'[3, 2] (replicate 6 (0 :: Double))) (T.fromListData @'[2] [0, 0])
             restored <- H.evalEither $ NN.loadWeights adapted template
             T.toList (NN.denseWeights restored) H.=== [1, 4, 2, 5, 3, 6]

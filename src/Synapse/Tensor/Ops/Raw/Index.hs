@@ -33,14 +33,8 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorIndex (..))
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes, RemoveAxis)
-import Synapse.Tensor.Shapes.Dimensions
-    ( Shape
-    , ShapeToDIM
-    , backendCoordinates
-    , backendIndex
-    , backendShape
-    , shape
-    )
+import Synapse.Tensor.Shapes.Backend (ShapeToDIM, backendCoordinates, backendIndex, backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 import Synapse.Tensor.Shapes.Index
     ( CanGather
     , CanIndex

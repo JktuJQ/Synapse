@@ -35,10 +35,13 @@ import Synapse.Tensor.Ops.Definition
     , TensorOps (..)
     , Wrapped
     , addInput
+    , resultFields
+    , resultValues
     , zeroInput
     )
 import Synapse.Tensor.Representation (DType)
 import Synapse.Tensor.Structure (TensorProduct, flatten, rebuild)
+import Synapse.Tensor.Structure.Product (ProductValues)
 
 import qualified Data.Array.Accelerate as A
 import qualified Numeric.Backprop.Explicit as BPE
@@ -63,12 +66,12 @@ preparePrimitiveInputs
     => InputTree a input
     -> Wrapped (Tensor s) input
     -> PrimitiveInputs s input
-preparePrimitiveInputs InputTensor (Tensor value) =
+preparePrimitiveInputs InputTensor (T.TensorField path (Tensor value)) =
     PrimitiveInputs
         (BPE.AF (+) :& RNil)
         (value :& RNil)
-        (\(Identity x :& RNil) -> x)
-        (\x -> Identity x :& RNil)
+        (\(Identity x :& RNil) -> T.TensorField path x)
+        (\(T.TensorField _ x) -> Identity x :& RNil)
 preparePrimitiveInputs (InputPair l r) (a, b) =
     case (preparePrimitiveInputs l a, preparePrimitiveInputs r b) of
         (PrimitiveInputs la lv lr lp, PrimitiveInputs ra rv rr rp) ->
@@ -83,9 +86,9 @@ wrapResults
     :: forall s a output
      . (Context s, T.DType a, Num a, Num (T.TensorElement a))
     => Result a output
-    -> BPE.BVar s output
+    -> BPE.BVar s (ProductValues output)
     -> Wrapped (Tensor s) output
-wrapResults Single = Tensor
+wrapResults Single = T.TensorField [] . Tensor
 wrapResults (Product tree) = wrapProduct tree
 
 {- | Project each output tensor from one shared tape node.
@@ -94,9 +97,9 @@ Contributions from different projections accumulate before the primitive pullbac
 wrapProduct
     :: (Context s, T.DType a, Num a, Num (T.TensorElement a))
     => InputTree a output
-    -> BPE.BVar s output
+    -> BPE.BVar s (ProductValues output)
     -> Wrapped (Tensor s) output
-wrapProduct InputTensor value = Tensor value
+wrapProduct InputTensor value = T.TensorField [] (Tensor value)
 wrapProduct tree@(InputPair l r) value =
     let left = BPE.liftOp1 (BPE.AF $ addInput tree) (BPE.op1 $ \(x, _) -> (x, (,zeroInput r))) value
         right = BPE.liftOp1 (BPE.AF $ addInput tree) (BPE.op1 $ \(_, y) -> (y, (zeroInput l,))) value
@@ -172,13 +175,20 @@ instance (Context s, DType a, Fractional a, Fractional (T.TensorElement a)) => T
         -> T.WithTensor (Tensor s) input
         -> T.WithTensor (Tensor s) output
     customVJP _ _ forward backward input =
-        let cached arguments =
+        let outputTree = resultTree @a @(TensorProduct T.Tensor output)
+            cached arguments =
                 let (output, cache) = forward arguments
-                 in (flatten @output @T.Tensor output, cache)
+                 in ( resultValues outputTree (flatten @output @T.Tensor output)
+                    , cache
+                    )
             result =
                 registerPrimitive
                     cached
-                    (\cache seed -> backward cache $ rebuild @output @T.Tensor seed)
+                    ( \cache seed ->
+                        backward cache $
+                            rebuild @output @T.Tensor $
+                                resultFields outputTree seed
+                    )
                     input
          in rebuild @output @(Tensor s) $
-                wrapResults @s (resultTree @a @(TensorProduct T.Tensor output)) result
+                wrapResults @s outputTree result

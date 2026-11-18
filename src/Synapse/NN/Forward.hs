@@ -19,21 +19,19 @@ import Control.Monad.Trans.State.Strict (State, evalState, runState, state)
 -- | Select training or evaluation behavior for operations such as BatchNorm and dropout.
 data ForwardMode = Train | Eval deriving (Eq, Show)
 
-{- | A forward computation using strict 'State' from
-<https://hackage.haskell.org/package/transformers/docs/Control-Monad-Trans-State-Strict.html transformers>.
+{- | A stateful forward computation.
+-
 Compose computations with standard arrows or @proc@ notation.
 Stateless operations lifted with @arr@ preserve the state.
 Sequential branches share state in composition order.
 -}
 newtype Forward state input output = Forward
     { forward :: input -> State state output
-    {- ^ Apply an input, producing an action that reads and updates the state.
-    Execute it with 'runState' or 'evalState', or compose it with other state actions.
-    -}
     }
     deriving (Category, Arrow, ArrowChoice) via Kleisli (State state)
 
 {- | Apply a stateful operation to a selected part of the enclosing state.
+
 The first argument is a Van Laarhoven lens, compatible with @Lens'@ from
 <https://hackage.haskell.org/package/lens lens> and
 <https://hackage.haskell.org/package/microlens microlens>.

@@ -19,7 +19,7 @@ import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import Synapse.Tensor.Ops.Raw.Construction (full)
 import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import qualified Synapse.Tensor.Ops.Raw.Math as Raw
-import Synapse.Tensor.Representation (DType, Tensor, TensorElement)
+import Synapse.Tensor.Representation (DType, Tensor, TensorElement, TensorLike)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 
@@ -57,7 +57,7 @@ instance (Shape sh, DType a, Floating a, Floating (TensorElement a)) => Floating
 
 -- | Sum pairwise products of equally sized vectors.
 dot
-    :: forall {t} n a
+    :: forall {t :: TensorLike} n a
      . (TensorOps t a, Num (TensorElement a), Shape '[n])
     => t '[n] a
     -> t '[n] a
@@ -71,7 +71,7 @@ dot =
 
 -- | Multiply vectors or matrices, broadcasting leading batch dimensions.
 matmul
-    :: forall {t} lhs rhs a
+    :: forall {t :: TensorLike} lhs rhs a
      . (TensorOps t a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs))
     => t lhs a
     -> t rhs a

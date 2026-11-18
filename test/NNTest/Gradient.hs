@@ -22,21 +22,21 @@ import Test.Tasty.Hedgehog (testProperty)
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
 values = T.toList . T.run T.CPU
 
--- Mixed precision, nested products and different tensor ranks in one record.
-data Gradients t = Gradients
-    { matrix :: t '[2, 2] Double
-    , nested :: (t '[1] Float, t '[] Double)
+-- Nested products and different tensor ranks with a shared element type.
+data Gradients t a = Gradients
+    { matrix :: t '[2, 2] a
+    , nested :: (t '[1] a, t '[] a)
     }
     deriving (Generic)
 
-instance T.TensorStructure (Gradients T.Tensor) where
-    type WithTensor t (Gradients T.Tensor) = Gradients t
+instance T.TensorStructure (Gradients T.Tensor a) where
+    type WithTensor t (Gradients T.Tensor a) = Gradients t a
 
-gradients :: Gradients T.Tensor
+gradients :: Gradients T.Tensor Double
 gradients = Gradients (T.fromList [3, -4, 0, 0]) (T.fromList [12], 0)
 
-components :: Gradients T.TensorData -> [Double]
-components (Gradients x (y, z)) = T.toList x ++ map realToFrac (T.toList y) ++ T.toList z
+components :: Gradients T.TensorData Double -> [Double]
+components (Gradients x (y, z)) = T.toList x ++ T.toList y ++ T.toList z
 
 tests :: TestTree
 tests =
@@ -83,11 +83,23 @@ tests =
             H.assert $ all isInfinite $ values $ T.normL2 infinite
             H.assert $ all isNaN $ values $ T.normL1 nan
             H.assert $ all isNaN $ values $ T.normL2 nan
-        , testProperty "global norms combine all fields of nested mixed-precision records" $ H.withTests 1 $ H.property $ do
+        , testProperty "global norms reduce each tensor in its original precision" $ H.withTests 1 $ H.property $ do
+            let floats = T.fromList @'[2] [16777216, 1 :: Float]
+                doubles = T.fromList @'[2] [16777216, 1 :: Double]
+            values (NN.gradientNormL1 floats) H.=== [16777216]
+            values (NN.gradientNormL1 doubles) H.=== [16777217]
+            values (NN.gradientNormL1 (floats, T.full @'[] (1 :: Float))) H.=== [16777216]
+        , testProperty "global norms combine nested records in either Float or Double" $ H.withTests 1 $ H.property $ do
             approxList (values $ NN.gradientNormL1 gradients) [19]
             approxList (values $ NN.gradientNormL2 gradients) [13]
             approxList (values $ NN.gradientNormL2 (T.fromList [3, 4] :: T.Tensor '[2] Float)) [5]
-            let emptyFields :: (T.Tensor '[0] Float, T.Tensor '[2, 0] Double)
+            let floats = Gradients (T.fromList [3, -4, 0, 0]) (T.fromList [12], 0) :: Gradients T.Tensor Float
+            values (NN.gradientNormL1 floats) H.=== [19]
+            approxList (values $ NN.gradientNormL2 floats) [13]
+            let clipped = T.run T.CPU $ NN.clipGradNormL2 6.5 floats
+            approxList (T.toList $ matrix clipped) [1.5, -2, 0, 0]
+            approxList (T.toList $ fst $ nested clipped) [6]
+            let emptyFields :: (T.Tensor '[0] Double, T.Tensor '[2, 0] Double)
                 emptyFields = (T.zeros, T.zeros)
             values (NN.gradientNormL1 emptyFields) H.=== [0]
             values (NN.gradientNormL2 emptyFields) H.=== [0]
@@ -107,7 +119,7 @@ tests =
             approxList (components $ T.run T.CPU $ NN.clipGradNormL2 0 gradients) $ replicate 6 0
         , testProperty "zero and empty gradients remain finite even with a zero limit" $ H.withTests 1 $ H.property $ do
             let zero = Gradients 0 (0, 0)
-                empty = (T.zeros @'[0] @Float, T.zeros @'[2, 0] @Double)
+                empty = (T.zeros @'[0] @Double, T.zeros @'[2, 0] @Double)
             forM_ [NN.clipGradNormL1, NN.clipGradNormL2] $ \clip ->
                 approxList (components $ T.run T.CPU $ clip 0 zero) $ replicate 6 0
             let (first, second) = T.run T.CPU $ NN.clipGradNormL2 0 empty
@@ -120,10 +132,10 @@ tests =
                     (first, second) = T.run T.CPU clipped
                 approxList (map (/ scale) $ values $ NN.gradientNormL2 g) [5]
                 approxList (map (/ scale) $ T.toList first ++ T.toList second) [1.5, 2]
-        , testProperty "Float clipping does not underflow the scale before multiplication" $ H.withTests 1 $ H.property $ do
+        , testProperty "Float clipping uses Float arithmetic for the scale" $ H.withTests 1 $ H.property $ do
             let g = T.full @'[1] (1e30 :: Float)
                 clipped = NN.clipGradNormL2 1e-20 g
-            approxList (map (/ 1e-20) $ values clipped) [1]
+            values clipped H.=== [0]
         , testProperty "prepared differentiation clipping and SGD accept changing parameters" $ H.withTests 1 $ H.property $ do
             let step = T.run1 T.CPU $ \p ->
                     let gradient = AG.gradient (\(x, y) -> (x * x + y * y) / 2) p
@@ -137,7 +149,10 @@ tests =
             approxList (T.toList firstX ++ T.toList firstY) [2.4, 3.2]
             approxList (T.toList secondNorm) [10]
             approxList (T.toList secondX ++ T.toList secondY) [5.4, 7.2]
+        , testProperty "global gradient operations reject mixed element types" $
+            H.withTests 1 $
+                Compiler.rejects "test/NNTest/Fixtures/Rejected/MixedGradient.hs" "Float"
         , testProperty "gradient clipping rejects integral tensor fields" $
             H.withTests 1 $
-                Compiler.rejects "test/NNTest/Fixtures/Rejected/IntegralGradient.hs" "GradientTensor"
+                Compiler.rejects "test/NNTest/Fixtures/Rejected/IntegralGradient.hs" "Floating"
         ]

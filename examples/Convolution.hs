@@ -23,7 +23,7 @@ import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
 import Synapse.Tensor.Ops.Elementwise (Comparison, Condition)
-import System.Random (mkStdGen, splitGen)
+import System.Random (mkStdGen)
 import Text.Printf (printf)
 
 data Parameters t = Parameters
@@ -110,14 +110,19 @@ dataset count offset = NN.Indexed count $ \index ->
 initialParameters
     :: Parameters T.Tensor
 initialParameters =
-    let (first, rest) = splitGen $ mkStdGen 7
-        (second, third) = splitGen rest
-     in Parameters
-            (NN.Convolution (NN.kaimingNormal @'[2, 1, 3, 3] 9 0 first) 0)
-            (NN.BatchNorm 1 0)
-            (NN.Dense (NN.xavierUniform @'[32, 8] 32 8 1 second) 0)
-            (NN.LayerNorm 1 0)
-            (NN.Dense (NN.xavierUniform @'[8, 2] 8 2 1 third) 0)
+    NN.evalState initialize $ mkStdGen 7
+  where
+    initialize = do
+        convolutionWeights <- NN.kaimingNormal @'[2, 1, 3, 3] 9 0
+        hiddenWeights <- NN.xavierUniform @'[32, 8] 32 8 1
+        outputWeights <- NN.xavierUniform @'[8, 2] 8 2 1
+        pure $
+            Parameters
+                (NN.Convolution convolutionWeights 0)
+                (NN.BatchNorm 1 0)
+                (NN.Dense hiddenWeights 0)
+                (NN.LayerNorm 1 0)
+                (NN.Dense outputWeights 0)
 
 initialModelState
     :: ModelState T.Tensor
@@ -180,7 +185,7 @@ main = do
     forM_ [0 .. 60 :: Int] $ \epoch -> do
         when (epoch > 0) $ do
             random <- readIORef generator
-            let (source, nextGenerator) = NN.shuffle training random
+            let (source, nextGenerator) = NN.runState (NN.shuffle training) random
             writeIORef generator nextGenerator
 
             forM_ (NN.batchLoads $ NN.planBatches 16 NN.DropLast source) $ \load -> do

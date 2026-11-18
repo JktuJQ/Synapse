@@ -50,7 +50,8 @@ import Synapse.Tensor.Ops.Raw.Construction (element)
 import Synapse.Tensor.Ops.Raw.Elementwise (map, zipWith)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Axes (Axes (..), CanReduce, CanReduceNonEmpty, NonEmpty, ReduceShape)
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape, shape, shapeSize, strides)
+import Synapse.Tensor.Shapes.Backend (backendCoordinates, backendShape, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 import Prelude hiding (Ord, all, any, map, max, maximum, min, minimum, sum, zipWith, (&&), (||))
 import qualified Prelude as P
 

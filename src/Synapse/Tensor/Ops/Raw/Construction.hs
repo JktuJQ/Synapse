@@ -25,7 +25,8 @@ import qualified Synapse.Tensor.Ops.Elementwise as E (fromIntegral)
 import Synapse.Tensor.Ops.Raw.Elementwise (map)
 import Synapse.Tensor.Ops.Raw.Index (coordinate)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorIndex (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
+import Synapse.Tensor.Shapes.Backend (backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Prelude hiding (map)
 
 -- | Generate each element from its multidimensional index.

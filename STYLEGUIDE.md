@@ -49,6 +49,9 @@ Use leading arrows in multiline signatures and omit parentheses around a single
 constraint. Argument Haddock comments follow their argument types (`-- ^`);
 Fourmolu controls whether they fit on the same line.
 
+Annotate inferred tensor representation binders as `{t :: TensorLike}` rather
+than `{t}`. Keep them inferred so visible type applications retain their order.
+
 ## Modules and public API
 
 - Facade modules such as `Synapse.Tensor` contain documentation and reexports,

@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeOperators #-}
 
 {- | Shape-preserving activation functions for tensors and element expressions.
-Ordinary and differentiable values use the same functions.
 Activations support ordinary function application and composition in an arbitrary arrow.
 -}
 module Synapse.NN.Activation (relu, leakyRelu, sigmoid, tanh, sin, softplus) where

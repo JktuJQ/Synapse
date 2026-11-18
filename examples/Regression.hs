@@ -22,7 +22,7 @@ import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
 import Synapse.Tensor.Ops.Elementwise (Comparison, Condition)
-import System.Random (mkStdGen, splitGen)
+import System.Random (mkStdGen)
 import Text.Printf (printf)
 
 data Parameters t = Parameters
@@ -68,12 +68,17 @@ dataset count shift = NN.Indexed count $ \index ->
 initialParameters
     :: Parameters T.Tensor
 initialParameters =
-    let (first, rest) = splitGen (mkStdGen 7)
-        (second, third) = splitGen rest
-     in Parameters
-            (NN.Dense (NN.xavierUniform @'[1, 32] 1 32 (sqrt 2) first) (T.zeros @'[32]))
-            (NN.Dense (NN.xavierUniform @'[32, 32] 32 32 1 second) (T.zeros @'[32]))
-            (NN.Dense (NN.xavierUniform @'[32, 1] 32 1 1 third) (T.zeros @'[1]))
+    NN.evalState initialize $ mkStdGen 7
+  where
+    initialize = do
+        first <- NN.xavierUniform @'[1, 32] 1 32 (sqrt 2)
+        second <- NN.xavierUniform @'[32, 32] 32 32 1
+        third <- NN.xavierUniform @'[32, 1] 32 1 1
+        pure $
+            Parameters
+                (NN.Dense first $ T.zeros @'[32])
+                (NN.Dense second $ T.zeros @'[32])
+                (NN.Dense third $ T.zeros @'[1])
 
 trainingStep
     :: forall batch_size
@@ -126,7 +131,7 @@ main = do
     forM_ [0 .. 1000 :: Int] $ \epoch -> do
         when (epoch > 0) $ do
             random <- readIORef generator
-            let (source, nextGenerator) = NN.shuffle training random
+            let (source, nextGenerator) = NN.runState (NN.shuffle training) random
             writeIORef generator nextGenerator
 
             forM_ (NN.batchLoads $ NN.planBatches 32 NN.KeepLast source) $ \load -> do

@@ -34,8 +34,16 @@ module Synapse.Tensor.Backend
     ) where
 
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, ShapeToDIM)
+import Synapse.Tensor.Shapes.Backend (ShapeToDIM)
+import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Structure
+    ( TensorField (..)
+    , TensorProduct
+    , TensorStructure
+    , WithTensor
+    , flatten
+    , rebuild
+    )
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.LLVM.Native as CPU
@@ -58,17 +66,17 @@ data Backend
 
 {- | Convert a tensor or a binary product of tensors to its backend array representation.
 
-'flatten' decomposes records into tensors and nested pairs before these conversions are applied.
+'flatten' decomposes records into named tensor fields and nested pairs.
 Each tensor becomes an Accelerate array; each pair becomes a pair of backend representations.
 Conversions preserve shapes, element types, and contents.
 
 'pack' and 'unpack' must preserve the meaning of the staged computation in either direction.
-'toBackend' and 'fromBackend' must be mutual inverses on valid materialized values.
+Paths are omitted from backend values; reconstruction ignores paths and flattening restores canonical names.
 -}
 class A.Arrays (BackendLeaves a) => BackendTree a where
     {- | Materialized Accelerate arrays corresponding to a staged tensor product.
 
-    For @Tensor sh a@ this is @A.Array (ShapeToDIM sh) a@.
+    For @TensorField (Tensor sh a)@ this is @A.Array (ShapeToDIM sh) a@.
     For @(left, right)@ it is @(BackendLeaves left, BackendLeaves right)@.
     Wrap this type in 'A.Acc' to represent the corresponding staged computation.
     -}
@@ -76,7 +84,7 @@ class A.Arrays (BackendLeaves a) => BackendTree a where
 
     {- | Materialized Synapse tensors with the same binary product structure.
 
-    A @Tensor sh a@ becomes @TensorData sh a@; pairs are converted recursively.
+    A @TensorField (Tensor sh a)@ becomes @TensorField (TensorData sh a)@; pairs are converted recursively.
     Unlike 'BackendLeaves', this representation retains Synapse's shape-indexed wrappers.
     -}
     type MaterialLeaves a
@@ -101,13 +109,13 @@ class A.Arrays (BackendLeaves a) => BackendTree a where
         :: BackendLeaves a
         -> MaterialLeaves a
 
-instance (Shape sh, DType a) => BackendTree (Tensor sh a) where
-    type BackendLeaves (Tensor sh a) = A.Array (ShapeToDIM sh) a
-    type MaterialLeaves (Tensor sh a) = TensorData sh a
-    pack = unTensor
-    unpack = Tensor
-    toBackend = unTensorData
-    fromBackend = TensorData
+instance (Shape sh, DType a) => BackendTree (TensorField (Tensor sh a)) where
+    type BackendLeaves (TensorField (Tensor sh a)) = A.Array (ShapeToDIM sh) a
+    type MaterialLeaves (TensorField (Tensor sh a)) = TensorField (TensorData sh a)
+    pack = unTensor . tensorFieldValue
+    unpack = TensorField [] . Tensor
+    toBackend = unTensorData . tensorFieldValue
+    fromBackend = TensorField [] . TensorData
 instance (BackendTree a, BackendTree b) => BackendTree (a, b) where
     type BackendLeaves (a, b) = (BackendLeaves a, BackendLeaves b)
     type MaterialLeaves (a, b) = (MaterialLeaves a, MaterialLeaves b)

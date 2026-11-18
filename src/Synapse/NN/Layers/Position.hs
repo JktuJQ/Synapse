@@ -17,7 +17,9 @@ import Synapse.Tensor.Ops.Definition (TensorOps (fromTensor))
 {- | Generate sinusoidal positions of shape @'[time, features]@, starting at
 the supplied position offset. For feature pair @2i, 2i+1@ the entries are
 @sin (position / 10000^(2i/features))@ and @cos (position / 10000^(2i/features))@.
-Odd feature widths retain the last sine entry. Empty dimensions are allowed.
+Odd feature widths retain the last sine entry.
+
+Empty dimensions are allowed.
 Broadcast to @'[batch, time, features]@ and add to token embeddings.
 Positions are constants with respect to differentiation.
 
@@ -57,6 +59,7 @@ sinusoidalPositions offset = T.fromGen $ \ix ->
 
 {- | Apply <https://arxiv.org/abs/2104.09864 rotary positional embedding>
 to projected queries or keys of shape @'[batch, heads, time, features]@.
+
 Adjacent features @(0,1), (2,3), ...@ form rotation pairs; this is the
 interleaved convention, not the split-half convention used by some models.
 The feature width must be even, checked at compile time.

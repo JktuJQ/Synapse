@@ -32,7 +32,7 @@ import Data.Kind (Type)
 import Data.Word (Word32, Word64)
 import GHC.TypeLits (Nat)
 
-import Synapse.Tensor.Shapes.Dimensions (ShapeToDIM)
+import Synapse.Tensor.Shapes.Backend (ShapeToDIM)
 
 import qualified Data.Array.Accelerate as A
 

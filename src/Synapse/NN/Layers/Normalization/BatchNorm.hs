@@ -26,16 +26,12 @@ import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, AxisSize, CanReduce, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Synapse.Tensor.Shapes.Normalization (BatchNormAxes)
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
-{- | Per-channel scale and bias for batch normalization.
-Initialize weights to ones and bias to zeros.
--}
+-- | Per-channel scale and bias for batch normalization.
 data BatchNorm (channels :: Nat) (t :: TensorLike) a = BatchNorm
     { batchNormWeights :: t '[channels] a
-    -- ^ Scale shared across all positions in a channel.
     , batchNormBias :: t '[channels] a
-    -- ^ Offset shared across all positions in a channel.
     }
     deriving (Generic)
 
@@ -45,9 +41,7 @@ instance TensorStructure (BatchNorm channels Tensor.Tensor a) where
 -- | Running per-channel statistics, independent of the trainable parameters.
 data BatchNormState (channels :: Nat) (t :: TensorLike) a = BatchNormState
     { batchNormMean :: t '[channels] a
-    -- ^ Exponentially averaged per-channel means.
     , batchNormVariance :: t '[channels] a
-    -- ^ Exponentially averaged unbiased per-channel variances.
     }
     deriving (Generic)
 
@@ -61,6 +55,7 @@ initialBatchNormState
 initialBatchNormState = BatchNormState 0 1
 
 {- | Normalize each channel over all other axes and apply its scale and bias.
+
 The visible type argument selects the channel axis, such as @batchNorm \@1@ for NCHW data.
 Arguments after the mode are epsilon, momentum, parameters and input.
 Running statistics are carried by the returned state action.

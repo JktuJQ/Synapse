@@ -4,6 +4,7 @@
 module NNTest.Layers.Convolution (tests) where
 
 import Control.Monad.Trans.State.Strict (evalState)
+import qualified Data.Map.Strict as Map
 import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
@@ -123,7 +124,8 @@ propRecords = H.withTests 1 $ H.property $ do
     approxList (T.toList $ NN.convolutionBias updated) [0.2, -1.3]
     let dictionary = NN.extractWeights materialized
         destination = NN.Convolution (T.zeros @'[2, 1, 1]) (T.zeros @'[2]) :: NN.Convolution 1 2 '[1] 1 T.Tensor Double
-    map fst (Weights.weightsToList dictionary) H.=== [["convolutionBias"], ["convolutionWeights"]]
+    map fst ((Map.toAscList . Weights.weightsEntries) dictionary)
+        H.=== [["convolutionBias"], ["convolutionWeights"]]
     restored <- H.evalEither $ NN.loadWeights dictionary $ T.run T.CPU destination
     T.toList (NN.convolutionWeights restored) H.=== [2, 3]
     T.toList (NN.convolutionBias restored) H.=== [0.5, -1]

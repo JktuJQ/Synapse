@@ -9,7 +9,7 @@ module Synapse.Tensor.Shapes.Normalization (LayerNormAxes, BatchNormAxes) where
 import GHC.TypeLits (ErrorMessage (..), Nat, TypeError, type (+), type (-))
 
 import Synapse.Tensor.Shapes.Axes (Rank)
-import Synapse.Tensor.Shapes.Dimensions (Reverse)
+import Synapse.Tensor.Shapes.Backend (Reverse)
 
 -- Layer normalization
 

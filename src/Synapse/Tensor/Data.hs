@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -21,8 +22,9 @@ where
 import Data.Proxy (Proxy (..))
 
 import Synapse.Tensor.Ops.Definition (TensorOps (fromTensor))
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shape, shapeSize)
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..), TensorLike)
+import Synapse.Tensor.Shapes.Backend (backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 
 import qualified Data.Array.Accelerate as A
 
@@ -73,7 +75,7 @@ toList = A.toList . unTensorData
 
 -- | Convert tensor data to a constant tensor.
 fromData
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (Shape sh, TensorOps t a)
     => TensorData sh a
     -> t sh a
@@ -81,7 +83,7 @@ fromData = fromTensor . Tensor . A.use . unTensorData
 
 -- | Construct a tensor from row-major elements. The list length must match the shape.
 fromList
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (Shape sh, TensorOps t a)
     => [a]
     -> t sh a
@@ -89,7 +91,7 @@ fromList xs = checkListLength (Proxy @sh) "fromList" xs (unsafeFromList @sh xs)
 
 -- | Construct a tensor from row-major elements without checking the list length.
 unsafeFromList
-    :: forall {t} sh a
+    :: forall {t :: TensorLike} sh a
      . (Shape sh, TensorOps t a)
     => [a]
     -> t sh a

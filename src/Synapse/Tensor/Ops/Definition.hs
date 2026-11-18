@@ -34,9 +34,12 @@ module Synapse.Tensor.Ops.Definition
     , addInput
     , Result (..)
     , ResultType (..)
+    , resultValues
+    , resultFields
     ) where
 
 import qualified Data.Array.Accelerate as A
+import Data.Bifunctor (bimap)
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy)
 import Synapse.Tensor.Ops.Elementwise ()
@@ -45,15 +48,24 @@ import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import Synapse.Tensor.Representation (DType)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Dimensions (Shape)
-import Synapse.Tensor.Structure (ProductFields, TensorProduct, TensorStructure)
+import Synapse.Tensor.Structure
+    ( TensorField (..)
+    , TensorProduct
+    , TensorStructure
+    )
 import qualified Synapse.Tensor.Structure as T
+import Synapse.Tensor.Structure.Product (ProductFields, ProductValues)
 
 type Wrapped t a = ProductFields t a
 
 -- All registered input leaves share the TensorOps scalar type.
 data InputTree a input where
-    InputTensor :: Shape sh => InputTree a (T.Tensor sh a)
-    InputPair :: InputTree a l -> InputTree a r -> InputTree a (l, r)
+    InputTensor
+        :: Shape sh => InputTree a (TensorField (T.Tensor sh a))
+    InputPair
+        :: InputTree a l
+        -> InputTree a r
+        -> InputTree a (l, r)
 
 deriving stock instance Show (InputTree a input)
 
@@ -61,30 +73,33 @@ class Wrapped T.Tensor input ~ input => InputType a input | input -> a where
     inputTree
         :: InputTree a input
 
-instance Shape sh => InputType a (T.Tensor sh a) where inputTree = InputTensor
+instance Shape sh => InputType a (TensorField (T.Tensor sh a)) where inputTree = InputTensor
 instance (InputType a l, InputType a r) => InputType a (l, r) where
     inputTree = InputPair (inputTree @a @l) (inputTree @a @r)
 
 zeroInput
     :: (T.DType a, Num a, Num (T.TensorElement a))
     => InputTree a input
-    -> input
+    -> ProductValues input
 zeroInput InputTensor = RawConstruction.full 0
 zeroInput (InputPair l r) = (zeroInput l, zeroInput r)
 
 addInput
     :: (T.DType a, Num a, Num (T.TensorElement a))
     => InputTree a input
-    -> input
-    -> input
-    -> input
+    -> ProductValues input
+    -> ProductValues input
+    -> ProductValues input
 addInput InputTensor = RawElementwise.zipWith (+)
 addInput (InputPair l r) = \(a, b) (c, d) -> (addInput l a c, addInput r b d)
 
 -- | Single results may change element type without requiring numeric output evidence.
 data Result a output where
-    Single :: Result a (T.Tensor sh b)
-    Product :: InputTree a output -> Result a output
+    Single
+        :: Result a (TensorField (T.Tensor sh b))
+    Product
+        :: InputTree a output
+        -> Result a output
 
 deriving stock instance Show (Result a output)
 
@@ -92,9 +107,39 @@ class Wrapped T.Tensor output ~ output => ResultType a output where
     resultTree
         :: Result a output
 
-instance ResultType a (T.Tensor sh b) where resultTree = Single
+instance ResultType a (TensorField (T.Tensor sh b)) where resultTree = Single
 instance (InputType a l, InputType a r) => ResultType a (l, r) where
     resultTree = Product $ InputPair (inputTree @a @l) (inputTree @a @r)
+
+-- | Extract tensor values before registering a primitive result.
+resultValues
+    :: Result a output
+    -> output
+    -> ProductValues output
+resultValues Single = tensorFieldValue
+resultValues (Product tree) = inputValues tree
+  where
+    inputValues
+        :: InputTree a input
+        -> input
+        -> ProductValues input
+    inputValues InputTensor = tensorFieldValue
+    inputValues (InputPair left right) = bimap (inputValues left) (inputValues right)
+
+-- | Wrap primitive result values for reconstruction.
+resultFields
+    :: Result a output
+    -> ProductValues output
+    -> output
+resultFields Single = TensorField []
+resultFields (Product tree) = inputFields tree
+  where
+    inputFields
+        :: InputTree a input
+        -> ProductValues input
+        -> input
+    inputFields InputTensor = TensorField []
+    inputFields (InputPair left right) = bimap (inputFields left) (inputFields right)
 
 {- | Tensor input structures accepted by primitive computations.
 Resolved automatically for tensors, tuples, and generic tensor records.

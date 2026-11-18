@@ -25,7 +25,8 @@ import GHC.TypeLits (KnownNat)
 import Synapse.Autograd.Tensor.Ops.Pullback.Shape (shapeOf)
 import Synapse.Tensor.Representation (DType)
 import Synapse.Tensor.Shapes.Axes (RemoveAxis)
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, backendShape, strides)
+import Synapse.Tensor.Shapes.Backend (backendCoordinates, backendShape, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Index
     ( CanGather
     , Index

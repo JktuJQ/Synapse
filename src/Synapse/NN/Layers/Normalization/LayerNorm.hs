@@ -25,16 +25,12 @@ import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Normalization (LayerNormAxes)
-import Synapse.Tensor.Structure
+import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
-{- | Per-element scale and bias over the trailing normalized dimensions.
-Initialize weights to ones and bias to zeros.
--}
+-- | Per-element scale and bias over the trailing normalized dimensions.
 data LayerNorm (normalized :: [Nat]) (t :: TensorLike) a = LayerNorm
     { layerNormWeights :: t normalized a
-    -- ^ Scale for each normalized element.
     , layerNormBias :: t normalized a
-    -- ^ Offset for each normalized element.
     }
     deriving (Generic)
 
@@ -42,8 +38,8 @@ instance TensorStructure (LayerNorm normalized Tensor.Tensor a) where
     type WithTensor t (LayerNorm normalized Tensor.Tensor a) = LayerNorm normalized t a
 
 {- | Normalize trailing dimensions with population variance, then apply per-element scale and bias.
-The normalized dimensions are inferred from the parameters and must match the input suffix.
-Epsilon must be positive; training and evaluation use the same computation.
+
+Epsilon must be positive.
 -}
 layerNorm
     :: forall normalized sh t a xs {arrow}

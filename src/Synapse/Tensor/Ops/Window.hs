@@ -45,7 +45,7 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat)
 
 import Synapse.Tensor.Ops.Definition (TensorOps, withVJP)
-import Synapse.Tensor.Representation (TensorElement)
+import Synapse.Tensor.Representation (TensorElement, TensorLike)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Window
     ( Conv1dShape
@@ -68,7 +68,7 @@ import qualified Synapse.Tensor.Ops.Raw.Window as Raw
 
 -- | Extract zero-padded 1D windows from NCL input as @[batch, channels * kernel_volume, positions]@.
 extractPatches1d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -88,7 +88,7 @@ extractPatches1d =
 
 -- | Extract zero-padded 2D windows from NCHW input as @[batch, channels * kernel_volume, positions]@.
 extractPatches2d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -108,7 +108,7 @@ extractPatches2d =
 
 -- | Extract zero-padded 3D windows from NCDHW input as @[batch, channels * kernel_volume, positions]@.
 extractPatches3d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -128,7 +128,7 @@ extractPatches3d =
 
 -- | Sum patches into a specified NCL output shape, dropping entries outside that shape.
 combinePatches1d
-    :: forall output kernel stride padding dilation {t} patches a
+    :: forall output kernel stride padding dilation {t :: TensorLike} patches a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape output
@@ -149,7 +149,7 @@ combinePatches1d =
 
 -- | Sum patches into a specified NCHW output shape, dropping entries outside that shape.
 combinePatches2d
-    :: forall output kernel stride padding dilation {t} patches a
+    :: forall output kernel stride padding dilation {t :: TensorLike} patches a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape output
@@ -170,7 +170,7 @@ combinePatches2d =
 
 -- | Sum patches into a specified NCDHW output shape, dropping entries outside that shape.
 combinePatches3d
-    :: forall output kernel stride padding dilation {t} patches a
+    :: forall output kernel stride padding dilation {t :: TensorLike} patches a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape output
@@ -191,7 +191,7 @@ combinePatches3d =
 
 -- | Apply 1D cross-correlation to NCL input using OIK weights, without reversing the kernel.
 conv1d
-    :: forall stride padding dilation groups {t} input kernel a
+    :: forall stride padding dilation groups {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -219,7 +219,7 @@ conv1d =
 
 -- | Apply 2D cross-correlation to NCHW input using OIHW weights, without reversing the kernel.
 conv2d
-    :: forall stride padding dilation groups {t} input kernel a
+    :: forall stride padding dilation groups {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -247,7 +247,7 @@ conv2d =
 
 -- | Apply 3D cross-correlation to NCDHW input using OIDHW weights, without reversing the kernel.
 conv3d
-    :: forall stride padding dilation groups {t} input kernel a
+    :: forall stride padding dilation groups {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -275,7 +275,7 @@ conv3d =
 
 -- | Apply transposed 1D convolution to NCL input using IOK weights.
 convTranspose1d
-    :: forall stride padding dilation groups extra {t} input kernel a
+    :: forall stride padding dilation groups extra {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -303,7 +303,7 @@ convTranspose1d =
 
 -- | Apply transposed 2D convolution to NCHW input using IOHW weights.
 convTranspose2d
-    :: forall stride padding dilation groups extra {t} input kernel a
+    :: forall stride padding dilation groups extra {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -331,7 +331,7 @@ convTranspose2d =
 
 -- | Apply transposed 3D convolution to NCDHW input using IODHW weights.
 convTranspose3d
-    :: forall stride padding dilation groups extra {t} input kernel a
+    :: forall stride padding dilation groups extra {t :: TensorLike} input kernel a
      . ( TensorOps t a
        , Num (TensorElement a)
        , Shape input
@@ -359,7 +359,7 @@ convTranspose3d =
 
 -- | Maximum over 1D spatial windows in NCL layout.
 maxPool1d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , E.Ord (TensorElement a)
@@ -380,7 +380,7 @@ maxPool1d =
 
 -- | Maximum over 2D spatial windows in NCHW layout.
 maxPool2d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , E.Ord (TensorElement a)
@@ -401,7 +401,7 @@ maxPool2d =
 
 -- | Maximum over 3D spatial windows in NCDHW layout.
 maxPool3d
-    :: forall kernel stride padding dilation {t} input a
+    :: forall kernel stride padding dilation {t :: TensorLike} input a
      . ( TensorOps t a
        , Num (TensorElement a)
        , E.Ord (TensorElement a)
@@ -424,7 +424,7 @@ maxPool3d =
 Include zero padding in the divisor when @includePadding@ is 'True'.
 -}
 avgPool1d
-    :: forall kernel stride padding {t} input a
+    :: forall kernel stride padding {t :: TensorLike} input a
      . ( TensorOps t a
        , Fractional (TensorElement a)
        , Shape input
@@ -446,7 +446,7 @@ avgPool1d includePadding =
 Include zero padding in the divisor when @includePadding@ is 'True'.
 -}
 avgPool2d
-    :: forall kernel stride padding {t} input a
+    :: forall kernel stride padding {t :: TensorLike} input a
      . ( TensorOps t a
        , Fractional (TensorElement a)
        , Shape input
@@ -468,7 +468,7 @@ avgPool2d includePadding =
 Include zero padding in the divisor when @includePadding@ is 'True'.
 -}
 avgPool3d
-    :: forall kernel stride padding {t} input a
+    :: forall kernel stride padding {t :: TensorLike} input a
      . ( TensorOps t a
        , Fractional (TensorElement a)
        , Shape input

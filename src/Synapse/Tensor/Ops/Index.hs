@@ -35,7 +35,7 @@ import GHC.TypeLits (KnownNat)
 import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import qualified Synapse.Tensor.Ops.Raw.Index as Raw
-import Synapse.Tensor.Representation (Tensor, TensorElement, TensorIndex)
+import Synapse.Tensor.Representation (Tensor, TensorElement, TensorIndex, TensorLike)
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, LookupRowsShape, Slice, SliceShape)
@@ -51,7 +51,7 @@ coordinate = Raw.coordinate @axis
 
 -- | Read the element at the specified coordinates.
 index
-    :: forall {t} ix sh a
+    :: forall {t :: TensorLike} ix sh a
      . (TensorOps t a, Shape sh, Index ix, CanIndex ix sh)
     => t sh a
     -> Element t a
@@ -95,7 +95,7 @@ dynamicIndexOr fallback tensor selected =
 
 -- | Select elements along an axis using an index tensor. Indices must be within the source bounds.
 unsafeGather
-    :: forall {t} axis sh indices a
+    :: forall {t :: TensorLike} axis sh indices a
      . ( TensorOps t a
        , KnownNat axis
        , Shape sh
@@ -114,7 +114,7 @@ unsafeGather tensor indices =
 
 -- | Select elements along an axis, returning the fallback for out-of-bounds indices.
 gatherOr
-    :: forall {t} axis sh indices a
+    :: forall {t :: TensorLike} axis sh indices a
      . ( TensorOps t a
        , KnownNat axis
        , Shape sh
@@ -134,7 +134,7 @@ gatherOr fallback tensor indices =
 
 -- | Select table rows using an index tensor. Row indices must be within the table bounds.
 unsafeLookupRows
-    :: forall {t} rows width indices a
+    :: forall {t :: TensorLike} rows width indices a
      . ( TensorOps t a
        , Shape '[rows, width]
        , Shape indices
@@ -152,7 +152,7 @@ unsafeLookupRows table indices =
 
 -- | Select the specified coordinates and ranges along each axis.
 slice
-    :: forall {t} spec sh a
+    :: forall {t :: TensorLike} spec sh a
      . ( TensorOps t a
        , Shape sh
        , Shape (SliceShape spec sh)

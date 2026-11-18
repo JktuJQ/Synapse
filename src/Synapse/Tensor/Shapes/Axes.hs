@@ -46,7 +46,8 @@ import GHC.TypeLits
     , type (-)
     )
 
-import Synapse.Tensor.Shapes.Dimensions (Reverse, ShapeSize)
+import Synapse.Tensor.Shapes.Backend (Reverse)
+import Synapse.Tensor.Shapes.Dimensions (ShapeSize)
 
 -- Axis lists and witnesses
 

@@ -22,7 +22,8 @@ import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Raw.Construction (full)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement, TensorLike)
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendShape, shapeSize)
+import Synapse.Tensor.Shapes.Backend (backendShape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 
 -- The three layers share two projection matrices and two biases.
 type Weights (t :: TensorLike) input hidden gates a =

@@ -20,7 +20,7 @@ import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
-import System.Random (mkStdGen, splitGen)
+import System.Random (mkStdGen)
 import Text.Printf (printf)
 
 data Parameters t = Parameters
@@ -96,24 +96,29 @@ sample index =
 initialParameters
     :: Parameters T.Tensor
 initialParameters =
-    let (embeddingGen, rest) = splitGen $ mkStdGen 7
-        (queryGen, rest1) = splitGen rest
-        (keyGen, rest2) = splitGen rest1
-        (valueGen, rest3) = splitGen rest2
-        (outputGen, rest4) = splitGen rest3
-        (expandGen, projectGen) = splitGen rest4
-     in Parameters
-            (NN.Embedding $ NN.normal 0 0.2 embeddingGen)
-            ( NN.MultiHeadAttention
-                (NN.Dense (NN.xavierUniform 8 8 1 queryGen) 0)
-                (NN.Dense (NN.xavierUniform 8 8 1 keyGen) 0)
-                (NN.Dense (NN.xavierUniform 8 8 1 valueGen) 0)
-                (NN.Dense (NN.xavierUniform 8 8 1 outputGen) 0)
-            )
-            (NN.LayerNorm 1 0)
-            (NN.LayerNorm 1 0)
-            (NN.Dense (NN.xavierUniform 8 16 1 expandGen) 0)
-            (NN.Dense (NN.xavierUniform 16 8 1 projectGen) 0)
+    NN.evalState initialize $ mkStdGen 7
+  where
+    initialize = do
+        embedding <- NN.normal 0 0.2
+        query <- NN.xavierUniform 8 8 1
+        key <- NN.xavierUniform 8 8 1
+        value <- NN.xavierUniform 8 8 1
+        output <- NN.xavierUniform 8 8 1
+        expandWeights <- NN.xavierUniform 8 16 1
+        projectWeights <- NN.xavierUniform 16 8 1
+        pure $
+            Parameters
+                (NN.Embedding embedding)
+                ( NN.MultiHeadAttention
+                    (NN.Dense query 0)
+                    (NN.Dense key 0)
+                    (NN.Dense value 0)
+                    (NN.Dense output 0)
+                )
+                (NN.LayerNorm 1 0)
+                (NN.LayerNorm 1 0)
+                (NN.Dense expandWeights 0)
+                (NN.Dense projectWeights 0)
 
 optimizer
     :: NN.AdamW

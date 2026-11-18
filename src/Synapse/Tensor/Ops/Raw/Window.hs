@@ -55,7 +55,8 @@ import GHC.TypeNats (KnownNat, natVal)
 
 import Synapse.Tensor.Ops.Raw.Math (contract, matrixProduct)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape (..), backendShape, strides)
+import Synapse.Tensor.Shapes.Backend (backendShape, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape (..))
 
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.Representation.Type as R

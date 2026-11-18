@@ -4,6 +4,7 @@
 module NNTest.Layers.Embedding (tests) where
 
 import Control.Monad (foldM)
+import qualified Data.Map.Strict as Map
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -105,7 +106,7 @@ tests =
         , testProperty "materialized embedding weights round-trip through named weight storage" $ H.withTests 1 $ H.property $ do
             let stored = NN.extractWeights $ T.run T.CPU parameters
                 template = NN.Embedding $ T.fromListData @'[4, 2] $ replicate 8 (0 :: Double)
-            map fst (Weights.weightsToList stored) H.=== [["embeddingWeights"]]
+            map fst ((Map.toAscList . Weights.weightsEntries) stored) H.=== [["embeddingWeights"]]
             restored <- H.evalEither $ NN.loadWeights stored template
             approxList (T.toList $ NN.embeddingWeights restored) [1, 2, 3, 4, 5, 6, 7, 8]
         , testProperty "embedding rejects a mismatched output feature dimension" $

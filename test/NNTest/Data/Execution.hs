@@ -55,7 +55,7 @@ tests =
             forM_ [NN.KeepLast, NN.DropLast, NN.PadLast 99999 (-12345)] $ \policy -> do
                 let plan = NN.planBatches limit policy $ source count
                     actual = map (\load -> NN.withBatch (runIdentity load) NN.batchSize) $ NN.batchLoads plan
-                NN.batchSizes plan H.=== map fromIntegral (sort $ nub actual)
+                NN.batchSizes plan H.=== sort (nub actual)
         , testProperty "custom plans normalize sizes without inspecting their actions" $ H.withTests 1 $ H.property $ do
             let plan = NN.batchPlan [16, 3, 16] (error "loading schedule evaluated") :: NN.BatchPlan IO '[1] '[1] Double Double
                 step = NN.prepareBatchStep T.CPU plan objective

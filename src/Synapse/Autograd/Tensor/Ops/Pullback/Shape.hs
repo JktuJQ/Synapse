@@ -37,7 +37,8 @@ import Prelude hiding (concat)
 
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Axes (Axes, axes)
-import Synapse.Tensor.Shapes.Dimensions (Shape, backendCoordinates, shape, shapeSize, strides)
+import Synapse.Tensor.Shapes.Backend (backendCoordinates, strides)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 
 import qualified Data.Array.Accelerate as A
 
@@ -207,7 +208,7 @@ stack selected left right _ gradient =
         insert value coordinates = take axis coordinates ++ [value] ++ drop axis coordinates
      in (reindexGradient (insert 0) left gradient, reindexGradient (insert 1) right gradient)
 
-{- | Join gate cotangents in their original packed order.
+{- | Join matrix chunks in their original order.
 The list must contain exactly @gates@ tensors.
 -}
 joinMatrixChunks
