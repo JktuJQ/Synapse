@@ -42,7 +42,7 @@ import qualified Data.Array.Accelerate as A
 import Data.Bifunctor (bimap)
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy)
-import Synapse.Tensor.Ops.Elementwise ()
+import Synapse.Tensor.Ops.Logic ()
 import qualified Synapse.Tensor.Ops.Raw.Construction as RawConstruction
 import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import Synapse.Tensor.Representation (DType)

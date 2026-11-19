@@ -17,11 +17,12 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, type (*))
 import Synapse.NN.Activation (sigmoid)
 import Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast, split4)
-import Synapse.Tensor.Representation (TensorElement, TensorLike)
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
@@ -67,7 +68,7 @@ lstmCell
        , KnownNat batch
        , KnownNat (4 * hidden)
        , TensorOps t a
-       , Num (TensorElement a)
+       , NumDType a
        , Num (t '[batch, 4 * hidden] a)
        , Floating (t '[batch, hidden] a)
        , E.Ord (t '[batch, hidden] a)
@@ -95,9 +96,8 @@ lstm
        , KnownNat time
        , KnownNat (4 * hidden)
        , TensorOps t a
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        )
     => LSTM input hidden t a
     -> t '[time, batch, input] a

@@ -67,6 +67,7 @@ import Prelude hiding
     , tanh
     )
 
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Raw.Elementwise (map)
 import Synapse.Tensor.Ops.Raw.Math
     ( broadcastBatchIndex
@@ -75,7 +76,7 @@ import Synapse.Tensor.Ops.Raw.Math
     , contract
     , matrixDimensions
     )
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
+import Synapse.Tensor.Representation (Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 
 import qualified Data.Array.Accelerate as A
@@ -305,7 +306,7 @@ atanh x _ seed = seed / (1 - x * x)
 
 -- | Scale each vector by the other vector and the scalar output seed.
 dot
-    :: (Shape '[n], DType a, Num (TensorElement a))
+    :: (Shape '[n], NumDType a)
     => Tensor '[n] a
     -> Tensor '[n] a
     -> Tensor '[] a
@@ -318,7 +319,7 @@ dot x y _ (Tensor gradient) =
 -- | Contract directly into each original input element, summing all broadcast batch copies.
 matmul
     :: forall lhs rhs out a
-     . (Shape lhs, Shape rhs, Shape out, DType a, Num (TensorElement a))
+     . (Shape lhs, Shape rhs, Shape out, NumDType a)
     => Tensor lhs a
     -> Tensor rhs a
     -> Tensor out a

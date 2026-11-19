@@ -3,18 +3,15 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Gradient rules for conditional selection and elementwise extrema.
-module Synapse.Autograd.Tensor.Ops.Pullback.Elementwise
-    ( -- * Conditional selection
-      select
+module Synapse.Autograd.Tensor.Ops.Pullback.Logic
+    ( select
     , cond
-
-      -- * Extrema
     , extremum
     ) where
 
 import Synapse.Autograd.Representation (Backpropagatable, zero)
 
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 
 -- | Route the seed using the forward mask, preserving zeros in the inactive branch.
 select

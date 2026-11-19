@@ -17,11 +17,13 @@ import Control.Monad.Trans.State.Strict (State, state)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
 import Synapse.NN.Forward (ForwardMode (..))
-import Synapse.NN.Layers.Normalization.Statistics (expand, moments)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
 import Synapse.Tensor.Ops.Math ()
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
-import Synapse.Tensor.Representation (TensorElement, TensorLike)
+import qualified Synapse.Tensor.Ops.Reduction as R
+import qualified Synapse.Tensor.Ops.Shape as T
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, AxisSize, CanReduce, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
@@ -50,7 +52,7 @@ instance TensorStructure (BatchNormState channels Tensor.Tensor a) where
 
 -- | Initialize running means to zero and running variances to one.
 initialBatchNormState
-    :: (KnownNat channels, Num a, Num (TensorElement a), Tensor.DType a)
+    :: (KnownNat channels, NumDType a)
     => BatchNormState channels Tensor.Tensor a
 initialBatchNormState = BatchNormState 0 1
 
@@ -73,8 +75,9 @@ batchNorm
        , KnownNat channels
        , TensorOps t a
        , RealFloat a
-       , Floating (TensorElement a)
+       , FloatingDType a
        , Floating (t sh a)
+       , Fractional (t '[channels] a)
        , Shape sh
        , Axes xs
        , CanReduce xs sh
@@ -87,8 +90,9 @@ batchNorm
     -> State (BatchNormState channels Tensor.Tensor a) (t sh a)
 batchNorm mode epsilon momentum parameters input = state $ \running ->
     let apply mean variance =
-            let normalized = (input - expand @xs input mean) / sqrt (expand @xs input variance + realToFrac epsilon)
-             in normalized * expand @xs input (batchNormWeights parameters) + expand @xs input (batchNormBias parameters)
+            let normalized = (input - T.expandReduced @xs input mean) / sqrt (T.expandReduced @xs input variance + realToFrac epsilon)
+             in normalized * T.expandReduced @xs input (batchNormWeights parameters)
+                    + T.expandReduced @xs input (batchNormBias parameters)
         evaluate = (apply (fromTensor (batchNormMean running)) (fromTensor (batchNormVariance running)), running)
      in case mode of
             Eval -> evaluate
@@ -96,7 +100,8 @@ batchNorm mode epsilon momentum parameters input = state $ \running ->
                 | shapeSize @sh == 0 -> evaluate
                 | count <= 1 -> error "batchNorm: training requires at least two values per channel"
                 | otherwise ->
-                    let (mean, variance) = moments @xs input
+                    let mean = R.meanAxes @xs input
+                        variance = R.varianceAxes @xs 0 input
                         update old current = realToFrac (1 - momentum) * old + realToFrac momentum * current
                         unbiased = toTensor variance * realToFrac (fromIntegral count / fromIntegral (count - 1) :: Double)
                         nextState =

@@ -12,6 +12,8 @@ module Synapse.Autograd.Tensor
     ) where
 
 import Synapse.Autograd.Tensor.Ops ()
-import Synapse.Autograd.Tensor.Ops.Elementwise ()
+import Synapse.Autograd.Tensor.Ops.Conversion ()
+import Synapse.Autograd.Tensor.Ops.Logic ()
 import Synapse.Autograd.Tensor.Ops.Math ()
+import Synapse.Autograd.Tensor.Ops.Numeric ()
 import Synapse.Autograd.Tensor.Representation (Tensor, TensorElement, WithGrad)

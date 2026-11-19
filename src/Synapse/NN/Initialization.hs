@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -152,7 +153,7 @@ xavierNormal
     -> State g (Tensor sh a)
 xavierNormal fanIn fanOut gain = normal @sh 0 (xavierScale fanIn fanOut gain)
 
-{- | Initialize uniformly on @[-bound, bound]@, where @bound = sqrt (6 / ((1 + slope²) * fan))@.
+{- | Initialize uniformly on @[-bound, bound]@, where @bound = sqrt (6 / ((1 + slope^2) * fan))@.
 Supply fan-in to preserve forward variance or fan-out to preserve backward variance.
 Fan must be positive and slope must be finite.
 Use zero for ReLU or the negative-input slope for leaky ReLU.
@@ -167,7 +168,7 @@ kaimingUniform fan slope =
     let bound = sqrt 3 * kaimingScale fan slope
      in uniform @sh (-bound) bound
 
-{- | Initialize normally with mean zero and @std = sqrt (2 / ((1 + slope²) * fan))@.
+{- | Initialize normally with mean zero and @std = sqrt (2 / ((1 + slope^2) * fan))@.
 Fan and slope have the same requirements as for 'kaimingUniform'.
 -}
 kaimingNormal

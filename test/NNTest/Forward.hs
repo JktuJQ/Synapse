@@ -21,7 +21,7 @@ import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -64,6 +64,7 @@ firstLens change (a, b) = (,b) <$> change a
 predict
     :: ( T.TensorOps t Double
        , Floating (t '[2, 2] Double)
+       , Fractional (t '[2] Double)
        , Num (t '[2, 1] Double)
        , E.Conditional (t '[2, 2] Double)
        , E.Condition (t '[2, 2] Double) ~ T.Tensor '[2, 2] Bool

@@ -12,6 +12,7 @@ import Control.Arrow (Arrow, arr)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, Mod, natVal)
 import qualified Synapse.Tensor as T
+import Synapse.Tensor.Ops.Constraints (FloatingDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (fromTensor))
 
 {- | Generate sinusoidal positions of shape @'[time, features]@, starting at
@@ -35,8 +36,7 @@ sinusoidalPositions
      . ( KnownNat time
        , KnownNat features
        , T.TensorOps t a
-       , Floating a
-       , Floating (T.TensorElement a)
+       , FloatingDType a
        , T.FromIntegral (T.TensorElement Int) (T.TensorElement a)
        )
     => Int
@@ -91,8 +91,7 @@ rope
        , KnownNat features
        , Mod features 2 ~ 0
        , T.TensorOps t a
-       , Floating a
-       , Floating (T.TensorElement a)
+       , FloatingDType a
        , T.FromIntegral (T.TensorElement Int) (T.TensorElement a)
        , Num (t '[batch, heads, time, features] a)
        )

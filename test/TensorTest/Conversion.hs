@@ -5,9 +5,9 @@ module TensorTest.Conversion (tests) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (void)
-import Data.Int (Int32, Int64)
+import Data.Int (Int32, Int64, Int8)
 import Data.List (isInfixOf)
-import Data.Word (Word32, Word64)
+import Data.Word (Word32, Word64, Word8)
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -48,7 +48,7 @@ propBoundedLength = H.property $ do
 propFromListDataRoundTrip :: H.Property
 propFromListDataRoundTrip = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 6) (Gen.float (Range.linearFracFrom 0 (-100) 100))
-    T.toList (T.fromListData @'[2, 3] xs :: T.TensorData '[2, 3] T.Float32) H.=== xs
+    T.toList (T.fromListData @'[2, 3] xs :: T.TensorData '[2, 3] Float) H.=== xs
 
 propFromListDataEdges :: H.Property
 propFromListDataEdges = H.property $ do
@@ -71,7 +71,7 @@ propFromListDataSize = H.property $ do
 propFromListRoundTrip :: H.Property
 propFromListRoundTrip = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 6) (Gen.float (Range.linearFracFrom 0 (-100) 100))
-    let tensor = T.fromList @'[2, 3] xs :: T.Tensor '[2, 3] T.Float32
+    let tensor = T.fromList @'[2, 3] xs :: T.Tensor '[2, 3] Float
     T.toList (T.run T.CPU tensor) H.=== xs
 
 propFromListExcess :: H.Property
@@ -88,17 +88,19 @@ propFromListEdges = H.property $ do
 
 propFromListRejectsInvalidSize :: H.Property
 propFromListRejectsInvalidSize = H.property $ do
-    result <- H.evalIO $ try @ErrorCall $ evaluate (T.fromList @'[2, 3] [1.0, 2.0] :: T.Tensor '[2, 3] T.Float32)
+    result <- H.evalIO $ try @ErrorCall $ evaluate (T.fromList @'[2, 3] [1.0, 2.0] :: T.Tensor '[2, 3] Float)
     case result of
         Left _ -> H.success
         Right _ -> H.failure
 
 propDTypes :: H.Property
 propDTypes = H.property $ do
+    T.toList (T.run T.CPU (T.fromList @'[2] [-3, 7 :: Int8])) H.=== [-3, 7]
+    T.toList (T.run T.CPU (T.fromList @'[2] [0, maxBound :: Word8])) H.=== [0, maxBound]
     T.toList (T.run T.CPU (T.fromList @'[2] [-3, 7 :: Int32])) H.=== [-3, 7]
     T.toList (T.run T.CPU (T.fromList @'[2] [-3, 7 :: Int64])) H.=== [-3, 7]
     T.toList (T.run T.CPU (T.fromList @'[2] [0, maxBound :: Word32])) H.=== [0, maxBound]
     T.toList (T.run T.CPU (T.fromList @'[2] [0, maxBound :: Word64])) H.=== [0, maxBound]
-    T.toList (T.run T.CPU (T.fromList @'[2] [-0.5, 1.25 :: T.Float32])) H.=== [-0.5, 1.25]
-    T.toList (T.run T.CPU (T.fromList @'[2] [-0.5, 1.25 :: T.Float64])) H.=== [-0.5, 1.25]
+    T.toList (T.run T.CPU (T.fromList @'[2] [-0.5, 1.25 :: Float])) H.=== [-0.5, 1.25]
+    T.toList (T.run T.CPU (T.fromList @'[2] [-0.5, 1.25 :: Double])) H.=== [-0.5, 1.25]
     T.toList (T.run T.CPU (T.fromList @'[2] [False, True])) H.=== [False, True]

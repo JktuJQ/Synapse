@@ -23,9 +23,10 @@ module Synapse.Tensor.Ops.Random
 import Control.Monad.Trans.State.Strict (State)
 import Data.Word (Word32)
 
-import Synapse.Tensor.Ops.Elementwise (FromIntegral)
+import Synapse.Tensor.Ops.Constraints (FractionalDType)
+import Synapse.Tensor.Ops.Conversion (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Random (StagedGenerator, generatorFromSeed, initializeGenerator, philox)
-import Synapse.Tensor.Representation (DType, Tensor, TensorElement)
+import Synapse.Tensor.Representation (Tensor, TensorElement)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 
 import qualified Synapse.Tensor.Ops.Raw.Random as Raw
@@ -40,12 +41,7 @@ randomWords = Raw.randomWords @sh
 -- | Sample uniformly from @[0, 1)@ and advance the generator.
 uniform
     :: forall sh a
-     . ( Shape sh
-       , DType a
-       , RealFloat a
-       , Fractional (TensorElement a)
-       , FromIntegral (TensorElement Word32) (TensorElement a)
-       )
+     . (Shape sh, RealFloat a, FractionalDType a, FromIntegral (TensorElement Word32) (TensorElement a))
     => State (StagedGenerator Tensor) (Tensor sh a)
 uniform = Raw.uniform @sh @a
 

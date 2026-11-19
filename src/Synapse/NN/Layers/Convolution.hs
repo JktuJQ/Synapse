@@ -25,6 +25,7 @@ module Synapse.NN.Layers.Convolution
 import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (Div, KnownNat, Mod, Nat)
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import Synapse.Tensor.Ops.Shape (broadcast, reshape)
 import qualified Synapse.Tensor.Ops.Window as T
@@ -104,7 +105,7 @@ conv1d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups
@@ -153,7 +154,7 @@ conv2d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups
@@ -203,7 +204,7 @@ conv3d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups
@@ -252,7 +253,7 @@ convTranspose1d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups
@@ -304,7 +305,7 @@ convTranspose2d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups
@@ -357,7 +358,7 @@ convTranspose3d
         {arrow}
      . ( Arrow arrow
        , TensorOps t a
-       , Num (Tensor.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        , KnownNat out_channels
        , KnownNat groups

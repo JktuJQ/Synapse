@@ -154,5 +154,5 @@ tests =
                 Compiler.rejects "test/NNTest/Fixtures/Rejected/MixedGradient.hs" "Float"
         , testProperty "gradient clipping rejects integral tensor fields" $
             H.withTests 1 $
-                Compiler.rejects "test/NNTest/Fixtures/Rejected/IntegralGradient.hs" "Floating"
+                Compiler.rejects "test/NNTest/Fixtures/Rejected/IntegralGradient.hs" "RealFloat"
         ]

@@ -61,25 +61,25 @@ tests =
 propReshape :: H.Property
 propReshape = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 6) (Gen.float (Range.linearFracFrom 0 (-100) 100))
-    let tensor = T.fromList @'[2, 3] xs :: T.Tensor '[2, 3] T.Float32
+    let tensor = T.fromList @'[2, 3] xs :: T.Tensor '[2, 3] Float
         reshaped = T.reshape @'[3, 2] tensor
     T.toList (T.run T.CPU reshaped) H.=== xs
 
 propBroadcastScalar :: H.Property
 propBroadcastScalar = H.property $ do
-    let tensor = T.scalar (T.element (3.0 :: T.Float32))
+    let tensor = T.scalar (T.element (3.0 :: Float))
         broadcasted = T.broadcast @'[2, 2] tensor
     T.toList (T.run T.CPU broadcasted) H.=== [3.0, 3.0, 3.0, 3.0]
 
 propBroadcastVector :: H.Property
 propBroadcastVector = H.property $ do
-    let tensor = T.fromList @'[3] [1.0, 2.0, 3.0] :: T.Tensor '[3] T.Float32
+    let tensor = T.fromList @'[3] [1.0, 2.0, 3.0] :: T.Tensor '[3] Float
         broadcasted = T.broadcast @'[2, 3] tensor
     T.toList (T.run T.CPU broadcasted) H.=== [1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
 
 propBroadcastSingletonDimension :: H.Property
 propBroadcastSingletonDimension = H.property $ do
-    let tensor = T.fromList @'[1, 3] [1.0, 2.0, 3.0] :: T.Tensor '[1, 3] T.Float32
+    let tensor = T.fromList @'[1, 3] [1.0, 2.0, 3.0] :: T.Tensor '[1, 3] Float
         broadcasted = T.broadcast @'[2, 3] tensor
     T.toList (T.run T.CPU broadcasted) H.=== [1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
 

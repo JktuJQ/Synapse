@@ -10,7 +10,7 @@ module Synapse.NN.Loss.Regression (mse, mae, huber, smoothL1) where
 
 import Synapse.Tensor.Representation (TensorLike)
 
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 
 {- | Compute squared differences between predictions and targets, then apply a reduction.
 Both inputs must have the same shape; broadcasting is explicit.
@@ -49,7 +49,7 @@ mae
 mae reduce predictions targets = reduce $ abs $ predictions - targets
 
 {- | Compute Huber errors with a finite, positive delta, then apply a reduction.
-For an absolute difference r, the error is r² / 2 below delta and delta * (r - delta / 2) otherwise.
+For an absolute difference r, the error is r^2 / 2 below delta and delta * (r - delta / 2) otherwise.
 Invalid delta values raise an error before constructing the loss.
 For example, @huber T.mean 1 predictions targets@ uses a transition at one.
 -}
@@ -70,7 +70,7 @@ huber reduce delta predictions targets
          in reduce $ (0.5 * quadratic) * quadratic + threshold * (magnitude - quadratic)
 
 {- | Compute Smooth L1 errors with a finite, nonnegative beta, then apply a reduction.
-For an absolute difference r, the error is r² / (2 * beta) below beta and r - beta / 2 otherwise.
+For an absolute difference r, the error is r^2 / (2 * beta) below beta and r - beta / 2 otherwise.
 A zero beta gives 'mae'; negative or nonfinite beta values raise an error.
 For positive beta, this is Huber loss divided by beta.
 -}

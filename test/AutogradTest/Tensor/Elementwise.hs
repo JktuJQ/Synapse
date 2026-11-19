@@ -92,6 +92,46 @@ tests =
             let input = T.full @'[] (3 :: Double)
                 function x = T.scalar (T.index @'[] x * T.index @'[] x)
             values (AG.gradient function input) H.=== [6]
+        , testProperty "rounding results are constants and fractional remainders retain gradients" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[3] [-2.75, 1.5, 3.125 :: Double]
+                function x =
+                    let (whole, fraction) = T.properFraction x
+                     in fraction * AG.constant (T.toFloating whole :: T.Tensor '[3] Double)
+                (output, gradient) = AG.backprop function input
+            approxList (values output) [1.5, 0.5, 0.375]
+            approxList (values gradient) [-2, 1, 3]
+        , testProperty "atan2 routes nonuniform seeds to both inputs" $ H.withTests 1 $ H.property $ do
+            let y = T.fromList @'[3] [1, -2, 3 :: Double]
+                x = T.fromList @'[3] [2, 3, -4 :: Double]
+                seed = T.fromList @'[3] [2, 3, 5 :: Double]
+                (_, backward) = AG.pullback (uncurry T.atan2) (y, x)
+                (dy, dx) = backward seed
+            approxList (values dy) [4 / 5, 9 / 13, -(20 / 25)]
+            approxList (values dx) [-(2 / 5), 6 / 13, -(15 / 25)]
+            approxList (values $ AG.gradient (\v -> T.atan2 v v) x) [0, 0, 0]
+        , testProperty "floating scaling and significand have local derivatives" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[3] [1.5, -6, 0.375 :: Double]
+                powers = T.fromList @'[3] [-2, 0, 3 :: Int]
+            approxList (values $ AG.gradient (T.scaleFloat powers) input) [0.25, 1, 8]
+            approxList (values $ AG.gradient T.significand input) [0.5, 0.125, 2]
+        , testProperty "floating encoding of detached metadata introduces no gradient path" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[3] [1.5, -6, 0.375 :: Double]
+                function x = let (m, e) = T.decodeFloat x in x + T.encodeFloat m e
+                (output, gradient) = AG.backprop function input
+            approxList (values output) [3, -12, 0.75]
+            approxList (values gradient) [1, 1, 1]
+        , testProperty "floating conversions cast the output seed back to the input type" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[3] [-1.5, 0, 2.25 :: Float]
+                weights = T.fromList @'[3] [2, 3, 5 :: Double]
+                gradient = AG.gradient (\x -> T.sum (T.toFloating x * AG.constant weights)) input
+            approxList (T.toList $ T.run T.CPU gradient) [2, 3, 5]
+        , testProperty "element expressions support decomposition and two-argument arctangent" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[1] [1.5 :: Double]
+                function x =
+                    let value = T.index @'[0] x
+                        (_, fraction) = T.properFraction value
+                     in T.scalar $ T.atan2 fraction 2
+            approxList (values $ AG.gradient function input) [2 / 4.25]
         , testProperty "prepared functions reuse a mask-dependent backward graph" $ H.withTests 1 $ H.property $ do
             let execute = T.run1 T.CPU (AG.backprop (\x -> T.select (x T.> 0) x 0))
                 (firstValue, firstGradient) = execute (T.run T.CPU (T.fromList @'[3] [-2, 0, 3 :: Double]))

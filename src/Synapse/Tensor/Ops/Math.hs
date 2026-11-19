@@ -15,15 +15,16 @@ module Synapse.Tensor.Ops.Math (dot, matmul) where
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import qualified Synapse.Autograd.Tensor.Ops.Pullback.Math as Pullback
+import Synapse.Tensor.Ops.Constraints (FloatingDType, FractionalDType, NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import Synapse.Tensor.Ops.Raw.Construction (full)
 import qualified Synapse.Tensor.Ops.Raw.Elementwise as RawElementwise
 import qualified Synapse.Tensor.Ops.Raw.Math as Raw
-import Synapse.Tensor.Representation (DType, Tensor, TensorElement, TensorLike)
+import Synapse.Tensor.Representation (Tensor, TensorLike)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 
-instance (Shape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) where
+instance (Shape sh, NumDType a) => Num (Tensor sh a) where
     (+) = RawElementwise.zipWith (+)
     (-) = RawElementwise.zipWith (-)
     (*) = RawElementwise.zipWith (*)
@@ -31,11 +32,11 @@ instance (Shape sh, DType a, Num a, Num (TensorElement a)) => Num (Tensor sh a) 
     abs = RawElementwise.map abs
     signum = RawElementwise.map signum
     fromInteger = full @sh . fromInteger
-instance (Shape sh, DType a, Fractional a, Fractional (TensorElement a)) => Fractional (Tensor sh a) where
+instance (Shape sh, FractionalDType a) => Fractional (Tensor sh a) where
     (/) = RawElementwise.zipWith (/)
     recip = RawElementwise.map recip
     fromRational = full @sh . fromRational
-instance (Shape sh, DType a, Floating a, Floating (TensorElement a)) => Floating (Tensor sh a) where
+instance (Shape sh, FloatingDType a) => Floating (Tensor sh a) where
     pi = full @sh pi
     exp = RawElementwise.map exp
     log = RawElementwise.map log
@@ -58,7 +59,7 @@ instance (Shape sh, DType a, Floating a, Floating (TensorElement a)) => Floating
 -- | Sum pairwise products of equally sized vectors.
 dot
     :: forall {t :: TensorLike} n a
-     . (TensorOps t a, Num (TensorElement a), Shape '[n])
+     . (TensorOps t a, NumDType a, Shape '[n])
     => t '[n] a
     -> t '[n] a
     -> t '[] a
@@ -72,7 +73,7 @@ dot =
 -- | Multiply vectors or matrices, broadcasting leading batch dimensions.
 matmul
     :: forall {t :: TensorLike} lhs rhs a
-     . (TensorOps t a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs))
+     . (TensorOps t a, NumDType a, Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs))
     => t lhs a
     -> t rhs a
     -> t (MatmulShape lhs rhs) a

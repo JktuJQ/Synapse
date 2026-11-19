@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module TensorTest.Ops.Reduction.Operations (tests) where

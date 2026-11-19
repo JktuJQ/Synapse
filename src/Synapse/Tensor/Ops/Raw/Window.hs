@@ -52,6 +52,7 @@ module Synapse.Tensor.Ops.Raw.Window
 import Data.List (zipWith4)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, natVal)
+import Prelude
 
 import Synapse.Tensor.Ops.Raw.Math (contract, matrixProduct)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
@@ -62,8 +63,9 @@ import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.Representation.Type as R
 import qualified Data.Array.Accelerate.Sugar.Elt as Sugar
 import qualified Data.Array.Accelerate.Type as AT
+import qualified Prelude as P
 
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 
 {- | Spatial window geometry in channels-first order.
 Strides, dilation, and padding ranks must already be validated by the caller.
@@ -146,7 +148,7 @@ windowLocation dims position inner = (valid, source)
 -- | Extract a contraction-by-position matrix, using zero outside the input.
 extract
     :: forall a
-     . (DType a, Num (TensorElement a))
+     . (DType a, Num (TensorElement a), P.Num a)
     => Window
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Matrix a)
@@ -158,13 +160,15 @@ extract dims input
   where
     extent =
         A.constant $
-            A.Z A.:. (channels dims * product (kernelSizes dims)) A.:. (batches dims * product (outputSizes dims))
+            A.Z
+                A.:. (channels dims * product (kernelSizes dims))
+                A.:. (batches dims * product (outputSizes dims))
     zero = unTensorElement (0 :: TensorElement a)
 
 -- | Sum patch contributions for each input element by gathering its overlapping windows.
 combine
     :: forall a
-     . (DType a, Num (TensorElement a))
+     . (DType a, Num (TensorElement a), P.Num a)
     => Window
     -> A.Acc (A.Matrix a)
     -> A.Acc (A.Vector a)
@@ -235,6 +239,7 @@ extractPatches
        , Shape out
        , DType a
        , Num (TensorElement a)
+       , P.Num a
        )
     => Tensor input a
     -> Tensor out a
@@ -258,6 +263,7 @@ combinePatches
        , Shape patches
        , DType a
        , Num (TensorElement a)
+       , P.Num a
        )
     => Tensor patches a
     -> Tensor output a
@@ -320,7 +326,7 @@ outputMatrix dims cout input = A.generate (A.constant $ A.Z A.:. (cout * batches
 
 -- | Multiply kernels by windows and restore channels-first output order.
 convolve
-    :: (DType a, Num (TensorElement a))
+    :: (DType a, Num (TensorElement a), P.Num a)
     => Window
     -> Int
     -> Int
@@ -343,7 +349,7 @@ convolve dims cout groups input weights = A.generate (A.constant $ A.Z A.:. (bat
 
 -- | Apply the transpose of a convolution's linear input mapping.
 transposeConvolve
-    :: (DType a, Num (TensorElement a))
+    :: (DType a, Num (TensorElement a), P.Num a)
     => Window
     -> Int
     -> Int
@@ -367,7 +373,7 @@ transposeConvolve dims cout groups weights input = combine dims $ A.reshape (A.c
 
 -- | Contract an input's windows with channels-first output contributions.
 kernelGradient
-    :: (DType a, Num (TensorElement a))
+    :: (DType a, Num (TensorElement a), P.Num a)
     => Window
     -> Int
     -> Int
@@ -395,6 +401,7 @@ convolution
        , Shape out
        , DType a
        , Num (TensorElement a)
+       , P.Num a
        )
     => Tensor input a
     -> Tensor kernel a
@@ -418,6 +425,7 @@ convTranspose
        , Shape out
        , DType a
        , Num (TensorElement a)
+       , P.Num a
        )
     => Tensor input a
     -> Tensor kernel a
@@ -474,7 +482,7 @@ paddingMinimum = A.constant $ Sugar.toElt @a $ lower $ Sugar.eltR @a
 -- | Select the first row-major maximum, or the first NaN, from valid input positions.
 maxWindows
     :: forall a
-     . (DType a, Num (TensorElement a), E.Ord (TensorElement a))
+     . (DType a, Num (TensorElement a), E.Ord (TensorElement a), P.Num a, P.Ord a)
     => Window
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector (Int, a))
@@ -485,7 +493,9 @@ maxWindows dims input = A.map discardValidity $ A.fold1 choose $ A.generate exte
   where
     extent =
         A.constant $
-            A.Z A.:. (batches dims * channels dims * product (outputSizes dims)) A.:. product (kernelSizes dims)
+            A.Z
+                A.:. (batches dims * channels dims * product (outputSizes dims))
+                A.:. product (kernelSizes dims)
     zero = paddingMinimum @a
     discardValidity value = let (valid, k, x) = A.unlift value :: (A.Exp Bool, A.Exp Int, A.Exp a) in A.lift (A.cond valid k (-1), x)
     choose lhs rhs =
@@ -503,7 +513,7 @@ maxWindows dims input = A.map discardValidity $ A.fold1 choose $ A.generate exte
 -- | Count the divisor for each output window in the tensor's numeric type.
 divisors
     :: forall a
-     . (DType a, Num (TensorElement a))
+     . (DType a, Num (TensorElement a), P.Num a)
     => Bool
     -> Window
     -> A.Acc (A.Vector a)
@@ -549,6 +559,8 @@ maxPool
        , DType a
        , Num (TensorElement a)
        , E.Ord (TensorElement a)
+       , P.Num a
+       , P.Ord a
        )
     => Tensor input a
     -> Tensor out a
@@ -567,6 +579,7 @@ avgPool
        , Shape out
        , DType a
        , Fractional (TensorElement a)
+       , P.Fractional a
        )
     => Bool
     -> Tensor input a

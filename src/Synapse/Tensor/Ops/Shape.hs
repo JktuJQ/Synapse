@@ -15,6 +15,7 @@ module Synapse.Tensor.Ops.Shape
     , squeeze
     , unsqueeze
     , broadcast
+    , expandReduced
 
       -- * Axis permutations
     , transpose
@@ -33,19 +34,24 @@ import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, type (*))
 import qualified Synapse.Autograd.Tensor.Ops.Pullback.Shape as Pullback
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP, withVJP)
+import qualified Synapse.Tensor.Ops.Raw.Reduction as RawReduction
 import qualified Synapse.Tensor.Ops.Raw.Shape as Raw
 import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Shapes.Axes
     ( Axes
+    , CanReduce
     , CanSqueeze
     , ConcatShape
     , InsertAxis
     , PermuteAxes
+    , ReduceShape
     , RemoveAxis
     , TransposeShape
     )
+import qualified Synapse.Tensor.Shapes.Axes as Axes
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)
@@ -98,6 +104,19 @@ broadcast =
         (Proxy @(Num (T.TensorElement a)))
         (Raw.broadcast @to)
         Pullback.broadcast
+
+-- | Expand a reduced tensor back along the specified axes.
+expandReduced
+    :: forall {t :: TensorLike} xs sh a
+     . (TensorOps t a, Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduce xs sh, NumDType a)
+    => t sh a
+    -> t (ReduceShape xs sh) a
+    -> t sh a
+expandReduced reference =
+    withVJP
+        (Proxy @(() :: Constraint))
+        (Pullback.expandReduced (Axes.axes @xs) (toTensor reference))
+        (\_ _ seed -> RawReduction.sumAxes @xs seed)
 
 -- | Transpose the last two axes of a matrix or batched matrix.
 transpose

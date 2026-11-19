@@ -14,6 +14,7 @@ module Synapse.NN.Layers.Dense (Dense (..), dense) where
 import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat)
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
@@ -53,7 +54,7 @@ dense
        , Shape out_sh
        , CanBroadcast '[out_features] out_sh
        , TensorOps t a
-       , Num (T.TensorElement a)
+       , NumDType a
        , Num (t out_sh a)
        )
     => Dense in_features out_features t a

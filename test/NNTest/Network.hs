@@ -17,7 +17,7 @@ import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -48,7 +48,7 @@ parameters =
 
 network
     :: ( T.TensorOps t a
-       , Num (T.TensorElement a)
+       , T.NumDType a
        , Num (t '[2] a)
        , Num (t '[1] a)
        , E.Ord (t '[2] a)
@@ -63,7 +63,7 @@ network p = proc input -> do
     NN.dense (outputLayer p) -< NN.relu hidden
 
 sharedNetwork
-    :: (T.TensorOps t a, Num (T.TensorElement a), Num (t '[2] a))
+    :: (T.TensorOps t a, T.NumDType a, Num (t '[2] a))
     => Shared t a
     -> (t '[2] a, t '[2] a)
     -> (t '[2] a, t '[2] a)

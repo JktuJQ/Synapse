@@ -18,14 +18,14 @@ module Synapse.Autograd.Tensor.Representation
     ) where
 
 import GHC.TypeLits (Nat)
+import qualified Synapse.Tensor.Representation as T
 
 import Synapse.Autograd.Representation (Backpropagatable)
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Structure (WithTensor)
 
 import qualified Numeric.Backprop as BP
-
-import qualified Synapse.Tensor.Representation as T
 
 {- | A tensor value and its differentiation history in scope @s@.
 The shape @sh@ and element type @a@ are those of the underlying 'T.Tensor'.
@@ -47,4 +47,4 @@ newtype TensorElement s a = TensorElement
     }
 
 instance Num (T.Tensor sh a) => Backpropagatable (T.Tensor sh a)
-instance Num (T.TensorElement a) => Backpropagatable (T.TensorElement a)
+instance NumDType a => Backpropagatable (T.TensorElement a)

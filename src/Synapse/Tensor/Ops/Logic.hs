@@ -1,13 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Elementwise arithmetic, comparisons, and conditional selection.
-module Synapse.Tensor.Ops.Elementwise
+-- | Boolean masks, comparisons, and conditional selection.
+module Synapse.Tensor.Ops.Logic
     ( -- * Masks and selection
       Boolean (..)
     , Conditional (..)
@@ -15,31 +14,19 @@ module Synapse.Tensor.Ops.Elementwise
       -- * Comparison
     , Eq (..)
     , Ord (..)
-
-      -- * Numeric operations and conversion
-    , Integral (..)
-    , RealFloat (..)
-    , FromIntegral (..)
     ) where
 
-import qualified Data.Array.Accelerate as A
 import Synapse.Tensor.Ops.Raw.Elementwise (map, zipWith, zipWith3)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Prelude hiding
     ( Eq
-    , Integral
     , Ord
-    , RealFloat
-    , fromIntegral
-    , isInfinite
-    , isNaN
+    , compare
     , map
     , max
     , min
     , not
-    , quot
-    , rem
     , zipWith
     , zipWith3
     , (&&)
@@ -51,6 +38,9 @@ import Prelude hiding
     , (>=)
     , (||)
     )
+
+import qualified Data.Array.Accelerate as A
+import qualified Prelude as P
 
 -- | Boolean operations on element expressions and equally shaped masks.
 class Boolean a where
@@ -153,6 +143,15 @@ instance A.Eq a => Eq (TensorElement a) where
 Floating point comparisons follow IEEE semantics and extrema propagate NaN.
 -}
 class Eq a => Ord a where
+    -- | Element expressions or tensors containing Ordering values with the input shape.
+    type OrderingResult a
+
+    -- | Compare corresponding values, returning LT, EQ, or GT.
+    compare
+        :: a
+        -> a
+        -> OrderingResult a
+
     -- | Compare corresponding values using strict less-than.
     (<)
         :: a
@@ -192,6 +191,8 @@ class Eq a => Ord a where
 infix 4 <, <=, >, >=
 
 instance {-# OVERLAPPABLE #-} A.Ord a => Ord (TensorElement a) where
+    type OrderingResult (TensorElement a) = TensorElement Ordering
+    compare (TensorElement x) (TensorElement y) = TensorElement (A.compare x y)
     (<) = elementComparison (A.<)
     (<=) = elementComparison (A.<=)
     (>) = elementComparison (A.>)
@@ -201,6 +202,10 @@ instance {-# OVERLAPPABLE #-} A.Ord a => Ord (TensorElement a) where
 
 -- | Boolean ordering uses False before True.
 instance {-# OVERLAPPING #-} Ord (TensorElement Bool) where
+    type OrderingResult (TensorElement Bool) = TensorElement Ordering
+    compare x y =
+        select (x == y) (TensorElement $ A.constant EQ) $
+            select x (TensorElement $ A.constant GT) (TensorElement $ A.constant LT)
     x < y = not x && y
     x <= y = not x || y
     x > y = x && not y
@@ -219,6 +224,8 @@ nanExtremum f (TensorElement x) (TensorElement y) =
     TensorElement (A.cond (A.isNaN x A.|| A.isNaN y) (0 / 0) (f x y))
 
 instance {-# OVERLAPPING #-} Ord (TensorElement Float) where
+    type OrderingResult (TensorElement Float) = TensorElement Ordering
+    compare (TensorElement x) (TensorElement y) = TensorElement (A.compare x y)
     (<) = elementComparison (A.<)
     (<=) = elementComparison (A.<=)
     (>) = elementComparison (A.>)
@@ -226,77 +233,27 @@ instance {-# OVERLAPPING #-} Ord (TensorElement Float) where
     min = nanExtremum A.min
     max = nanExtremum A.max
 instance {-# OVERLAPPING #-} Ord (TensorElement Double) where
+    type OrderingResult (TensorElement Double) = TensorElement Ordering
+    compare (TensorElement x) (TensorElement y) = TensorElement (A.compare x y)
     (<) = elementComparison (A.<)
     (<=) = elementComparison (A.<=)
     (>) = elementComparison (A.>)
     (>=) = elementComparison (A.>=)
     min = nanExtremum A.min
     max = nanExtremum A.max
-instance (Shape sh, DType a, Eq (TensorElement a)) => Eq (Tensor sh a) where
+instance (Shape sh, DType a, Eq (TensorElement a), P.Eq a) => Eq (Tensor sh a) where
     type Comparison (Tensor sh a) = Tensor sh Bool
     (==) = zipWith (==)
     (/=) = zipWith (/=)
-instance (Shape sh, DType a, Ord (TensorElement a)) => Ord (Tensor sh a) where
+instance
+    (Shape sh, DType a, Ord (TensorElement a), OrderingResult (TensorElement a) ~ TensorElement Ordering, P.Ord a)
+    => Ord (Tensor sh a)
+    where
+    type OrderingResult (Tensor sh a) = Tensor sh Ordering
+    compare = zipWith compare
     (<) = zipWith (<)
     (<=) = zipWith (<=)
     (>) = zipWith (>)
     (>=) = zipWith (>=)
     min = zipWith min
     max = zipWith max
-
-{- | Integer division with truncation toward zero and its corresponding remainder.
-Division by zero is undefined and must be avoided by the caller.
--}
-class Integral a where
-    -- | Divide corresponding values, rounding the quotient toward zero.
-    quot
-        :: a
-        -> a
-        -> a
-
-    -- | Remainder whose sign follows the dividend.
-    rem
-        :: a
-        -> a
-        -> a
-
-instance A.Integral a => Integral (TensorElement a) where
-    quot (TensorElement x) (TensorElement y) = TensorElement (A.quot x y)
-    rem (TensorElement x) (TensorElement y) = TensorElement (A.rem x y)
-instance (Shape sh, DType a, Integral (TensorElement a)) => Integral (Tensor sh a) where
-    quot = zipWith quot
-    rem = zipWith rem
-
--- | Classification of floating point elements and tensors.
-class Eq a => RealFloat a where
-    -- | Test whether each value is NaN.
-    isNaN
-        :: a
-        -> Comparison a
-
-    -- | Test whether each value is positive or negative infinity.
-    isInfinite
-        :: a
-        -> Comparison a
-
-instance A.RealFloat a => RealFloat (TensorElement a) where
-    isNaN (TensorElement x) = TensorElement (A.isNaN x)
-    isInfinite (TensorElement x) = TensorElement (A.isInfinite x)
-instance (Shape sh, DType a, RealFloat (TensorElement a)) => RealFloat (Tensor sh a) where
-    isNaN = map isNaN
-    isInfinite = map isInfinite
-
--- | Conversion of integral expressions to numeric expressions.
-class FromIntegral a b where
-    -- | Convert an integral expression without evaluating it on the host.
-    fromIntegral
-        :: a
-        -> b
-
-instance (A.Integral a, A.FromIntegral a b) => FromIntegral (TensorElement a) (TensorElement b) where
-    fromIntegral (TensorElement x) = TensorElement (A.fromIntegral x)
-instance
-    (out ~ sh, Shape sh, DType a, DType b, A.Integral a, A.FromIntegral a b)
-    => FromIntegral (Tensor sh a) (Tensor out b)
-    where
-    fromIntegral (Tensor x) = Tensor (A.map A.fromIntegral x)

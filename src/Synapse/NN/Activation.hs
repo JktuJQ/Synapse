@@ -9,7 +9,7 @@ Activations support ordinary function application and composition in an arbitrar
 module Synapse.NN.Activation (relu, leakyRelu, sigmoid, tanh, sin, softplus) where
 
 import Control.Arrow (Arrow, arr)
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import Prelude hiding (sin, tanh)
 import qualified Prelude as P
 

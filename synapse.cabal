@@ -112,10 +112,13 @@ library
                     , Synapse.Autograd.Representation
                     , Synapse.Tensor
                     , Synapse.Tensor.Backend
+                    , Synapse.Tensor.Ops.Constraints
                     , Synapse.Tensor.Ops.Construction
                     , Synapse.Tensor.Data
                     , Synapse.Tensor.Ops
-                    , Synapse.Tensor.Ops.Elementwise
+                    , Synapse.Tensor.Ops.Logic
+                    , Synapse.Tensor.Ops.Numeric
+                    , Synapse.Tensor.Ops.Conversion
                     , Synapse.Tensor.Ops.Math
                     , Synapse.Tensor.Ops.Window
                     , Synapse.Tensor.Ops.Index
@@ -140,7 +143,6 @@ library
                     , Synapse.Tensor.Ops.Raw.Random
                     , Synapse.Tensor.Ops.Definition
                     , Synapse.NN.Layers.Recurrent.Sequence
-                    , Synapse.NN.Layers.Normalization.Statistics
                     , Synapse.Tensor.Ops.Raw.Window
                     , Synapse.Autograd.Tensor.Ops.Pullback.Window
                     , Synapse.Tensor.Ops.Raw.Construction
@@ -148,14 +150,17 @@ library
                     , Synapse.Tensor.Ops.Raw.Math
                     , Synapse.Tensor.Ops.Raw.Shape
                     , Synapse.Tensor.Ops.Raw.Reduction
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Elementwise
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Logic
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Numeric
                     , Synapse.Autograd.Tensor.Ops.Pullback.Math
                     , Synapse.Autograd.Tensor.Ops.Pullback.Index
                     , Synapse.Autograd.Tensor.Ops.Pullback.Shape
                     , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
                     , Synapse.Tensor.Ops.Raw.Elementwise
                     , Synapse.Autograd.Tensor.Ops
-                    , Synapse.Autograd.Tensor.Ops.Elementwise
+                    , Synapse.Autograd.Tensor.Ops.Logic
+                    , Synapse.Autograd.Tensor.Ops.Numeric
+                    , Synapse.Autograd.Tensor.Ops.Conversion
                     , Synapse.Autograd.Tensor.Ops.Math
 
     if flag(gpu)
@@ -167,7 +172,7 @@ executable tensor-example
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Tensors.hs
+    main-is:          Tensor.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
@@ -177,7 +182,7 @@ executable autograd-example
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Autograd.hs
+    main-is:          Autograd.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
@@ -187,54 +192,60 @@ executable regression-example
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Regression.hs
+    main-is:          NN/Regression.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
                     , random >= 1.3 && < 1.4
+                    , transformers >= 0.6 && < 0.7
 
 executable convolution-example
     import:           warnings
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Convolution.hs
+    main-is:          NN/Convolution.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
                     , random >= 1.3 && < 1.4
+                    , transformers >= 0.6 && < 0.7
 
 executable recurrent-example
     import:           warnings
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Recurrent.hs
+    main-is:          NN/Recurrent.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
                     , random >= 1.3 && < 1.4
+                    , transformers >= 0.6 && < 0.7
 
 executable transformer-example
     import:           warnings
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Transformer.hs
+    main-is:          NN/Transformer.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
                     , random >= 1.3 && < 1.4
+                    , transformers >= 0.6 && < 0.7
 
 executable classification-example
     import:           warnings
     ghc-options:      -threaded
     default-language: Haskell2010
     hs-source-dirs:   examples
-    main-is:          Classification.hs
+    main-is:          NN/Classification.lhs
 
     build-depends:    base >= 4.19 && < 4.22
                     , synapse
+                    , random >= 1.3 && < 1.4
+                    , transformers >= 0.6 && < 0.7
 
 test-suite synapse-test
     import:           warnings
@@ -299,6 +310,7 @@ test-suite synapse-test
                     , TensorTest.Ops.Shape
                     , TensorTest.Ops.Reduction
                     , TensorTest.Ops.Reduction.Operations
+                    , TensorTest.Ops.Reduction.Masked
                     , TensorTest.Ops.Reduction.Types
                     , TensorTest.Shapes
                     , TensorTest.Shapes.Axes

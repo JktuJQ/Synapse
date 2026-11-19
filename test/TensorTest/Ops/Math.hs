@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module TensorTest.Ops.Math (tests) where
@@ -59,19 +60,19 @@ propNumInstance = H.property $ do
 
 propFractionalInstance :: H.Property
 propFractionalInstance = H.property $ do
-    let lhs = T.fromList @'[2] [8.0, 9.0] :: T.Tensor '[2] T.Float32
-        rhs = T.fromList @'[2] [2.0, 3.0] :: T.Tensor '[2] T.Float32
-        literal = 0.5 :: T.Tensor '[2] T.Float32
+    let lhs = T.fromList @'[2] [8.0, 9.0] :: T.Tensor '[2] Float
+        rhs = T.fromList @'[2] [2.0, 3.0] :: T.Tensor '[2] Float
+        literal = 0.5 :: T.Tensor '[2] Float
     T.toList (T.run T.CPU (lhs / rhs)) H.=== [4.0, 3.0]
     T.toList (T.run T.CPU (recip rhs)) H.=== [0.5, 1.0 / 3.0]
     T.toList (T.run T.CPU literal) H.=== [0.5, 0.5]
 
 propFloatingInstance :: H.Property
 propFloatingInstance = H.property $ do
-    let tensor = T.fromList @'[2] [1.0, 4.0] :: T.Tensor '[2] T.Float32
-        expInput = T.fromList @'[2] [0.0, 1.0] :: T.Tensor '[2] T.Float32
-        logInput = T.fromList @'[2] [1.0, Prelude.exp 1.0] :: T.Tensor '[2] T.Float32
-        piTensor = pi :: T.Tensor '[2] T.Float32
+    let tensor = T.fromList @'[2] [1.0, 4.0] :: T.Tensor '[2] Float
+        expInput = T.fromList @'[2] [0.0, 1.0] :: T.Tensor '[2] Float
+        logInput = T.fromList @'[2] [1.0, Prelude.exp 1.0] :: T.Tensor '[2] Float
+        piTensor = pi :: T.Tensor '[2] Float
     approxList (T.toList (T.run T.CPU (sqrt tensor))) [1.0, 2.0]
     approxList (T.toList (T.run T.CPU (exp expInput))) [1.0, Prelude.exp 1.0]
     approxList (T.toList (T.run T.CPU (log logInput))) [0.0, 1.0]
@@ -92,9 +93,9 @@ propIntegerArithmetic = H.property $ do
 
 propFloatingMethods :: H.Property
 propFloatingMethods = H.property $ do
-    let xs = [0.2, 0.3, 0.5, 0.7 :: T.Float64]
+    let xs = [0.2, 0.3, 0.5, 0.7 :: Double]
         input = T.fromList @'[4] xs
-        operations :: [(String, T.Tensor '[4] T.Float64 -> T.Tensor '[4] T.Float64, T.Float64 -> T.Float64)]
+        operations :: [(String, T.Tensor '[4] Double -> T.Tensor '[4] Double, Double -> Double)]
         operations =
             [ ("exp", exp, exp)
             , ("log", log, log)
@@ -179,7 +180,7 @@ propComparisonEdges = H.property $ do
 
 propComparisonDTypes :: H.Property
 propComparisonDTypes = H.property $ do
-    let check :: (T.DType a, T.Ord (T.TensorElement a)) => a -> a -> H.PropertyT IO ()
+    let check :: T.OrdDType a => a -> a -> H.PropertyT IO ()
         check low high = do
             let lhs = T.scalar (T.element low)
                 rhs = T.scalar (T.element high)

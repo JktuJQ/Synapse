@@ -18,7 +18,8 @@ module Synapse.NN.Gradient
     , clipGradNormL2
     ) where
 
-import Synapse.Tensor.Representation (DType, Tensor, TensorElement)
+import Synapse.Tensor.Ops.Constraints (FractionalDType, NumDType, OrdDType, RealFloatDType)
+import Synapse.Tensor.Representation (Tensor)
 import Synapse.Tensor.Structure (ElementConstraints, TensorStructure)
 
 import qualified Synapse.Tensor as T
@@ -29,12 +30,7 @@ The accumulator starts at zero; the combining function must treat zero as its id
 -}
 gradientNorm
     :: forall a p
-     . ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Num a
-       , Num (TensorElement a)
-       )
+     . (TensorStructure p, ElementConstraints ((~) a) p, NumDType a)
     => (forall sh. T.Shape sh => Tensor sh a -> Tensor '[] a)
     -> (Tensor '[] a -> Tensor '[] a -> Tensor '[] a)
     -> p
@@ -45,12 +41,7 @@ gradientNorm norm combine =
 -- | Sum absolute gradient elements across every tensor field.
 gradientNormL1
     :: forall a p
-     . ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Num a
-       , Num (TensorElement a)
-       )
+     . (TensorStructure p, ElementConstraints ((~) a) p, NumDType a)
     => p
     -> Tensor '[] a
 gradientNormL1 = gradientNorm T.normL1 (+)
@@ -58,14 +49,7 @@ gradientNormL1 = gradientNorm T.normL1 (+)
 -- | L2 norm across every tensor field, using one shared floating-point element type.
 gradientNormL2
     :: forall a p
-     . ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Floating a
-       , Floating (TensorElement a)
-       , T.Ord (TensorElement a)
-       , T.RealFloat (TensorElement a)
-       )
+     . (TensorStructure p, ElementConstraints ((~) a) p, RealFloatDType a)
     => p
     -> Tensor '[] a
 gradientNormL2 =
@@ -74,13 +58,7 @@ gradientNormL2 =
 -- | Scale every field by the same factor when the norm exceeds the limit.
 clipGradNorm
     :: forall a p
-     . ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Fractional a
-       , Fractional (TensorElement a)
-       , T.Ord (TensorElement a)
-       )
+     . (TensorStructure p, ElementConstraints ((~) a) p, FractionalDType a, OrdDType a)
     => (p -> Tensor '[] a)
     -> a
     -> p
@@ -99,13 +77,7 @@ clipGradNorm norm maxNorm gradients =
 Supply a finite, nonnegative limit. Zero gradients are preserved; nonfinite gradients are not repaired.
 -}
 clipGradNormL1
-    :: ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Fractional a
-       , Fractional (TensorElement a)
-       , T.Ord (TensorElement a)
-       )
+    :: (TensorStructure p, ElementConstraints ((~) a) p, FractionalDType a, OrdDType a)
     => a
     -> p
     -> p
@@ -126,14 +98,7 @@ let gradients = AG.gradient objective parameters
 @
 -}
 clipGradNormL2
-    :: ( TensorStructure p
-       , ElementConstraints ((~) a) p
-       , DType a
-       , Floating a
-       , Floating (TensorElement a)
-       , T.Ord (TensorElement a)
-       , T.RealFloat (TensorElement a)
-       )
+    :: (TensorStructure p, ElementConstraints ((~) a) p, RealFloatDType a)
     => a
     -> p
     -> p

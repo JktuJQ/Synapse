@@ -23,20 +23,21 @@ module Synapse.NN.Metrics.Classification
     , binaryF1
     ) where
 
+import Synapse.Tensor.Ops.Constraints (FractionalDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (toTensor))
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorLike)
+import Synapse.Tensor.Representation (Tensor (..), TensorElement (..), TensorLike)
 import Synapse.Tensor.Shapes.Axes (Axes, AxisSize, CanReduceNonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 
 import qualified Data.Array.Accelerate as A
 
 import qualified Synapse.Tensor.Ops.Construction as C
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import qualified Synapse.Tensor.Ops.Reduction as R
 
 -- | Divide counts, returning zero when the denominator is zero.
 ratio
-    :: (Shape sh, DType a, Fractional a, Fractional (TensorElement a), E.Ord (TensorElement a))
+    :: (Shape sh, FractionalDType a, OrdDType a)
     => Tensor sh a
     -> Tensor sh a
     -> Tensor sh a
@@ -45,7 +46,7 @@ ratio numerator denominator = E.select (denominator E.== 0) 0 $ numerator / E.se
 -- | Fraction of true elements; empty inputs return NaN.
 meanMatches
     :: forall sh a
-     . (Shape sh, DType a, RealFloat a, Fractional (TensorElement a))
+     . (Shape sh, RealFloat a, FractionalDType a)
     => Tensor sh Bool
     -> Tensor '[] a
 meanMatches matches = R.mean (E.select matches (C.full @sh 1) (C.full @sh 0))
@@ -63,8 +64,8 @@ classificationCounts
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -98,7 +99,7 @@ classificationCounts predictions (Tensor targets) =
 -- | Compute a score from pooled counts or aggregate its class-wise values.
 averageCounts
     :: forall classes a
-     . (Shape '[classes], DType a, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (Shape '[classes], RealFloat a, FractionalDType a, OrdDType a)
     => (forall sh. Shape sh => Tensor sh a -> Tensor sh a -> Tensor sh a -> Tensor sh a)
     -> Averaging
     -> (Tensor '[classes] a, Tensor '[classes] a, Tensor '[classes] a)
@@ -112,7 +113,7 @@ averageCounts score averaging (tp, predicted, support) =
 -- | Count positive-label true positives, predictions, and targets with an explicit threshold.
 binaryCounts
     :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (TensorOps t a, Shape sh, RealFloat a, FractionalDType a, OrdDType a)
     => a
     -> t sh a
     -> t sh a
@@ -144,8 +145,8 @@ accuracy
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -168,8 +169,8 @@ precisionPerClass
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -193,8 +194,8 @@ precision
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => Averaging
     -> t sh a
@@ -220,8 +221,8 @@ recallPerClass
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -245,8 +246,8 @@ recall
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => Averaging
     -> t sh a
@@ -271,8 +272,8 @@ f1PerClass
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -296,8 +297,8 @@ f1
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FractionalDType a
+       , OrdDType a
        )
     => Averaging
     -> t sh a
@@ -321,7 +322,7 @@ confusionMatrix
        , Shape '[AxisSize axis sh]
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
-       , E.Ord (TensorElement a)
+       , OrdDType a
        )
     => t sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -347,7 +348,7 @@ All elements count independently; empty inputs return NaN.
 -}
 binaryAccuracy
     :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (TensorOps t a, Shape sh, RealFloat a, FractionalDType a, OrdDType a)
     => a
     -> t sh a
     -> t sh a
@@ -365,7 +366,7 @@ Zero denominators and empty inputs give zero.
 -}
 binaryPrecision
     :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (TensorOps t a, Shape sh, RealFloat a, FractionalDType a, OrdDType a)
     => a
     -> t sh a
     -> t sh a
@@ -382,7 +383,7 @@ Zero denominators and empty inputs give zero.
 -}
 binaryRecall
     :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (TensorOps t a, Shape sh, RealFloat a, FractionalDType a, OrdDType a)
     => a
     -> t sh a
     -> t sh a
@@ -399,7 +400,7 @@ Zero denominators and empty inputs give zero.
 -}
 binaryF1
     :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, RealFloat a, Fractional (TensorElement a), E.Ord (TensorElement a))
+     . (TensorOps t a, Shape sh, RealFloat a, FractionalDType a, OrdDType a)
     => a
     -> t sh a
     -> t sh a

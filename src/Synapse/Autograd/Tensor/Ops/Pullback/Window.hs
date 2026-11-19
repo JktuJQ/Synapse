@@ -21,6 +21,7 @@ module Synapse.Autograd.Tensor.Ops.Pullback.Window
 
 import GHC.TypeNats (KnownNat)
 
+import Synapse.Tensor.Ops.Constraints (FractionalDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Raw.Window
     ( combine
     , convolutionWindow
@@ -33,26 +34,17 @@ import Synapse.Tensor.Ops.Raw.Window
     , poolWindow
     , transposeConvolve
     )
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
+import Synapse.Tensor.Representation (Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Dimensions (Shape (shape, shapeRank))
 
 import qualified Data.Array.Accelerate as A
 
-import qualified Synapse.Tensor.Ops.Elementwise as E
 import qualified Synapse.Tensor.Ops.Raw.Window as Raw
 
 -- | Sum the seed's overlapping patches into the original input shape.
 extractPatches
     :: forall kernel stride padding dilation input out a
-     . ( Shape input
-       , Shape kernel
-       , Shape stride
-       , Shape padding
-       , Shape dilation
-       , Shape out
-       , DType a
-       , Num (TensorElement a)
-       )
+     . (Shape input, Shape kernel, Shape stride, Shape padding, Shape dilation, Shape out, NumDType a)
     => Tensor input a
     -> Tensor out a
     -> Tensor out a
@@ -62,15 +54,7 @@ extractPatches _ _ = Raw.combinePatches @input @kernel @stride @padding @dilatio
 -- | Extract output seed windows in the original patch layout.
 combinePatches
     :: forall kernel stride padding dilation patches out a
-     . ( Shape patches
-       , Shape kernel
-       , Shape stride
-       , Shape padding
-       , Shape dilation
-       , Shape out
-       , DType a
-       , Num (TensorElement a)
-       )
+     . (Shape patches, Shape kernel, Shape stride, Shape padding, Shape dilation, Shape out, NumDType a)
     => Tensor patches a
     -> Tensor out a
     -> Tensor out a
@@ -89,8 +73,7 @@ convolution
        , Shape dilation
        , KnownNat groups
        , Shape out
-       , DType a
-       , Num (TensorElement a)
+       , NumDType a
        )
     => Tensor input a
     -> Tensor kernel a
@@ -119,8 +102,7 @@ convTranspose
        , Shape dilation
        , KnownNat groups
        , Shape out
-       , DType a
-       , Num (TensorElement a)
+       , NumDType a
        )
     => Tensor input a
     -> Tensor kernel a
@@ -142,16 +124,7 @@ convTranspose (Tensor input) (Tensor weights) _ (Tensor seed) =
 -- | Send each output seed to its selected input maximum, summing overlapping contributions.
 maxPool
     :: forall kernel stride padding dilation input out a
-     . ( Shape input
-       , Shape kernel
-       , Shape stride
-       , Shape padding
-       , Shape dilation
-       , Shape out
-       , DType a
-       , Num (TensorElement a)
-       , E.Ord (TensorElement a)
-       )
+     . (Shape input, Shape kernel, Shape stride, Shape padding, Shape dilation, Shape out, NumDType a, OrdDType a)
     => Tensor input a
     -> Tensor out a
     -> Tensor out a
@@ -169,14 +142,7 @@ maxPool (Tensor input) _ (Tensor seed) = Tensor $ A.reshape (A.shape input) $ co
 -- | Distribute each seed over its window using the forward divisor.
 avgPool
     :: forall kernel stride padding input out a
-     . ( Shape input
-       , Shape kernel
-       , Shape stride
-       , Shape padding
-       , Shape out
-       , DType a
-       , Fractional (TensorElement a)
-       )
+     . (Shape input, Shape kernel, Shape stride, Shape padding, Shape out, FractionalDType a)
     => Bool
     -> Tensor input a
     -> Tensor out a

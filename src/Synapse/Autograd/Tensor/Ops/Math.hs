@@ -11,15 +11,14 @@ module Synapse.Autograd.Tensor.Ops.Math () where
 import Synapse.Autograd.Representation (Context, zero)
 import Synapse.Autograd.Tensor.Ops (binaryVJP, unaryVJP)
 import Synapse.Autograd.Tensor.Representation (Tensor (..), TensorElement (..))
-import Synapse.Tensor.Representation (DType)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, FractionalDType, NumDType)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 
 import qualified Numeric.Backprop.Explicit as BPE
 
 import qualified Synapse.Autograd.Tensor.Ops.Pullback.Math as Pullback
-import qualified Synapse.Tensor.Representation as T
 
-instance (Context s, Shape sh, DType a, Num a, Num (T.TensorElement a)) => Num (Tensor s sh a) where
+instance (Context s, Shape sh, NumDType a) => Num (Tensor s sh a) where
     (+) (Tensor x) (Tensor y) = Tensor $ binaryVJP (+) Pullback.add x y
     (-) (Tensor x) (Tensor y) = Tensor $ binaryVJP (-) Pullback.subtract x y
     (*) (Tensor x) (Tensor y) = Tensor $ binaryVJP (*) Pullback.multiply x y
@@ -28,14 +27,14 @@ instance (Context s, Shape sh, DType a, Num a, Num (T.TensorElement a)) => Num (
     signum (Tensor x) = Tensor $ unaryVJP signum (Pullback.signum zero) x
     fromInteger = Tensor . BPE.auto . fromInteger
 instance
-    (Context s, Shape sh, DType a, Fractional a, Fractional (T.TensorElement a))
+    (Context s, Shape sh, FractionalDType a)
     => Fractional (Tensor s sh a)
     where
     (/) (Tensor x) (Tensor y) = Tensor $ binaryVJP (/) Pullback.divide x y
     recip (Tensor x) = Tensor $ unaryVJP recip Pullback.recip x
     fromRational = Tensor . BPE.auto . fromRational
 instance
-    (Context s, Shape sh, DType a, Floating a, Floating (T.TensorElement a))
+    (Context s, Shape sh, FloatingDType a)
     => Floating (Tensor s sh a)
     where
     pi = Tensor $ BPE.auto pi
@@ -56,7 +55,7 @@ instance
     atanh (Tensor x) = Tensor $ unaryVJP atanh Pullback.atanh x
     (**) (Tensor x) (Tensor y) = Tensor $ binaryVJP (**) Pullback.power x y
     logBase x y = log y / log x
-instance (Context s, Num (T.TensorElement a)) => Num (TensorElement s a) where
+instance (Context s, NumDType a) => Num (TensorElement s a) where
     (+) (TensorElement x) (TensorElement y) = TensorElement $ binaryVJP (+) Pullback.add x y
     (-) (TensorElement x) (TensorElement y) = TensorElement $ binaryVJP (-) Pullback.subtract x y
     (*) (TensorElement x) (TensorElement y) = TensorElement $ binaryVJP (*) Pullback.multiply x y
@@ -64,11 +63,11 @@ instance (Context s, Num (T.TensorElement a)) => Num (TensorElement s a) where
     abs (TensorElement x) = TensorElement $ unaryVJP abs Pullback.abs x
     signum (TensorElement x) = TensorElement $ unaryVJP signum (Pullback.signum zero) x
     fromInteger = TensorElement . BPE.auto . fromInteger
-instance (Context s, Fractional (T.TensorElement a)) => Fractional (TensorElement s a) where
+instance (Context s, FractionalDType a) => Fractional (TensorElement s a) where
     (/) (TensorElement x) (TensorElement y) = TensorElement $ binaryVJP (/) Pullback.divide x y
     recip (TensorElement x) = TensorElement $ unaryVJP recip Pullback.recip x
     fromRational = TensorElement . BPE.auto . fromRational
-instance (Context s, Floating (T.TensorElement a)) => Floating (TensorElement s a) where
+instance (Context s, FloatingDType a) => Floating (TensorElement s a) where
     pi = TensorElement $ BPE.auto pi
     exp (TensorElement x) = TensorElement $ unaryVJP exp Pullback.exp x
     log (TensorElement x) = TensorElement $ unaryVJP log Pullback.log x

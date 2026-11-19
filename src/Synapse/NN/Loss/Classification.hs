@@ -23,13 +23,14 @@ import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.NN.Activation (softplus)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps, withVJP)
 import Synapse.Tensor.Representation (Tensor, TensorElement, TensorLike)
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduceNonEmpty, ReduceShape, RemoveAxis)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 
 import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import qualified Synapse.Tensor.Ops.Raw.Index as Raw
 import qualified Synapse.Tensor.Ops.Reduction as R
 
@@ -48,12 +49,7 @@ Prefer 'binaryCrossEntropyWithLogits' when the model returns unnormalized scores
 -}
 binaryCrossEntropy
     :: forall {t :: TensorLike} sh out_sh a
-     . ( TensorOps t a
-       , Shape sh
-       , RealFloat a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
-       )
+     . (TensorOps t a, Shape sh, RealFloat a, FloatingDType a, OrdDType a)
     => (t sh a -> t out_sh a)
     -> t sh a
     -> t sh a
@@ -119,7 +115,7 @@ negativeLogLikelihood
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
-       , Num (TensorElement a)
+       , NumDType a
        , Num (t sh a)
        )
     => (t (ReduceShape '[axis] sh) a -> t out_sh a)
@@ -144,9 +140,8 @@ crossEntropy
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        , Num (t sh a)
        )
     => (t (ReduceShape '[axis] sh) a -> t out_sh a)
@@ -201,9 +196,8 @@ unsafeCrossEntropy
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        , Num (t (RemoveAxis axis sh) a)
        )
     => (t (RemoveAxis axis sh) a -> t out_sh a)
@@ -245,8 +239,8 @@ unsafeCrossEntropySmoothed
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
        , RealFloat a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        , Fractional (t (RemoveAxis axis sh) a)
        )
     => (t (RemoveAxis axis sh) a -> t out_sh a)

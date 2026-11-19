@@ -31,8 +31,9 @@ module Synapse.Tensor.Ops.Construction
     , scalar
     ) where
 
+import Synapse.Tensor.Ops.Constraints (FloatingDType, FractionalDType, NumDType)
+import Synapse.Tensor.Ops.Conversion (FromIntegral)
 import Synapse.Tensor.Ops.Definition (TensorOps (Element, fromElement, fromTensor))
-import Synapse.Tensor.Ops.Elementwise (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Construction (element)
 import qualified Synapse.Tensor.Ops.Raw.Construction as Raw
 import Synapse.Tensor.Representation (TensorElement, TensorIndex, TensorLike)
@@ -79,14 +80,14 @@ ones = full @sh 1
 -- | Create a matrix with ones on the main diagonal and zeros elsewhere.
 eye
     :: forall {t :: TensorLike} rows cols a
-     . (TensorOps t a, Shape '[rows, cols], Num (TensorElement a))
+     . (TensorOps t a, Shape '[rows, cols], NumDType a)
     => t '[rows, cols] a
 eye = fromTensor Raw.eye
 
 -- | Create a square identity matrix.
 identity
     :: forall {t :: TensorLike} n a
-     . (TensorOps t a, Shape '[n, n], Num (TensorElement a))
+     . (TensorOps t a, Shape '[n, n], NumDType a)
     => t '[n, n] a
 identity = eye @n @n
 
@@ -118,7 +119,7 @@ onesLike _ = ones @sh
 -- | Create a vector with evenly spaced values @start, start + step, ...@.
 arange
     :: forall {t :: TensorLike} n a
-     . (TensorOps t a, Shape '[n], Num (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a))
+     . (TensorOps t a, Shape '[n], NumDType a, FromIntegral (TensorElement Int) (TensorElement a))
     => a
     -> a
     -> t '[n] a
@@ -127,12 +128,7 @@ arange x y = fromTensor $ Raw.arange x y
 -- | Create a vector with @n@ evenly spaced values from @start@ to @end@.
 linspace
     :: forall {t :: TensorLike} n a
-     . ( TensorOps t a
-       , Shape '[n]
-       , Fractional a
-       , Fractional (TensorElement a)
-       , FromIntegral (TensorElement Int) (TensorElement a)
-       )
+     . (TensorOps t a, Shape '[n], FractionalDType a, FromIntegral (TensorElement Int) (TensorElement a))
     => a
     -> a
     -> t '[n] a
@@ -141,12 +137,7 @@ linspace x y = fromTensor $ Raw.linspace x y
 -- | Exponentiate 'linspace' using the supplied base.
 logspace
     :: forall {t :: TensorLike} n a
-     . ( TensorOps t a
-       , Shape '[n]
-       , Floating a
-       , Floating (TensorElement a)
-       , FromIntegral (TensorElement Int) (TensorElement a)
-       )
+     . (TensorOps t a, Shape '[n], FloatingDType a, FromIntegral (TensorElement Int) (TensorElement a))
     => a
     -> a
     -> a

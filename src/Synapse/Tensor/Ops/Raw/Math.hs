@@ -39,7 +39,7 @@ import qualified Prelude as P
 
 -- | Sum pairwise products of equally sized vectors.
 dot
-    :: (Shape '[n], DType a, Num (TensorElement a))
+    :: (Shape '[n], DType a, Num (TensorElement a), P.Num a)
     => Tensor '[n] a
     -> Tensor '[n] a
     -> Tensor '[] a
@@ -48,7 +48,7 @@ dot x y = Reduction.sum (zipWith (*) x y)
 -- | Multiply vectors or matrices, broadcasting leading batch dimensions.
 matmul
     :: forall lhs rhs a
-     . (DType a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs))
+     . (DType a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs), P.Num a)
     => Tensor lhs a
     -> Tensor rhs a
     -> Tensor (MatmulShape lhs rhs) a
@@ -164,7 +164,7 @@ multiply x y = unTensorElement (TensorElement x * TensorElement y)
 -- | Sum one generated row of terms per output element, including empty contractions.
 contract
     :: forall a
-     . (DType a, Num (TensorElement a))
+     . (DType a, Num (TensorElement a), P.Num a)
     => Int
     -> Int
     -> (A.Exp Int -> A.Exp Int -> A.Exp a)
@@ -183,7 +183,7 @@ contract count width term
 
 -- | Contract matrix products while mapping shared batch positions back to each operand.
 matrixProduct
-    :: (DType a, Num (TensorElement a))
+    :: (DType a, Num (TensorElement a), P.Num a)
     => [Int]
     -> [Int]
     -> [Int]

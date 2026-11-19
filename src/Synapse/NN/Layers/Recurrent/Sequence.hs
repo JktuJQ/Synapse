@@ -17,11 +17,12 @@ import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, natVal)
 import qualified Synapse.Autograd.Execution as AG
+import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Raw.Construction (full)
-import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement, TensorLike)
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorLike)
 import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 
@@ -121,16 +122,7 @@ readHistory i history = Tensor $
 -- Only differentiated execution saves states; ordinary execution uses empty histories.
 traverseSequence
     :: forall time batch input hidden gates memory a
-     . ( KnownNat time
-       , KnownNat batch
-       , KnownNat input
-       , KnownNat hidden
-       , KnownNat gates
-       , KnownNat memory
-       , DType a
-       , Num a
-       , Num (TensorElement a)
-       )
+     . (KnownNat time, KnownNat batch, KnownNat input, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
     => Bool
     -> ( Weights Tensor input hidden gates a
          -> Tensor '[batch, input] a
@@ -180,16 +172,7 @@ traverseSequence retainHistory step (parameters, (inputs, initial)) =
 -- Recompute each cell's intermediates from its saved input state.
 backward
     :: forall time batch input hidden gates memory a
-     . ( KnownNat time
-       , KnownNat batch
-       , KnownNat input
-       , KnownNat hidden
-       , KnownNat gates
-       , KnownNat memory
-       , DType a
-       , Num a
-       , Num (TensorElement a)
-       )
+     . (KnownNat time, KnownNat batch, KnownNat input, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
     => ( ( Weights Tensor input hidden gates a
          , (Tensor '[batch, input] a, Memory Tensor batch hidden memory a)
          )
@@ -254,9 +237,8 @@ sequenceMemory
        , KnownNat gates
        , KnownNat memory
        , TensorOps t a
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        )
     => ( forall u
           . ( TensorOps u a
@@ -293,9 +275,8 @@ sequenceHidden
        , KnownNat hidden
        , KnownNat gates
        , TensorOps t a
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        )
     => ( forall u
           . ( TensorOps u a

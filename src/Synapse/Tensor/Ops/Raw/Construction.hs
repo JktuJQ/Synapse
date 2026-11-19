@@ -20,14 +20,15 @@ module Synapse.Tensor.Ops.Raw.Construction
 
 import qualified Data.Array.Accelerate as A
 import Data.Proxy (Proxy (..))
-import Synapse.Tensor.Ops.Elementwise (FromIntegral)
-import qualified Synapse.Tensor.Ops.Elementwise as E (fromIntegral)
+import Synapse.Tensor.Ops.Conversion (FromIntegral)
+import qualified Synapse.Tensor.Ops.Conversion as E (fromIntegral)
 import Synapse.Tensor.Ops.Raw.Elementwise (map)
 import Synapse.Tensor.Ops.Raw.Index (coordinate)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorIndex (..))
 import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Prelude hiding (map)
+import qualified Prelude as P
 
 -- | Generate each element from its multidimensional index.
 fromGen
@@ -51,7 +52,7 @@ full x = Tensor $ A.fill (A.constant (backendShape (Proxy @sh))) (A.constant x)
 -- | Compare row and column coordinates to construct a diagonal matrix.
 eye
     :: forall rows cols a
-     . (Shape '[rows, cols], DType a, Num (TensorElement a))
+     . (Shape '[rows, cols], DType a, Num (TensorElement a), P.Num a)
     => Tensor '[rows, cols] a
 eye =
     fromGen @'[rows, cols] $ \ix ->
@@ -63,7 +64,7 @@ eye =
 -- | Construct an arithmetic progression from coordinate expressions.
 arange
     :: forall n a
-     . (Shape '[n], DType a, Num (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a))
+     . (Shape '[n], DType a, Num (TensorElement a), FromIntegral (TensorElement Int) (TensorElement a), P.Num a)
     => a
     -> a
     -> Tensor '[n] a

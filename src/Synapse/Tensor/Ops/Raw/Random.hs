@@ -34,7 +34,7 @@ import GHC.Generics (Generic)
 import System.Random (RandomGen, genWord64)
 
 import Synapse.Tensor.Data (fromList)
-import Synapse.Tensor.Ops.Elementwise (FromIntegral)
+import Synapse.Tensor.Ops.Conversion (FromIntegral)
 import Synapse.Tensor.Ops.Raw.Construction (element)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Backend (backendShape)
@@ -44,7 +44,7 @@ import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 import qualified Data.Array.Accelerate as A
 import qualified Data.Array.Accelerate.Data.Bits as B
 
-import qualified Synapse.Tensor.Ops.Elementwise as T (fromIntegral)
+import qualified Synapse.Tensor.Ops.Conversion as T (fromIntegral)
 
 {- | Explicit state for random tensor computations.
 Each draw produces samples and an updated state for the next draw.

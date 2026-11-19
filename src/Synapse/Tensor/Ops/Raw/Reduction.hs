@@ -39,13 +39,15 @@ module Synapse.Tensor.Ops.Raw.Reduction
 
       -- * Reduction geometry
     , reductionSize
+    , expandReduced
     ) where
 
 import qualified Data.Array.Accelerate as A
 import Data.List (foldl', partition)
 import Data.Proxy (Proxy (..))
-import Synapse.Tensor.Ops.Elementwise (Ord (..), select, (&&), (||))
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import Synapse.Tensor.Ops.Logic (Ord (..), select, (&&), (||))
+import qualified Synapse.Tensor.Ops.Logic as E
+import qualified Synapse.Tensor.Ops.Numeric as E
 import Synapse.Tensor.Ops.Raw.Construction (element)
 import Synapse.Tensor.Ops.Raw.Elementwise (map, zipWith)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
@@ -115,7 +117,7 @@ reduceAxesWith reduce input
 
 -- | Sum elements.
 sum
-    :: (Shape sh, DType a, Num (TensorElement a))
+    :: (Shape sh, DType a, Num (TensorElement a), P.Num a)
     => Tensor sh a
     -> Tensor '[] a
 sum (Tensor input) = Tensor (A.foldAll (elementOp (+)) (unTensorElement 0) input)
@@ -150,7 +152,7 @@ expandReduced (Tensor input) = Tensor (A.backpermute (A.constant (backendShape (
 
 -- | Choose an extremum together with its earliest position, including the first NaN.
 choosePosition
-    :: (DType a, Ord (TensorElement a))
+    :: (DType a, Ord (TensorElement a), P.Ord a)
     => (TensorElement a -> TensorElement a -> TensorElement Bool)
     -> A.Exp (Int, a)
     -> A.Exp (Int, a)
@@ -171,7 +173,7 @@ choosePosition better left right = unTensorElement (select rightWins y x)
 -- | Reduce one axis while retaining the position rather than the extremum value.
 argReduce
     :: forall axis sh a
-     . (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], DType a, Ord (TensorElement a))
+     . (Shape sh, Shape (ReduceShape '[axis] sh), Axes '[axis], DType a, Ord (TensorElement a), P.Ord a)
     => (TensorElement a -> TensorElement a -> TensorElement Bool)
     -> Tensor sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -186,7 +188,7 @@ argReduce better input
 -- | Sum selected axes.
 sumAxes
     :: forall xs sh a
-     . (Shape sh, Shape (ReduceShape xs sh), Axes xs, DType a, Num (TensorElement a))
+     . (Shape sh, Shape (ReduceShape xs sh), Axes xs, DType a, Num (TensorElement a), P.Num a)
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
 sumAxes input
@@ -219,7 +221,7 @@ meanAxes = map (/ element (fromIntegral (reductionSize @xs @sh) :: a)) . sumAxes
 
 -- | Sum the absolute values of all elements.
 normL1
-    :: (Shape sh, DType a, Num (TensorElement a))
+    :: (Shape sh, DType a, Num (TensorElement a), P.Num a)
     => Tensor sh a
     -> Tensor '[] a
 normL1 = sum . map abs
@@ -227,7 +229,15 @@ normL1 = sum . map abs
 -- | Compute the square root of the sum of squared elements.
 normL2
     :: forall sh a
-     . (Shape sh, DType a, Floating (TensorElement a), Ord (TensorElement a), E.RealFloat (TensorElement a))
+     . ( Shape sh
+       , DType a
+       , Floating (TensorElement a)
+       , Ord (TensorElement a)
+       , E.RealFloat (TensorElement a)
+       , P.Floating a
+       , P.Ord a
+       , P.RealFloat a
+       )
     => Tensor sh a
     -> Tensor '[] a
 normL2 input =
@@ -241,7 +251,7 @@ normL2 input =
 -- | Minimum of all elements of a statically nonempty tensor.
 minimum
     :: forall sh a
-     . (DType a, Ord (TensorElement a), Shape sh, NonEmpty sh)
+     . (DType a, Ord (TensorElement a), Shape sh, NonEmpty sh, P.Ord a)
     => Tensor sh a
     -> Tensor '[] a
 minimum (Tensor input) = Tensor (A.fold1All (elementOp min) input)
@@ -249,7 +259,14 @@ minimum (Tensor input) = Tensor (A.fold1All (elementOp min) input)
 -- | Minimum over selected axes, removing them from the output shape.
 minimumAxes
     :: forall xs sh a
-     . (DType a, Ord (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh)
+     . ( DType a
+       , Ord (TensorElement a)
+       , Shape sh
+       , Shape (ReduceShape xs sh)
+       , Axes xs
+       , CanReduceNonEmpty xs sh
+       , P.Ord a
+       )
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
 minimumAxes = reduceAxesWith @xs (A.fold1 (elementOp min))
@@ -263,6 +280,7 @@ argmin
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
+       , P.Ord a
        )
     => Tensor sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -271,7 +289,7 @@ argmin = argReduce @axis (E.<)
 -- | Maximum of all elements of a statically nonempty tensor.
 maximum
     :: forall sh a
-     . (DType a, Ord (TensorElement a), Shape sh, NonEmpty sh)
+     . (DType a, Ord (TensorElement a), Shape sh, NonEmpty sh, P.Ord a)
     => Tensor sh a
     -> Tensor '[] a
 maximum (Tensor input) = Tensor (A.fold1All (elementOp max) input)
@@ -279,7 +297,14 @@ maximum (Tensor input) = Tensor (A.fold1All (elementOp max) input)
 -- | Maximum over selected axes, removing them from the output shape.
 maximumAxes
     :: forall xs sh a
-     . (DType a, Ord (TensorElement a), Shape sh, Shape (ReduceShape xs sh), Axes xs, CanReduceNonEmpty xs sh)
+     . ( DType a
+       , Ord (TensorElement a)
+       , Shape sh
+       , Shape (ReduceShape xs sh)
+       , Axes xs
+       , CanReduceNonEmpty xs sh
+       , P.Ord a
+       )
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
 maximumAxes = reduceAxesWith @xs (A.fold1 (elementOp max))
@@ -293,6 +318,7 @@ argmax
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
+       , P.Ord a
        )
     => Tensor sh a
     -> Tensor (ReduceShape '[axis] sh) Int
@@ -369,7 +395,7 @@ logSumExpAxes input
         Tensor (A.fill (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (A.constant (negate (1 / 0) :: a)))
     | null (axes @xs) =
         Tensor (A.reshape (A.constant (backendShape (Proxy @(ReduceShape xs sh)))) (unTensor input))
-    | otherwise = select (E.isInfinite peak) peak (zipWith (+) peak (map log total))
+    | otherwise = select (map E.isInfinite peak) peak (zipWith (+) peak (map log total))
   where
     peak = reduceAxesWith @xs (A.fold1 (elementOp max)) input
     shifted = zipWith (-) input (expandReduced @xs @sh peak)
@@ -385,6 +411,8 @@ softmax
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
+       , P.Floating a
+       , P.Ord a
        )
     => Tensor sh a
     -> Tensor sh a
@@ -403,6 +431,8 @@ logSoftmax
        , Shape (ReduceShape '[axis] sh)
        , Axes '[axis]
        , CanReduceNonEmpty '[axis] sh
+       , P.Floating a
+       , P.Ord a
        )
     => Tensor sh a
     -> Tensor sh a

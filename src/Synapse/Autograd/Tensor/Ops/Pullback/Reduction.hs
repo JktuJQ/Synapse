@@ -32,13 +32,14 @@ import Data.Proxy (Proxy (..))
 import Prelude hiding (sum)
 
 import Synapse.Autograd.Tensor.Ops.Pullback.Shape (axesOf, expandReduced, shapeOf, singletonAxis)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, FractionalDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Raw.Construction (element)
-import Synapse.Tensor.Representation (DType, Tensor, TensorElement)
+import Synapse.Tensor.Representation (DType, Tensor)
 import Synapse.Tensor.Shapes.Axes (Axes, ReduceShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 
-import qualified Synapse.Tensor.Ops.Elementwise as E
+import qualified Synapse.Tensor.Ops.Logic as E
 import qualified Synapse.Tensor.Ops.Raw.Elementwise as H
 import qualified Synapse.Tensor.Ops.Raw.Reduction as Raw
 
@@ -71,7 +72,7 @@ sumAxes input _ = expandReduced (axesOf (Proxy @xs)) input
 -- | Divide each repeated output seed by the number of reduced elements.
 mean
     :: forall sh a
-     . (Shape sh, DType a, Num a, Fractional (TensorElement a))
+     . (Shape sh, FractionalDType a)
     => Tensor sh a
     -> Tensor '[] a
     -> Tensor '[] a
@@ -83,7 +84,7 @@ mean input output seed =
 -- | Divide each repeated seed by its axis-wise reduction region size.
 meanAxes
     :: forall xs sh a
-     . (Axes xs, Shape sh, Shape (ReduceShape xs sh), DType a, Num a, Fractional (TensorElement a))
+     . (Axes xs, Shape sh, Shape (ReduceShape xs sh), FractionalDType a)
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
     -> Tensor (ReduceShape xs sh) a
@@ -94,7 +95,7 @@ meanAxes input output seed =
 
 -- | Choose zero at the origin and otherwise multiply by the element's sign.
 normL1
-    :: (Shape sh, DType a, Num a, Num (TensorElement a))
+    :: (Shape sh, NumDType a)
     => Tensor sh a
     -> Tensor '[] a
     -> Tensor '[] a
@@ -103,7 +104,7 @@ normL1 input _ seed = signum input * expandReduced (allAxes input) input seed
 
 -- | Normalize the input direction, choosing a zero cotangent at the origin.
 normL2
-    :: (Shape sh, DType a, Fractional a, Fractional (TensorElement a), E.Ord (TensorElement a))
+    :: (Shape sh, FractionalDType a, OrdDType a)
     => Tensor sh a
     -> Tensor '[] a
     -> Tensor '[] a
@@ -115,7 +116,7 @@ normL2 input output seed =
 
 -- | Divide an extremum's seed uniformly among all input positions tied at its value.
 extremum
-    :: (Shape sh, DType a, Fractional a, Fractional (TensorElement a), E.Ord (TensorElement a))
+    :: (Shape sh, FractionalDType a, OrdDType a)
     => Tensor sh a
     -> Tensor '[] a
     -> Tensor '[] a
@@ -129,14 +130,7 @@ extremum input output seed =
 -- | Share each extremum seed among ties within its selected reduction region.
 extremumAxes
     :: forall xs sh a
-     . ( Axes xs
-       , Shape sh
-       , Shape (ReduceShape xs sh)
-       , DType a
-       , Fractional a
-       , Fractional (TensorElement a)
-       , E.Ord (TensorElement a)
-       )
+     . (Axes xs, Shape sh, Shape (ReduceShape xs sh), FractionalDType a, OrdDType a)
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
     -> Tensor (ReduceShape xs sh) a
@@ -150,7 +144,7 @@ extremumAxes input output seed =
 -- | Subtract the output-weighted seed sum along the normalization axis.
 softmax
     :: forall axis sh a proxy
-     . (Axes '[axis], Shape sh, Shape (ReduceShape '[axis] sh), DType a, Num a, Num (TensorElement a))
+     . (Axes '[axis], Shape sh, Shape (ReduceShape '[axis] sh), NumDType a)
     => proxy axis
     -> Tensor sh a
     -> Tensor sh a
@@ -162,13 +156,7 @@ softmax selected input output seed =
 -- | Subtract the softmax-weighted seed sum along the normalization axis.
 logSoftmax
     :: forall axis sh a proxy
-     . ( Axes '[axis]
-       , Shape sh
-       , Shape (ReduceShape '[axis] sh)
-       , DType a
-       , Floating a
-       , Floating (TensorElement a)
-       )
+     . (Axes '[axis], Shape sh, Shape (ReduceShape '[axis] sh), FloatingDType a)
     => proxy axis
     -> Tensor sh a
     -> Tensor sh a
@@ -179,7 +167,7 @@ logSoftmax selected input output seed =
 
 -- | Weight a repeated scalar seed by the corresponding normalized exponential.
 logSumExp
-    :: (Shape sh, DType a, Floating a, Floating (TensorElement a))
+    :: (Shape sh, FloatingDType a)
     => Tensor sh a
     -> Tensor '[] a
     -> Tensor '[] a
@@ -191,7 +179,7 @@ logSumExp input output seed =
 -- | Weight repeated seeds by normalized exponentials within each reduction region.
 logSumExpAxes
     :: forall xs sh a
-     . (Axes xs, Shape sh, Shape (ReduceShape xs sh), DType a, Floating a, Floating (TensorElement a))
+     . (Axes xs, Shape sh, Shape (ReduceShape xs sh), FloatingDType a)
     => Tensor sh a
     -> Tensor (ReduceShape xs sh) a
     -> Tensor (ReduceShape xs sh) a

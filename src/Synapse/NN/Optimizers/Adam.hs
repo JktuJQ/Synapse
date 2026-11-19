@@ -13,6 +13,7 @@ module Synapse.NN.Optimizers.Adam (Adam (..), AdamW (..)) where
 import Control.Monad.Trans.State.Strict (get, put)
 
 import Synapse.NN.Optimizers.Optimizer (Optimizer (..))
+import Synapse.Tensor.Ops.Constraints (FloatingDType)
 import Synapse.Tensor.Structure (FieldConstraints, TensorStructure)
 
 import qualified Synapse.Tensor.Structure as Structure
@@ -29,12 +30,7 @@ class Floating a => AdamParameter a where
         -> a
 
 instance
-    ( T.Shape sh
-    , T.DType a
-    , Floating a
-    , Floating (T.TensorElement a)
-    , T.FromIntegral (T.Tensor '[] Int) (T.Tensor '[] a)
-    )
+    (T.Shape sh, FloatingDType a, T.FromIntegral (T.Tensor '[] Int) (T.Tensor '[] a))
     => AdamParameter (T.Tensor sh a)
     where
     correctMoment beta count moment =

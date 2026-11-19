@@ -25,3 +25,12 @@ reverseRange = T.slice @'[ 'T.RangeReverse 1 7 2] (T.zeros @'[8])
 
 scalar :: T.TensorElement Bool
 scalar = T.index @'[] (T.scalar (T.element True))
+
+booleanRow :: T.Tensor '[3] Bool
+booleanRow = T.slice @'[ 'T.At 1, 'T.All] (T.full @'[2, 3] True)
+
+booleanBroadcast :: T.Tensor '[2, 3] Bool
+booleanBroadcast = T.broadcast (T.full @'[3] True)
+
+numericSum :: T.NumDType a => T.Tensor '[3] a -> T.Tensor '[] a
+numericSum = T.sum

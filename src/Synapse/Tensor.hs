@@ -134,8 +134,6 @@ import Synapse.Tensor.Data
 import Synapse.Tensor.Ops
 import Synapse.Tensor.Representation
     ( DType
-    , Float32
-    , Float64
     , Tensor
     , TensorData
     , TensorElement

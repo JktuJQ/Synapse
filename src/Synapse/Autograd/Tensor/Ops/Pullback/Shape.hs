@@ -33,6 +33,7 @@ module Synapse.Autograd.Tensor.Ops.Pullback.Shape
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
+import qualified Synapse.Tensor.Representation as T
 import Prelude hiding (concat)
 
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
@@ -41,8 +42,6 @@ import Synapse.Tensor.Shapes.Backend (backendCoordinates, strides)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
 
 import qualified Data.Array.Accelerate as A
-
-import qualified Synapse.Tensor.Representation as T
 
 -- | Turn a selected axis into a singleton axis list.
 singletonAxis

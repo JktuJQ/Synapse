@@ -21,6 +21,7 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (Div, KnownNat, Nat, natVal, type (*), type (<=))
 import Synapse.NN.Layers.Dense (Dense, dense)
 import qualified Synapse.Tensor as T
+import Synapse.Tensor.Ops.Constraints (FloatingDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (withCachedVJP)
 import Synapse.Tensor.Representation (TensorLike)
 import Synapse.Tensor.Shapes.Axes (CanReduceNonEmpty)
@@ -103,8 +104,8 @@ maskedSoftmax
        , CanReduceNonEmpty '[3] '[batch, heads, queries, keys]
        , T.TensorOps t a
        , RealFloat a
-       , Floating (T.TensorElement a)
-       , T.Ord (T.TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        )
     => T.Tensor '[batch, heads, queries, keys] Bool
     -> t '[batch, heads, queries, keys] a
@@ -149,8 +150,8 @@ attention
        , 1 <= depth
        , T.TensorOps t a
        , RealFloat a
-       , Floating (T.TensorElement a)
-       , T.Ord (T.TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        , Fractional (t '[batch, heads, queries, keys] a)
        )
     => Maybe (T.Tensor '[batch, heads, queries, keys] Bool)
@@ -216,8 +217,8 @@ multiHeadAttention
        , features ~ (heads * Div features heads)
        , T.TensorOps t a
        , RealFloat a
-       , Floating (T.TensorElement a)
-       , T.Ord (T.TensorElement a)
+       , FloatingDType a
+       , OrdDType a
        , Num (t '[batch, queries, features] a)
        , Num (t '[batch, keys, features] a)
        , Fractional (t '[batch, heads, queries, keys] a)

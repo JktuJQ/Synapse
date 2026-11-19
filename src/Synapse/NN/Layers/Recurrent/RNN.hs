@@ -14,11 +14,11 @@ import Control.Monad.Trans.State.Strict (State, state)
 import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat)
 import Synapse.NN.Layers.Recurrent.Sequence (sequenceHidden)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
-import qualified Synapse.Tensor.Ops.Elementwise as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
-import Synapse.Tensor.Representation (TensorElement, TensorLike)
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as T
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
@@ -41,13 +41,7 @@ instance TensorStructure (RNN input hidden T.Tensor a) where
 -- | Apply @h' = tanh (x * W_input + b_input + h * W_hidden + b_hidden)@.
 rnnCell
     :: forall input hidden batch t a
-     . ( KnownNat input
-       , KnownNat hidden
-       , KnownNat batch
-       , TensorOps t a
-       , Num (TensorElement a)
-       , Floating (t '[batch, hidden] a)
-       )
+     . (KnownNat input, KnownNat hidden, KnownNat batch, TensorOps t a, NumDType a, Floating (t '[batch, hidden] a))
     => RNN input hidden t a
     -> t '[batch, input] a
     -> State (t '[batch, hidden] a) (t '[batch, hidden] a)
@@ -69,15 +63,7 @@ context, or supply a new state for an independent sequence.
 -}
 rnn
     :: forall input hidden batch time t a
-     . ( KnownNat input
-       , KnownNat hidden
-       , KnownNat batch
-       , KnownNat time
-       , TensorOps t a
-       , Floating a
-       , Floating (TensorElement a)
-       , E.Ord (TensorElement a)
-       )
+     . (KnownNat input, KnownNat hidden, KnownNat batch, KnownNat time, TensorOps t a, FloatingDType a, OrdDType a)
     => RNN input hidden t a
     -> t '[time, batch, input] a
     -> State (t '[batch, hidden] a) (t '[time, batch, hidden] a)

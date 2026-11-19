@@ -16,10 +16,11 @@ module Synapse.NN.Layers.Normalization.LayerNorm (LayerNorm (..), layerNorm) whe
 import Control.Arrow (Arrow, arr)
 import GHC.Generics (Generic)
 import GHC.TypeLits (Nat)
-import Synapse.NN.Layers.Normalization.Statistics (expand, moments)
+import Synapse.Tensor.Ops.Constraints (FloatingDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import qualified Synapse.Tensor.Ops.Reduction as R
 import qualified Synapse.Tensor.Ops.Shape as T
-import Synapse.Tensor.Representation (TensorElement, TensorLike)
+import Synapse.Tensor.Representation (TensorLike)
 import qualified Synapse.Tensor.Representation as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
@@ -47,8 +48,9 @@ layerNorm
        , xs ~ LayerNormAxes normalized sh
        , TensorOps t a
        , RealFloat a
-       , Floating (TensorElement a)
+       , FloatingDType a
        , Floating (t sh a)
+       , Fractional (t (ReduceShape xs sh) a)
        , Shape sh
        , Shape normalized
        , NonEmpty normalized
@@ -61,6 +63,7 @@ layerNorm
     -> LayerNorm normalized t a
     -> arrow (t sh a) (t sh a)
 layerNorm epsilon parameters = arr $ \input ->
-    let (mean, variance) = moments @xs input
-        normalized = (input - expand @xs input mean) / sqrt (expand @xs input variance + realToFrac epsilon)
+    let mean = R.meanAxes @xs input
+        variance = R.varianceAxes @xs 0 input
+        normalized = (input - T.expandReduced @xs input mean) / sqrt (T.expandReduced @xs input variance + realToFrac epsilon)
      in normalized * T.broadcast (layerNormWeights parameters) + T.broadcast (layerNormBias parameters)

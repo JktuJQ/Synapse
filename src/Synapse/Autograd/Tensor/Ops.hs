@@ -21,10 +21,12 @@ module Synapse.Autograd.Tensor.Ops (unaryVJP, binaryVJP) where
 import Data.Functor.Identity (Identity (..))
 import Data.Proxy (Proxy)
 import Numeric.Backprop.Op (Rec (..))
+import qualified Synapse.Tensor.Representation as T
 
 import Synapse.Autograd.Record (append, split)
 import Synapse.Autograd.Representation (Backpropagatable, Context, add)
 import Synapse.Autograd.Tensor.Representation (Tensor (..), TensorElement (..))
+import Synapse.Tensor.Ops.Constraints (FractionalDType, NumDType)
 import Synapse.Tensor.Ops.Definition
     ( Compatible
     , CompatibleInput
@@ -39,7 +41,6 @@ import Synapse.Tensor.Ops.Definition
     , resultValues
     , zeroInput
     )
-import Synapse.Tensor.Representation (DType)
 import Synapse.Tensor.Structure (TensorProduct, flatten, rebuild)
 import Synapse.Tensor.Structure.Product (ProductValues)
 
@@ -47,7 +48,6 @@ import qualified Data.Array.Accelerate as A
 import qualified Numeric.Backprop.Explicit as BPE
 import qualified Numeric.Backprop.Internal as BPI
 
-import qualified Synapse.Tensor.Representation as T
 import qualified Synapse.Tensor.Structure as T
 
 -- | Existing input variables, accumulation rules, and conversions for one primitive.
@@ -62,7 +62,7 @@ data PrimitiveInputs s input where
 -- | Collect existing tensor variables and their gradient accumulation rules.
 preparePrimitiveInputs
     :: forall s a input
-     . (T.DType a, Num a, Num (T.TensorElement a))
+     . NumDType a
     => InputTree a input
     -> Wrapped (Tensor s) input
     -> PrimitiveInputs s input
@@ -84,7 +84,7 @@ preparePrimitiveInputs (InputPair l r) (a, b) =
 -- | Wrap a single result or project a product into differentiable tensor fields.
 wrapResults
     :: forall s a output
-     . (Context s, T.DType a, Num a, Num (T.TensorElement a))
+     . (Context s, NumDType a)
     => Result a output
     -> BPE.BVar s (ProductValues output)
     -> Wrapped (Tensor s) output
@@ -95,7 +95,7 @@ wrapResults (Product tree) = wrapProduct tree
 Contributions from different projections accumulate before the primitive pullback is evaluated.
 -}
 wrapProduct
-    :: (Context s, T.DType a, Num a, Num (T.TensorElement a))
+    :: (Context s, NumDType a)
     => InputTree a output
     -> BPE.BVar s (ProductValues output)
     -> Wrapped (Tensor s) output
@@ -108,7 +108,7 @@ wrapProduct tree@(InputPair l r) value =
 -- | Register input tensors and attach the cached forward calculation and its pullback.
 registerPrimitive
     :: forall s a input output cache
-     . (Context s, DType a, Fractional a, Fractional (T.TensorElement a), CompatibleInput (Tensor s) a input)
+     . (Context s, FractionalDType a, CompatibleInput (Tensor s) a input)
     => (input -> (output, cache))
     -> (cache -> output -> input)
     -> T.WithTensor (Tensor s) input
@@ -151,7 +151,7 @@ binaryVJP forward backward = BPE.liftOp2 (BPE.AF add) (BPE.AF add) $ BPE.op2 $ \
     let output = forward x y
      in (output, backward x y output)
 
-instance (Context s, DType a, Fractional a, Fractional (T.TensorElement a)) => TensorOps (Tensor s) a where
+instance (Context s, FractionalDType a) => TensorOps (Tensor s) a where
     type Element (Tensor s) = TensorElement s
     type BackwardConstraints (Tensor s) c = c
     fromTensor = Tensor . BPE.auto
