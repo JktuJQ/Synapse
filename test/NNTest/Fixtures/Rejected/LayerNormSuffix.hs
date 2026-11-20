@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module LayerNormSuffix where
 
 import qualified Synapse.NN as NN

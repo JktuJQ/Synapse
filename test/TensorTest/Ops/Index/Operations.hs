@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Index.Operations (tests) where
 
 import qualified Data.Array.Accelerate as A

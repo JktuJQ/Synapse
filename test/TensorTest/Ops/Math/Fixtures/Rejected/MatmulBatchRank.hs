@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module MatmulBatchRank where
 
 import qualified Synapse.Tensor as T

@@ -5,17 +5,8 @@ Train a multilayer neural network to approximate a function on [-1, 1].
 The target combines periodic, quadratic, and piecewise-linear behavior.
 A separate set of points measures how well the model generalizes.
 
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE DeriveGeneric #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE FlexibleInstances #-}
 > {-# LANGUAGE ImpredicativeTypes #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
 > {-# LANGUAGE TypeFamilies #-}
-> {-# LANGUAGE TypeOperators #-}
-> {-# LANGUAGE UndecidableInstances #-}
-> {-# LANGUAGE NoDeepSubsumption #-}
 >
 > module Main (main) where
 >

@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module IntegralGradient where
 
 import qualified Synapse.NN as NN

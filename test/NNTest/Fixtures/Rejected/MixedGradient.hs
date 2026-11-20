@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module MixedGradient where
 
 import qualified Synapse.NN as NN

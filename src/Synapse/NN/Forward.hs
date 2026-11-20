@@ -1,5 +1,4 @@
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- | Stateful forward computations composed with standard arrows.
 module Synapse.NN.Forward

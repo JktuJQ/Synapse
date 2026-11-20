@@ -1,9 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-
 -- | Vector-Jacobian products for arithmetic, elementary functions, and matrix computations.
 module Synapse.Autograd.Tensor.Ops.Pullback.Math
     ( -- * Arithmetic

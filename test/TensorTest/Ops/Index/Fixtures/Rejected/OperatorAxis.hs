@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module OperatorAxis where
 
 import Data.Proxy (Proxy (..))

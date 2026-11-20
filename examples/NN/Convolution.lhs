@@ -6,17 +6,8 @@ The bar can appear at different positions, so the model must recognize its orien
 Use convolutions to extract local features and a residual block to refine them.
 
 > {-# LANGUAGE Arrows #-}
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE DeriveGeneric #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE FlexibleInstances #-}
 > {-# LANGUAGE ImpredicativeTypes #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
 > {-# LANGUAGE TypeFamilies #-}
-> {-# LANGUAGE TypeOperators #-}
-> {-# LANGUAGE UndecidableInstances #-}
-> {-# LANGUAGE NoDeepSubsumption #-}
 >
 > module Main (main) where
 >

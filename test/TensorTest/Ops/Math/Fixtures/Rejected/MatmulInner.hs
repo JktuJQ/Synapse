@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module MatmulInner where
 
 import qualified Synapse.Tensor as T

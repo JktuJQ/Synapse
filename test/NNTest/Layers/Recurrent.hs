@@ -1,8 +1,4 @@
 {-# LANGUAGE Arrows #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module NNTest.Layers.Recurrent (tests) where
 

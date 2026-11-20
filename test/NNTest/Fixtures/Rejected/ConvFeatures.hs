@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module ConvFeatures where
 
 import qualified Synapse.NN.Layers as NN

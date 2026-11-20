@@ -1,6 +1,4 @@
 {-# LANGUAGE Arrows #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 module NNTest.Attention (tests) where
 

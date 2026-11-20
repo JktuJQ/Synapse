@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Conversion (tests) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)

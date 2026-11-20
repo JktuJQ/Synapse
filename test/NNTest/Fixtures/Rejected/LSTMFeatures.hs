@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module LSTMFeatures where
 
 import qualified Synapse.NN as NN

@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Math.Linear (tests) where
 
 import Data.List (transpose)

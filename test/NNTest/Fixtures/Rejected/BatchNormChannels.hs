@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module BatchNormChannels where
 
 import qualified Synapse.NN as NN

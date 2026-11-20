@@ -1,8 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Sums, means, extrema, norms, and exponential normalization.
@@ -43,7 +39,7 @@ module Synapse.Tensor.Ops.Raw.Reduction
     ) where
 
 import qualified Data.Array.Accelerate as A
-import Data.List (foldl', partition)
+import Data.List (partition)
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.Ops.Logic (Ord (..), select, (&&), (||))
 import qualified Synapse.Tensor.Ops.Logic as E

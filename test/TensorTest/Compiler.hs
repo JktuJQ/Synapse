@@ -13,6 +13,7 @@ compile file =
         , "--offline"
         , "--"
         , "ghc"
+        , "-XGHC2024"
         , "-fno-code"
         , "-fforce-recomp"
         , "-v0"

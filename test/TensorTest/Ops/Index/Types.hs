@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Index.Types (tests) where
 
 import qualified Hedgehog as H

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Elementwise (tests) where
 
 import Data.Int (Int64)

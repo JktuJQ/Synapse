@@ -5,10 +5,6 @@ Given five observations from y = x^2 + 2*x + 1,
 fit the coefficients of a quadratic curve y = a*x^2 + b*x + c.
 We start at zero and use gradient descent to minimize the mean squared error between predictions and observations.
 
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE MonoLocalBinds #-}
-> {-# LANGUAGE TypeApplications #-}
->
 > module Main (main) where
 >
 > import Control.Monad (foldM, when)

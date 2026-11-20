@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module AttentionDepth where
 
 import qualified Synapse.NN as NN

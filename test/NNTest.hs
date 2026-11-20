@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest (tests) where
 
 import Control.Exception (ErrorCall, evaluate, try)

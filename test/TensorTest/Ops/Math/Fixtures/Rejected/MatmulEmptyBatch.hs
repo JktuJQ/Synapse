@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module MatmulEmptyBatch where
 
 import qualified Synapse.Tensor as T

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Shapes.Dimensions (tests) where
 
 import qualified Data.Array.Accelerate as A

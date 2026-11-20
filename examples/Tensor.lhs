@@ -5,11 +5,6 @@ Given points and centers on a plane, find the nearest center to each point.
 The input tensors have shapes [n, 2] and [m, 2], where n is the number of points
 and m is the number of centers.
 
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
->
 > module Main (main) where
 >
 > import System.Environment (getArgs)

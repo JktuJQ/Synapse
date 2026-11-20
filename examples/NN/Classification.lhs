@@ -5,16 +5,8 @@ Assign a point in the plane to one of three concentric rings.
 Each ring has a slightly varying radius; the validation points lie between the training angles.
 A single linear classifier cannot separate these classes, so we use two nonlinear hidden layers.
 
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE DeriveGeneric #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE FlexibleInstances #-}
 > {-# LANGUAGE ImpredicativeTypes #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
 > {-# LANGUAGE TypeFamilies #-}
-> {-# LANGUAGE UndecidableInstances #-}
-> {-# LANGUAGE NoDeepSubsumption #-}
 >
 > module Main (main) where
 >

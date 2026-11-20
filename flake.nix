@@ -16,7 +16,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        haskellPackages = pkgs.haskell.packages.ghc98;
+        haskellPackages = pkgs.haskell.packages.ghc910;
       in
       {
         formatter = pkgs.nixfmt;

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Transpose1Padding where
 
 import qualified Synapse.Tensor as T

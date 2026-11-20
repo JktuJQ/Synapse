@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Shapes.Axes (tests) where
 
 import Data.Proxy (Proxy (..))

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest.Layers.Normalization (tests) where
 
 import qualified Hedgehog as H

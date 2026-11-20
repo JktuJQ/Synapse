@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest.Layers.Dropout (tests) where
 
 import qualified Control.Monad.Trans.State.Strict as State

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Conv1Rank where
 
 import qualified Synapse.Tensor as T

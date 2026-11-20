@@ -1,6 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- | Elementwise mapping and combination of tensors.
 module Synapse.Tensor.Ops.Raw.Elementwise (map, zipWith, zipWith3) where
 

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest.Layers.Embedding (tests) where
 
 import Control.Monad (foldM)

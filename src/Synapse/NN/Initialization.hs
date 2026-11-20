@@ -1,7 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-
 {- | Initialize tensors with uniformly or normally distributed values.
 
 @

@@ -1,10 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Reshaping, broadcasting, axis permutations, and tensor assembly.
@@ -22,7 +16,6 @@ module Synapse.Tensor.Ops.Raw.Shape
     ) where
 
 import qualified Data.Array.Accelerate as A
-import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.Representation (DType, Tensor (..))

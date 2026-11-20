@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Conv3Channels where
 
 import qualified Synapse.Tensor as T

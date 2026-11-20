@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module ArgmaxGradient where
 
 import qualified Synapse.Autograd as AG

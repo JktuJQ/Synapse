@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module TransposeScalar where
 
 import qualified Synapse.Tensor as T

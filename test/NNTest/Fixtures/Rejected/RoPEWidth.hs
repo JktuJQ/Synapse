@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module RoPEWidth where
 
 import qualified Synapse.NN as NN

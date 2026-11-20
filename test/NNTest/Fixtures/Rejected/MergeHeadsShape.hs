@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module MergeHeadsShape where
 
 import qualified Synapse.NN as NN

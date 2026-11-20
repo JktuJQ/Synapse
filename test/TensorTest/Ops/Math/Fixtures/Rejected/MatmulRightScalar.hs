@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module MatmulRightScalar where
 
 import qualified Synapse.Tensor as T

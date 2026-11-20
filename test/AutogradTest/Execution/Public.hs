@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module AutogradTest.Execution.Public (squaredGradient, constantGradient) where
 
 import qualified Synapse.Autograd.Execution as AG

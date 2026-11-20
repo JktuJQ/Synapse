@@ -6,16 +6,8 @@ For example, [2, 5, 1, 2, 5, 1] has next-token targets [5, 1, 2, 5, 1, 2].
 A causal Transformer must use the observed prefix to identify the repetition without seeing future tokens.
 
 > {-# LANGUAGE Arrows #-}
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE DeriveGeneric #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE FlexibleInstances #-}
 > {-# LANGUAGE ImpredicativeTypes #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
 > {-# LANGUAGE TypeFamilies #-}
-> {-# LANGUAGE UndecidableInstances #-}
-> {-# LANGUAGE NoDeepSubsumption #-}
 >
 > module Main (main) where
 >

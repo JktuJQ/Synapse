@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest.Layers.Convolution (tests) where
 
 import Control.Monad.Trans.State.Strict (evalState)

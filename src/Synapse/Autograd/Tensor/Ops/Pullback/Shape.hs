@@ -1,11 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoStarIsType #-}
 
 -- | Shape transformations used by tensor pullbacks.
@@ -30,7 +23,6 @@ module Synapse.Autograd.Tensor.Ops.Pullback.Shape
     , joinMatrixChunks
     ) where
 
-import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
 import qualified Synapse.Tensor.Representation as T

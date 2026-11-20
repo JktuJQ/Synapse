@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module OperatorBounds where
 
 import Data.Proxy (Proxy (..))

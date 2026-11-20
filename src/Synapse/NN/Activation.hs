@@ -1,7 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 {- | Shape-preserving activation functions for tensors and element expressions.
 Activations support ordinary function application and composition in an arbitrary arrow.

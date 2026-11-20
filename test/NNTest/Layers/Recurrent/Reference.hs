@@ -13,7 +13,6 @@ module NNTest.Layers.Recurrent.Reference
     , finiteDifferences
     ) where
 
-import Data.List (foldl')
 
 -- Independent scalar implementations of the published recurrent equations.
 data Kind = RNN | GRU | LSTM deriving (Eq, Show)

@@ -7,34 +7,20 @@ author:             JktuJQ
 maintainer:         odmamontov@gmail.com
 
 homepage:           https://github.com/JktuJQ/Synapse
-extra-doc-files:    README.md
-                  , CHANGELOG.md
+extra-doc-files:    CHANGELOG.md
+                  , README.md
                   , SynapseLogo.png
 
-extra-source-files: test/TensorTest/Ops/Convolution/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Convolution/Fixtures/Rejected/*.hs
-                  , test/AutogradTest/Differentiable/Fixtures/Rejected/*.hs
-                  , test/NNTest/Fixtures/Rejected/*.hs
-                  , test/TensorTest/Shapes/Axes/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Shapes/Axes/Fixtures/Rejected/*.hs
-                  , test/TensorTest/Ops/Index/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Index/Fixtures/Rejected/*.hs
-                  , test/TensorTest/Ops/Reduction/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Reduction/Fixtures/Rejected/*.hs
-                  , test/TensorTest/Ops/Math/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Math/Fixtures/Rejected/*.hs
-                  , test/TensorTest/Ops/Elementwise/Fixtures/Accepted/*.hs
-                  , test/TensorTest/Ops/Elementwise/Fixtures/Rejected/*.hs
+extra-source-files: test/**/*.hs
 
 license:            MIT
 license-file:       LICENSE
 
-synopsis:
-    Type-safe neural networks in Haskell.
+synopsis:           Typed tensor and neural networks
 description:
-    Synapse 2.0 is a work-in-progress rewrite focused on type-level tensor
-    shapes, an Accelerate backend, pure autograd, and a compositional neural
-    network API.
+    Staged tensor computations with type-level shapes,
+    reverse-mode automatic differentiation,
+    and composable neural network layers in pure Haskell.
 category:           Math
 
 
@@ -44,7 +30,7 @@ source-repository head
 
 
 flag gpu
-    description: Enable the Accelerate LLVM PTX backend.
+    description: Enable LLVM PTX backend.
     default:     False
     manual:      True
 
@@ -54,278 +40,278 @@ common warnings
 
 library
     import:           warnings
-    default-language: Haskell2010
+    default-language: GHC2024
 
-    build-depends:    base >= 4.19 && < 4.22
+    build-depends:    accelerate >= 1.3 && < 1.5
+                    , accelerate-llvm-native >= 1.3 && < 1.5
                     , array >= 0.5 && < 0.6
-                    , containers >= 0.6 && < 0.9
+                    , backprop >= 0.2.7.2 && < 0.3
+                    , base >= 4.20 && < 4.22
                     , binary >= 0.8 && < 0.9
                     , bytestring >= 0.11 && < 0.13
-                    , text >= 2.0 && < 2.2
+                    , containers >= 0.6 && < 0.9
                     , json >= 0.11 && < 0.12
-                    , transformers >= 0.6 && < 0.7
-                    , backprop >= 0.2.7.2 && < 0.3
                     , random >= 1.3 && < 1.4
-                    , accelerate >= 1.3 && < 1.5
-                    , accelerate-llvm-native >= 1.3 && < 1.5
+                    , text >= 2.0 && < 2.2
+                    , transformers >= 0.6 && < 0.7
 
     hs-source-dirs:   src
     exposed-modules:  Synapse
-                    , Synapse.NN
-                    , Synapse.NN.Weights
-                    , Synapse.NN.Weights.Safetensors
-                    , Synapse.NN.Data
-                    , Synapse.NN.Gradient
-                    , Synapse.NN.Loss
-                    , Synapse.NN.Loss.Regression
-                    , Synapse.NN.Loss.Classification
-                    , Synapse.NN.Activation
-                    , Synapse.NN.Layers.Position
-                    , Synapse.NN.Layers.Attention
-                    , Synapse.NN.Initialization
-                    , Synapse.NN.Metrics
-                    , Synapse.NN.Metrics.Regression
-                    , Synapse.NN.Metrics.Classification
-                    , Synapse.NN.Layers
-                    , Synapse.NN.Layers.Convolution
-                    , Synapse.NN.Forward
-                    , Synapse.NN.Layers.Normalization
-                    , Synapse.NN.Layers.Normalization.LayerNorm
-                    , Synapse.NN.Layers.Normalization.BatchNorm
-                    , Synapse.NN.Layers.Dropout
-                    , Synapse.Tensor.Shapes.Normalization
-                    , Synapse.NN.Layers.Dense
-                    , Synapse.NN.Layers.Embedding
-                    , Synapse.NN.Layers.Recurrent
-                    , Synapse.NN.Layers.Recurrent.RNN
-                    , Synapse.NN.Layers.Recurrent.GRU
-                    , Synapse.NN.Layers.Recurrent.LSTM
-                    , Synapse.NN.Optimizers
-                    , Synapse.NN.Optimizers.Optimizer
-                    , Synapse.NN.Optimizers.SGD
-                    , Synapse.NN.Optimizers.Adam
-                    , Synapse.NN.Optimizers.RMSprop
                     , Synapse.Autograd
-                    , Synapse.Autograd.Tensor
-                    , Synapse.Autograd.Tensor.Representation
                     , Synapse.Autograd.Execution
                     , Synapse.Autograd.Representation
+                    , Synapse.Autograd.Tensor
+                    , Synapse.Autograd.Tensor.Representation
+                    , Synapse.NN
+                    , Synapse.NN.Activation
+                    , Synapse.NN.Data
+                    , Synapse.NN.Forward
+                    , Synapse.NN.Gradient
+                    , Synapse.NN.Initialization
+                    , Synapse.NN.Layers
+                    , Synapse.NN.Layers.Attention
+                    , Synapse.NN.Layers.Convolution
+                    , Synapse.NN.Layers.Dense
+                    , Synapse.NN.Layers.Dropout
+                    , Synapse.NN.Layers.Embedding
+                    , Synapse.NN.Layers.Normalization
+                    , Synapse.NN.Layers.Normalization.BatchNorm
+                    , Synapse.NN.Layers.Normalization.LayerNorm
+                    , Synapse.NN.Layers.Position
+                    , Synapse.NN.Layers.Recurrent
+                    , Synapse.NN.Layers.Recurrent.GRU
+                    , Synapse.NN.Layers.Recurrent.LSTM
+                    , Synapse.NN.Layers.Recurrent.RNN
+                    , Synapse.NN.Loss
+                    , Synapse.NN.Loss.Classification
+                    , Synapse.NN.Loss.Regression
+                    , Synapse.NN.Metrics
+                    , Synapse.NN.Metrics.Classification
+                    , Synapse.NN.Metrics.Regression
+                    , Synapse.NN.Optimizers
+                    , Synapse.NN.Optimizers.Adam
+                    , Synapse.NN.Optimizers.Optimizer
+                    , Synapse.NN.Optimizers.RMSprop
+                    , Synapse.NN.Optimizers.SGD
+                    , Synapse.NN.Weights
+                    , Synapse.NN.Weights.Safetensors
                     , Synapse.Tensor
                     , Synapse.Tensor.Backend
-                    , Synapse.Tensor.Ops.Constraints
-                    , Synapse.Tensor.Ops.Construction
                     , Synapse.Tensor.Data
                     , Synapse.Tensor.Ops
-                    , Synapse.Tensor.Ops.Logic
-                    , Synapse.Tensor.Ops.Numeric
+                    , Synapse.Tensor.Ops.Constraints
+                    , Synapse.Tensor.Ops.Construction
                     , Synapse.Tensor.Ops.Conversion
-                    , Synapse.Tensor.Ops.Math
-                    , Synapse.Tensor.Ops.Window
                     , Synapse.Tensor.Ops.Index
-                    , Synapse.Tensor.Ops.Shape
+                    , Synapse.Tensor.Ops.Logic
+                    , Synapse.Tensor.Ops.Math
+                    , Synapse.Tensor.Ops.Numeric
+                    , Synapse.Tensor.Ops.Random
                     , Synapse.Tensor.Ops.Reduction
+                    , Synapse.Tensor.Ops.Shape
+                    , Synapse.Tensor.Ops.Window
+                    , Synapse.Tensor.Representation
                     , Synapse.Tensor.Shapes
                     , Synapse.Tensor.Shapes.Axes
+                    , Synapse.Tensor.Shapes.Backend
                     , Synapse.Tensor.Shapes.Broadcast
                     , Synapse.Tensor.Shapes.Dimensions
-                    , Synapse.Tensor.Shapes.Backend
                     , Synapse.Tensor.Shapes.Index
-                    , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Shapes.Matmul
+                    , Synapse.Tensor.Shapes.Normalization
+                    , Synapse.Tensor.Shapes.Reshape
                     , Synapse.Tensor.Shapes.Window
-                    , Synapse.Tensor.Representation
                     , Synapse.Tensor.Structure
-                    , Synapse.Tensor.Ops.Random
 
-    other-modules:    Synapse.Tensor.Structure.Product
-                    , Synapse.Tensor.Structure.Constraints
-                    , Synapse.Autograd.Record
-                    , Synapse.Tensor.Ops.Raw.Random
-                    , Synapse.Tensor.Ops.Definition
-                    , Synapse.NN.Layers.Recurrent.Sequence
-                    , Synapse.Tensor.Ops.Raw.Window
+    other-modules:    Synapse.Autograd.Record
+                    , Synapse.Autograd.Tensor.Ops
+                    , Synapse.Autograd.Tensor.Ops.Conversion
+                    , Synapse.Autograd.Tensor.Ops.Logic
+                    , Synapse.Autograd.Tensor.Ops.Math
+                    , Synapse.Autograd.Tensor.Ops.Numeric
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Index
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Logic
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Math
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Numeric
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
+                    , Synapse.Autograd.Tensor.Ops.Pullback.Shape
                     , Synapse.Autograd.Tensor.Ops.Pullback.Window
+                    , Synapse.NN.Layers.Recurrent.Sequence
+                    , Synapse.Tensor.Ops.Definition
                     , Synapse.Tensor.Ops.Raw.Construction
+                    , Synapse.Tensor.Ops.Raw.Elementwise
                     , Synapse.Tensor.Ops.Raw.Index
                     , Synapse.Tensor.Ops.Raw.Math
-                    , Synapse.Tensor.Ops.Raw.Shape
+                    , Synapse.Tensor.Ops.Raw.Random
                     , Synapse.Tensor.Ops.Raw.Reduction
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Logic
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Numeric
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Math
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Index
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Shape
-                    , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
-                    , Synapse.Tensor.Ops.Raw.Elementwise
-                    , Synapse.Autograd.Tensor.Ops
-                    , Synapse.Autograd.Tensor.Ops.Logic
-                    , Synapse.Autograd.Tensor.Ops.Numeric
-                    , Synapse.Autograd.Tensor.Ops.Conversion
-                    , Synapse.Autograd.Tensor.Ops.Math
+                    , Synapse.Tensor.Ops.Raw.Shape
+                    , Synapse.Tensor.Ops.Raw.Window
+                    , Synapse.Tensor.Structure.Constraints
+                    , Synapse.Tensor.Structure.Product
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
         build-depends: accelerate-llvm-ptx >= 1.3 && < 1.5
 
-executable tensor-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          Tensor.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-
-executable autograd-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          Autograd.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-
-executable regression-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          NN/Regression.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-                    , random >= 1.3 && < 1.4
-                    , transformers >= 0.6 && < 0.7
-
-executable convolution-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          NN/Convolution.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-                    , random >= 1.3 && < 1.4
-                    , transformers >= 0.6 && < 0.7
-
-executable recurrent-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          NN/Recurrent.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-                    , random >= 1.3 && < 1.4
-                    , transformers >= 0.6 && < 0.7
-
-executable transformer-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          NN/Transformer.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-                    , random >= 1.3 && < 1.4
-                    , transformers >= 0.6 && < 0.7
-
-executable classification-example
-    import:           warnings
-    ghc-options:      -threaded
-    default-language: Haskell2010
-    hs-source-dirs:   examples
-    main-is:          NN/Classification.lhs
-
-    build-depends:    base >= 4.19 && < 4.22
-                    , synapse
-                    , random >= 1.3 && < 1.4
-                    , transformers >= 0.6 && < 0.7
-
 test-suite synapse-test
     import:           warnings
     ghc-options:      -threaded
-    default-language: Haskell2010
+    default-language: GHC2024
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
-    other-modules:    NNTest.Layers.Recurrent
-                    , NNTest.Layers.Recurrent.Reference
-                    , NNTest.Forward
+    other-modules:    AutogradTest
+                    , AutogradTest.Differentiable
+                    , AutogradTest.Execution
+                    , AutogradTest.Execution.Public
+                    , AutogradTest.Tensor
+                    , AutogradTest.Tensor.Convolution
+                    , AutogradTest.Tensor.ElementLifting
+                    , AutogradTest.Tensor.Elementwise
+                    , AutogradTest.Tensor.Lifting
+                    , AutogradTest.Tensor.Spatial
                     , NNTest
+                    , NNTest.Activation
+                    , NNTest.Attention
+                    , NNTest.Data
+                    , NNTest.Data.Execution
+                    , NNTest.Forward
+                    , NNTest.Gradient
+                    , NNTest.Initialization
+                    , NNTest.Layers
+                    , NNTest.Layers.Convolution
+                    , NNTest.Layers.Dense
+                    , NNTest.Layers.Dropout
+                    , NNTest.Layers.Embedding
+                    , NNTest.Layers.Normalization
+                    , NNTest.Layers.Recurrent
+                    , NNTest.Layers.Recurrent.Reference
+                    , NNTest.Metrics
+                    , NNTest.Network
+                    , NNTest.Optimizer
+                    , NNTest.Position
+                    , NNTest.Regression
                     , NNTest.Weights
                     , NNTest.Weights.Public
                     , NNTest.Weights.Safetensors
-                    , NNTest.Data
-                    , NNTest.Data.Execution
-                    , NNTest.Gradient
-                    , NNTest.Activation
-                    , NNTest.Attention
-                    , NNTest.Position
-                    , NNTest.Initialization
-                    , NNTest.Metrics
-                    , NNTest.Layers
-                    , NNTest.Layers.Convolution
-                    , NNTest.Layers.Normalization
-                    , NNTest.Layers.Dropout
-                    , NNTest.Layers.Dense
-                    , NNTest.Layers.Embedding
-                    , NNTest.Network
-                    , NNTest.Optimizer
-                    , NNTest.Regression
-                    , AutogradTest
-                    , AutogradTest.Tensor
-                    , AutogradTest.Tensor.Convolution
-                    , AutogradTest.Tensor.Spatial
-                    , AutogradTest.Tensor.Elementwise
-                    , AutogradTest.Tensor.ElementLifting
-                    , AutogradTest.Tensor.Lifting
-                    , AutogradTest.Execution
-                    , AutogradTest.Execution.Public
-                    , AutogradTest.Differentiable
                     , TensorTest
                     , TensorTest.Backend
                     , TensorTest.Backend.Structure
-                    , TensorTest.Random
+                    , TensorTest.Compiler
                     , TensorTest.Construction
                     , TensorTest.Conversion
-                    , TensorTest.Compiler
                     , TensorTest.Ops
-                    , TensorTest.Ops.Elementwise
-                    , TensorTest.Ops.Math
                     , TensorTest.Ops.Convolution
                     , TensorTest.Ops.Convolution.Dilated
-                    , TensorTest.Ops.Spatial
-                    , TensorTest.Ops.Spatial.Reference
                     , TensorTest.Ops.Convolution.Reference
-                    , TensorTest.Ops.Math.Linear
+                    , TensorTest.Ops.Elementwise
                     , TensorTest.Ops.Index
                     , TensorTest.Ops.Index.Operations
                     , TensorTest.Ops.Index.Types
-                    , TensorTest.Ops.Shape
+                    , TensorTest.Ops.Math
+                    , TensorTest.Ops.Math.Linear
                     , TensorTest.Ops.Reduction
-                    , TensorTest.Ops.Reduction.Operations
                     , TensorTest.Ops.Reduction.Masked
+                    , TensorTest.Ops.Reduction.Operations
                     , TensorTest.Ops.Reduction.Types
+                    , TensorTest.Ops.Shape
+                    , TensorTest.Ops.Spatial
+                    , TensorTest.Ops.Spatial.Reference
+                    , TensorTest.Random
                     , TensorTest.Shapes
                     , TensorTest.Shapes.Axes
                     , TensorTest.Shapes.Dimensions
                     , TensorTest.Support
 
-    build-depends:    base >= 4.19 && < 4.22
-                    , transformers >= 0.6 && < 0.7
+    build-depends:    accelerate >= 1.3 && < 1.5
+                    , backprop >= 0.2.7.2 && < 0.3
+                    , base >= 4.20 && < 4.22
                     , bytestring >= 0.11 && < 0.13
                     , containers >= 0.6 && < 0.9
-                    , synapse
-                    , accelerate >= 1.3 && < 1.5
-                    , backprop >= 0.2.7.2 && < 0.3
                     , hedgehog >= 1.5 && < 1.8
+                    , process >= 1.6 && < 1.7
                     , random >= 1.3 && < 1.4
+                    , synapse
                     , tasty >= 1.5 && < 1.6
                     , tasty-hedgehog >= 1.4 && < 1.5
-                    , process >= 1.6 && < 1.7
+                    , transformers >= 0.6 && < 0.7
+
+executable tensor-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          Tensor.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , synapse
+
+executable autograd-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          Autograd.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , synapse
+
+executable regression-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          NN/Regression.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , random >= 1.3 && < 1.4
+                    , synapse
+                    , transformers >= 0.6 && < 0.7
+
+executable classification-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          NN/Classification.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , random >= 1.3 && < 1.4
+                    , synapse
+                    , transformers >= 0.6 && < 0.7
+
+executable convolution-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          NN/Convolution.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , random >= 1.3 && < 1.4
+                    , synapse
+                    , transformers >= 0.6 && < 0.7
+
+executable recurrent-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          NN/Recurrent.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , random >= 1.3 && < 1.4
+                    , synapse
+                    , transformers >= 0.6 && < 0.7
+
+executable transformer-example
+    import:           warnings
+    ghc-options:      -threaded
+    default-language: GHC2024
+    hs-source-dirs:   examples
+    main-is:          NN/Transformer.lhs
+
+    build-depends:    base >= 4.20 && < 4.22
+                    , random >= 1.3 && < 1.4
+                    , synapse
+                    , transformers >= 0.6 && < 0.7

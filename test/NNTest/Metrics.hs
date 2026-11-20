@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module NNTest.Metrics (tests) where
 
 import Control.Exception (ErrorCall, evaluate, try)

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module SGDInt where
 
 import Control.Monad.Trans.State.Strict (runState)

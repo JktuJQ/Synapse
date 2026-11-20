@@ -1,10 +1,4 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 
 module NNTest.Data (tests) where
 
@@ -14,7 +8,7 @@ import Control.Monad.Trans.State.Strict (evalState)
 import Data.Char (ord)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.IORef (modifyIORef', newIORef, readIORef)
-import Data.List (foldl', isInfixOf, sort)
+import Data.List (isInfixOf, sort)
 import GHC.TypeNats (KnownNat)
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen

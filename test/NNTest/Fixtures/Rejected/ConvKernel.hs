@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module ConvKernel where
 
 import qualified Synapse.NN.Layers as NN

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Patches1Shape where
 
 import qualified Synapse.Tensor as T

@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Shape (tests) where
 
 import qualified Data.Array.Accelerate as A

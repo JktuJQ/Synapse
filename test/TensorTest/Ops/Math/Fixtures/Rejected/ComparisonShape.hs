@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module ComparisonShape where
 
 import qualified Synapse.Tensor as T

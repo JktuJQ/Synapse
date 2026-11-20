@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 -- | Gradient rules for conditional selection and elementwise extrema.
 module Synapse.Autograd.Tensor.Ops.Pullback.Logic

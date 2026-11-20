@@ -6,16 +6,8 @@ The target follows y_t = 0.7 * y_(t-1) + 0.3 * x_t, starting from y_(-1) = 0.
 A prediction depends on earlier inputs, so the model must retain information across time steps.
 
 > {-# LANGUAGE Arrows #-}
-> {-# LANGUAGE DataKinds #-}
-> {-# LANGUAGE DeriveGeneric #-}
-> {-# LANGUAGE FlexibleContexts #-}
-> {-# LANGUAGE FlexibleInstances #-}
 > {-# LANGUAGE ImpredicativeTypes #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
-> {-# LANGUAGE TypeApplications #-}
 > {-# LANGUAGE TypeFamilies #-}
-> {-# LANGUAGE UndecidableInstances #-}
-> {-# LANGUAGE NoDeepSubsumption #-}
 >
 > module Main (main) where
 >

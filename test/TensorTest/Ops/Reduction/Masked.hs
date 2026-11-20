@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module TensorTest.Ops.Reduction.Masked (tests) where
 
 import qualified Hedgehog as H
