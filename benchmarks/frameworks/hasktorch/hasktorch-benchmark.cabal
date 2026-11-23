@@ -1,0 +1,16 @@
+cabal-version: 3.0
+name: hasktorch-benchmark
+version: 0.1.0.0
+build-type: Simple
+
+executable hasktorch-iris
+    main-is: Iris.hs
+    hs-source-dirs: .
+    default-language: GHC2021
+    ghc-options: -Wall -threaded -rtsopts -O2
+    build-depends: base >= 4.16 && < 5
+                 , deepseq
+                 , filepath
+                 , hasktorch >= 0.2.2 && < 0.3
+                 , libtorch-ffi >= 2.0 && < 2.1
+                 , json >= 0.11 && < 0.12

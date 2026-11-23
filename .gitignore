@@ -4,3 +4,13 @@
 
 # Haskell
 /dist-newstyle
+
+# Local benchmark data and results
+/benchmarks/datasets/
+/benchmarks/results/
+
+# Standalone framework builds
+/benchmarks/dist-newstyle/
+/benchmarks/frameworks/*/dist-newstyle/
+/benchmarks/cabal.project.local
+/benchmarks/.libtorch/

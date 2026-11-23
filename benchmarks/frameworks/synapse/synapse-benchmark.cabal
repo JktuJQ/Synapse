@@ -1,0 +1,12 @@
+cabal-version: 3.0
+name:          synapse-benchmark
+version:       0.1.0.0
+build-type:    Simple
+
+executable synapse-iris
+    main-is:          Iris.hs
+    default-language: GHC2024
+    ghc-options:      -Wall -threaded -rtsopts
+    build-depends:    synapse
+                    , base >= 4.20 && < 4.22
+                    , filepath >= 1.4 && < 1.6
