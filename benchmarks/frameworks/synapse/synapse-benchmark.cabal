@@ -3,10 +3,32 @@ name:          synapse-benchmark
 version:       0.1.0.0
 build-type:    Simple
 
-executable synapse-iris
-    main-is:          Iris.hs
+common benchmark
     default-language: GHC2024
     ghc-options:      -Wall -threaded -rtsopts
-    build-depends:    synapse
+    build-depends:    synapse >= 0.2 && < 0.3
                     , base >= 4.20 && < 4.22
+                    , bytestring >= 0.11 && < 0.13
                     , filepath >= 1.4 && < 1.6
+                    , json >= 0.11 && < 0.12
+                    , transformers >= 0.6 && < 0.7
+
+executable synapse-iris
+    import:  benchmark
+    main-is: Iris.hs
+
+executable synapse-mnist-mlp
+    import:  benchmark
+    main-is: MnistMlp.hs
+
+executable synapse-mnist-cnn
+    import:  benchmark
+    main-is: MnistCnn.hs
+
+executable synapse-mnist-lstm
+    import:  benchmark
+    main-is: MnistLstm.hs
+
+executable synapse-mnist-vit
+    import:  benchmark
+    main-is: MnistVit.hs

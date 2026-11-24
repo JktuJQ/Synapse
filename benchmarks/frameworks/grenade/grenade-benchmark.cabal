@@ -1,18 +1,34 @@
 cabal-version: 3.0
-name: grenade-benchmark
-version: 0.1.0.0
-build-type: Simple
+name:          grenade-benchmark
+version:       0.1.0.0
+build-type:    Simple
+
+common benchmark
+    default-language: GHC2024
+    ghc-options:      -Wall -threaded -rtsopts -O2
+    build-depends:    grenade >= 0.1 && < 0.2
+                    , base >= 4.20 && < 5
+                    , bytestring >= 0.11 && < 0.13
+                    , deepseq >= 1.4 && < 1.6
+                    , filepath >= 1.4 && < 1.6
+                    , hmatrix >= 0.20 && < 0.21
+                    , json >= 0.11 && < 0.12
+                    , MonadRandom >= 0.6 && < 0.7
+                    , random >= 1.3 && < 1.4
+                    , vector >= 0.12 && < 0.14
 
 executable grenade-iris
+    import:  benchmark
     main-is: Iris.hs
-    hs-source-dirs: .
-    default-language: GHC2021
-    ghc-options: -Wall -threaded -rtsopts -O2
-    build-depends: base >= 4.16 && < 5
-                 , deepseq
-                 , filepath
-                 , grenade
-                 , hmatrix
-                 , json >= 0.11 && < 0.12
-                 , vector
 
+executable grenade-mnist-mlp
+    import:  benchmark
+    main-is: MnistMlp.hs
+
+executable grenade-mnist-cnn
+    import:  benchmark
+    main-is: MnistCnn.hs
+
+executable grenade-mnist-lstm
+    import:  benchmark
+    main-is: MnistLstm.hs

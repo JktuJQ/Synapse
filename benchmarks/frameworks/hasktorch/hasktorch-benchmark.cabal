@@ -1,16 +1,35 @@
 cabal-version: 3.0
-name: hasktorch-benchmark
-version: 0.1.0.0
-build-type: Simple
+name:          hasktorch-benchmark
+version:       0.1.0.0
+build-type:    Simple
+
+common benchmark
+    default-language: GHC2024
+    ghc-options:      -Wall -threaded -rtsopts -O2
+    build-depends:    hasktorch >= 0.2.2 && < 0.3
+                    , base >= 4.20 && < 5
+                    , bytestring >= 0.11 && < 0.13
+                    , deepseq >= 1.4 && < 1.6
+                    , filepath >= 1.4 && < 1.6
+                    , json >= 0.11 && < 0.12
+                    , libtorch-ffi >= 2.0 && < 2.1
 
 executable hasktorch-iris
+    import:  benchmark
     main-is: Iris.hs
-    hs-source-dirs: .
-    default-language: GHC2021
-    ghc-options: -Wall -threaded -rtsopts -O2
-    build-depends: base >= 4.16 && < 5
-                 , deepseq
-                 , filepath
-                 , hasktorch >= 0.2.2 && < 0.3
-                 , libtorch-ffi >= 2.0 && < 2.1
-                 , json >= 0.11 && < 0.12
+
+executable hasktorch-mnist-mlp
+    import:  benchmark
+    main-is: MnistMlp.hs
+
+executable hasktorch-mnist-cnn
+    import:  benchmark
+    main-is: MnistCnn.hs
+
+executable hasktorch-mnist-lstm
+    import:  benchmark
+    main-is: MnistLstm.hs
+
+executable hasktorch-mnist-vit
+    import:  benchmark
+    main-is: MnistVit.hs
