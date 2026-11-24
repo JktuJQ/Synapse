@@ -1,5 +1,6 @@
 packages:
     .
+    ..
     frameworks/grenade
     frameworks/hasktorch
     frameworks/synapse
@@ -7,11 +8,6 @@ packages:
 optimization: 2
 tests: False
 benchmarks: False
-
-source-repository-package
-    type: git
-    location: https://github.com/JktuJQ/Synapse.git
-    tag: e451264b3868631f864784c4358df3cec6ad2c0b
 
 source-repository-package
     type: git

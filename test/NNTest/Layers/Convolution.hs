@@ -16,7 +16,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 addBias :: Int -> Int -> Int -> [Double] -> [Double] -> [Double]
 addBias batch channels spatial biases output =
@@ -109,11 +109,11 @@ propRecords = H.withTests 1 $ H.property $ do
     let parameters =
             NN.Convolution (T.fromList @'[2, 1, 1] [2, 3]) (T.fromList @'[2] [0.5, -1])
                 :: NN.Convolution 1 2 '[1] 1 T.Tensor Double
-        execute = T.run2 T.CPU $ \p batch ->
+        execute = T.run T.defaultCPU $ \p batch ->
             let (objective, gradient) = AG.backprop (\layer -> T.sum $ NN.conv1d @'[1] @'[0, 0] @'[1] layer $ AG.constant batch) p
                 updatedParameters = evalState (NN.optimizerStep (NN.SGD 0.1) p gradient) ()
              in (objective, updatedParameters)
-        materialized = T.run T.CPU parameters
+        materialized = T.run T.defaultCPU parameters
         input = T.fromListData @'[1, 1, 3] [1, 2, 3 :: Double]
         (loss, updated) = execute materialized input
     T.toList loss H.=== [28.5]
@@ -123,7 +123,7 @@ propRecords = H.withTests 1 $ H.property $ do
         destination = NN.Convolution (T.zeros @'[2, 1, 1]) (T.zeros @'[2]) :: NN.Convolution 1 2 '[1] 1 T.Tensor Double
     map fst ((Map.toAscList . Weights.weightsEntries) dictionary)
         H.=== [["convolutionBias"], ["convolutionWeights"]]
-    restored <- H.evalEither $ NN.loadWeights dictionary $ T.run T.CPU destination
+    restored <- H.evalEither $ NN.loadWeights dictionary $ T.run T.defaultCPU destination
     T.toList (NN.convolutionWeights restored) H.=== [2, 3]
     T.toList (NN.convolutionBias restored) H.=== [0.5, -1]
 
@@ -134,7 +134,7 @@ propEmpty = H.withTests 1 $ H.property $ do
     let noInput = NN.Convolution (T.zeros @'[2, 0, 1]) (T.fromList @'[2] [1, 2]) :: NN.Convolution 0 2 '[1] 2 T.Tensor Double
     values (NN.conv1d @'[1] @'[0, 0] @'[1] noInput $ T.zeros @'[1, 0, 2]) H.=== [1, 1, 2, 2]
     let float = NN.Convolution (T.ones @'[1, 1, 1]) (T.fromList @'[1] [0.5]) :: NN.Convolution 1 1 '[1] 1 T.Tensor Float
-    approxList (T.toList $ T.run T.CPU $ NN.conv1d @'[1] @'[0, 0] @'[1] float $ T.ones @'[1, 1, 2]) [1.5, 1.5]
+    approxList (T.toList $ T.run T.defaultCPU $ NN.conv1d @'[1] @'[0, 0] @'[1] float $ T.ones @'[1, 1, 2]) [1.5, 1.5]
 
 tests :: TestTree
 tests =

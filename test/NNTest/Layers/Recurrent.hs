@@ -47,7 +47,7 @@ checkRNNGradient = do
     let seed :: RNNOutput T.Tensor
         seed = (T.fromList $ Ref.outputSeeds 2 1, 0.3)
         (output, backward) = AG.pullback rnnForward rnnInput
-        (actual, gradient) = T.run T.CPU (output, backward seed)
+        (actual, gradient) = T.run T.defaultCPU (output, backward seed)
         expected = Ref.evaluate Ref.RNN (Ref.parameters Ref.RNN) 2 1 (Ref.sample 2 1) (Ref.initialHidden 1) []
         vector = Ref.parameterValues (Ref.parameters Ref.RNN) ++ Ref.sample 2 1 ++ Ref.initialHidden 1
     approxList (T.toList $ fst actual) $ Ref.outputs expected
@@ -85,7 +85,7 @@ checkGRUGradient = do
     let seed :: GRUOutput T.Tensor
         seed = (T.fromList $ Ref.outputSeeds 2 1, 0.3)
         (output, backward) = AG.pullback gruForward gruInput
-        (actual, gradient) = T.run T.CPU (output, backward seed)
+        (actual, gradient) = T.run T.defaultCPU (output, backward seed)
         expected = Ref.evaluate Ref.GRU (Ref.parameters Ref.GRU) 2 1 (Ref.sample 2 1) (Ref.initialHidden 1) []
         vector = Ref.parameterValues (Ref.parameters Ref.GRU) ++ Ref.sample 2 1 ++ Ref.initialHidden 1
     approxList (T.toList $ fst actual) $ Ref.outputs expected
@@ -130,7 +130,7 @@ checkLSTMGradient = do
     let seed :: LSTMOutput T.Tensor
         seed = (T.fromList $ Ref.outputSeeds 2 1, NN.LSTMState 0.3 (-0.2))
         (output, backward) = AG.pullback lstmForward lstmInput
-        (actual, gradient) = T.run T.CPU (output, backward seed)
+        (actual, gradient) = T.run T.defaultCPU (output, backward seed)
         expected =
             Ref.evaluate
                 Ref.LSTM
@@ -154,14 +154,14 @@ tests =
         [ testProperty "RNN cell agrees with scalar gate equations" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2, 2] $ Ref.sample 1 2
                 initial = T.fromList @'[2, 2] $ Ref.initialHidden 2
-                (output, final) = T.run T.CPU $ runState (NN.rnnCell rnnParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.rnnCell rnnParameters input) initial
                 expected = Ref.evaluate Ref.RNN (Ref.parameters Ref.RNN) 1 2 (Ref.sample 1 2) (Ref.initialHidden 2) []
             approxList (T.toList output) $ Ref.outputs expected
             approxList (T.toList final) $ Ref.hidden expected
         , testProperty "RNN sequence agrees with batched scalar recurrence" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3, 2, 2] $ Ref.sample 3 2
                 initial = T.fromList @'[2, 2] $ Ref.initialHidden 2
-                (output, final) = T.run T.CPU $ runState (NN.rnn rnnParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.rnn rnnParameters input) initial
                 expected = Ref.evaluate Ref.RNN (Ref.parameters Ref.RNN) 3 2 (Ref.sample 3 2) (Ref.initialHidden 2) []
             approxList (T.toList output) $ Ref.outputs expected
             approxList (T.toList final) $ Ref.hidden expected
@@ -171,14 +171,14 @@ tests =
         , testProperty "GRU cell agrees with scalar gate equations" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2, 2] $ Ref.sample 1 2
                 initial = T.fromList @'[2, 2] $ Ref.initialHidden 2
-                (output, final) = T.run T.CPU $ runState (NN.gruCell gruParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.gruCell gruParameters input) initial
                 expected = Ref.evaluate Ref.GRU (Ref.parameters Ref.GRU) 1 2 (Ref.sample 1 2) (Ref.initialHidden 2) []
             approxList (T.toList output) $ Ref.outputs expected
             approxList (T.toList final) $ Ref.hidden expected
         , testProperty "GRU sequence agrees with batched scalar recurrence" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3, 2, 2] $ Ref.sample 3 2
                 initial = T.fromList @'[2, 2] $ Ref.initialHidden 2
-                (output, final) = T.run T.CPU $ runState (NN.gru gruParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.gru gruParameters input) initial
                 expected = Ref.evaluate Ref.GRU (Ref.parameters Ref.GRU) 3 2 (Ref.sample 3 2) (Ref.initialHidden 2) []
             approxList (T.toList output) $ Ref.outputs expected
             approxList (T.toList final) $ Ref.hidden expected
@@ -188,7 +188,7 @@ tests =
         , testProperty "LSTM cell agrees with scalar gate equations" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2, 2] $ Ref.sample 1 2
                 initial = NN.LSTMState (T.fromList $ Ref.initialHidden 2) (T.fromList $ Ref.initialMemory 2)
-                (output, final) = T.run T.CPU $ runState (NN.lstmCell lstmParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.lstmCell lstmParameters input) initial
                 expected =
                     Ref.evaluate
                         Ref.LSTM
@@ -204,7 +204,7 @@ tests =
         , testProperty "LSTM sequence agrees with batched scalar recurrence" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3, 2, 2] $ Ref.sample 3 2
                 initial = NN.LSTMState (T.fromList $ Ref.initialHidden 2) (T.fromList $ Ref.initialMemory 2)
-                (output, final) = T.run T.CPU $ runState (NN.lstm lstmParameters input) initial
+                (output, final) = T.run T.defaultCPU $ runState (NN.lstm lstmParameters input) initial
                 expected =
                     Ref.evaluate
                         Ref.LSTM
@@ -223,7 +223,7 @@ tests =
         , testProperty "empty LSTM sequences preserve both states and their gradients" $ H.withTests 1 $ H.property $ do
             let initial = NN.LSTMState (T.fromList @'[1, 2] [0.2, -0.3]) (T.fromList @'[1, 2] [0.4, -0.5])
                 (result, (dp, (dx, ds))) = AG.backprop (\(p, (xs, s)) -> runState (NN.lstm p xs) s) (lstmParameters, (T.zeros @'[0, 1, 2], initial))
-                ((output, final), (grad, (inputGradient, stateGradient))) = T.run T.CPU (result, (dp, (dx, ds)))
+                ((output, final), (grad, (inputGradient, stateGradient))) = T.run T.defaultCPU (result, (dp, (dx, ds)))
             T.toList output H.=== []
             T.toList (NN.lstmHiddenState final) H.=== [0.2, -0.3]
             T.toList (NN.lstmCellState final) H.=== [0.4, -0.5]
@@ -239,8 +239,8 @@ tests =
             T.toList (NN.lstmCellState stateGradient) H.=== [1, 1]
         , testProperty "empty RNN and GRU sequences preserve hidden state" $ H.withTests 1 $ H.property $ do
             let initial = T.fromList @'[1, 2] [0.2, -0.3 :: Double]
-                (ro, rh) = T.run T.CPU $ runState (NN.rnn rnnParameters $ T.zeros @'[0, 1, 2]) initial
-                (go, gh) = T.run T.CPU $ runState (NN.gru gruParameters $ T.zeros @'[0, 1, 2]) initial
+                (ro, rh) = T.run T.defaultCPU $ runState (NN.rnn rnnParameters $ T.zeros @'[0, 1, 2]) initial
+                (go, gh) = T.run T.defaultCPU $ runState (NN.gru gruParameters $ T.zeros @'[0, 1, 2]) initial
             T.toList ro H.=== []
             T.toList go H.=== []
             T.toList rh H.=== [0.2, -0.3]
@@ -257,23 +257,23 @@ tests =
                 seed = (T.fromList $ Ref.outputSeeds 2 1, NN.LSTMState 0.3 (-0.2)) :: LSTMOutput T.Tensor
                 (full, backward) = AG.pullback lstmForward lstmInput
                 (chunked, chunkBackward) = AG.pullback chunks lstmInput
-                ((ys, final), gradient) = T.run T.CPU (full, backward seed)
-                ((cy, cs), cg) = T.run T.CPU (chunked, chunkBackward seed)
+                ((ys, final), gradient) = T.run T.defaultCPU (full, backward seed)
+                ((cy, cs), cg) = T.run T.defaultCPU (chunked, chunkBackward seed)
             approxList (T.toList cy) $ T.toList ys
             approxList (T.toList $ NN.lstmHiddenState cs) $ T.toList $ NN.lstmHiddenState final
             approxList (T.toList $ NN.lstmCellState cs) $ T.toList $ NN.lstmCellState final
             approxList (lstmGradientValues cg) $ lstmGradientValues gradient
         , testProperty "prepared LSTM accepts changing parameters, inputs and initial states" $ H.withTests 1 $ H.property $ do
-            let execute = T.run1 T.CPU $ \arguments -> AG.backprop lstmForward arguments
-                material = T.run T.CPU lstmInput
+            let execute = T.run T.defaultCPU $ \arguments -> AG.backprop lstmForward arguments
+                material = T.run T.defaultCPU lstmInput
                 first@(ys, _) = fst $ execute material
                 (p, (xs, s)) = lstmInput
                 changed =
                     ( p{NN.lstmInputBias = NN.lstmInputBias p + 0.1}
                     , (xs + 0.05, NN.LSTMState (NN.lstmHiddenState s + 0.02) (NN.lstmCellState s - 0.03))
                     )
-                second@(newOutputs, _) = fst $ execute $ T.run T.CPU changed
-                (expected, expectedState) = T.run T.CPU $ lstmForward changed
+                second@(newOutputs, _) = fst $ execute $ T.run T.defaultCPU changed
+                (expected, expectedState) = T.run T.defaultCPU $ lstmForward changed
             H.assert $ T.toList ys /= T.toList newOutputs
             approxList (T.toList $ fst first) $
                 Ref.outputs $
@@ -288,15 +288,15 @@ tests =
             approxList (T.toList $ fst second) $ T.toList expected
             approxList (T.toList $ NN.lstmCellState $ snd second) $ T.toList $ NN.lstmCellState expectedState
         , testProperty "recurrent layers accept empty batches and zero hidden width" $ H.withTests 1 $ H.property $ do
-            let (r, _) = T.run T.CPU $ runState (NN.rnn rnnParameters $ T.zeros @'[2, 0, 2]) (T.zeros @'[0, 2])
-                (g, _) = T.run T.CPU $ runState (NN.gru gruParameters $ T.zeros @'[2, 0, 2]) (T.zeros @'[0, 2])
+            let (r, _) = T.run T.defaultCPU $ runState (NN.rnn rnnParameters $ T.zeros @'[2, 0, 2]) (T.zeros @'[0, 2])
+                (g, _) = T.run T.defaultCPU $ runState (NN.gru gruParameters $ T.zeros @'[2, 0, 2]) (T.zeros @'[0, 2])
                 (l, _) =
-                    T.run T.CPU $
+                    T.run T.defaultCPU $
                         runState (NN.lstm lstmParameters $ T.zeros @'[2, 0, 2]) (NN.LSTMState (T.zeros @'[0, 2]) (T.zeros @'[0, 2]))
                 empty =
                     NN.LSTM (T.zeros @'[2, 0]) (T.zeros @'[0, 0]) (T.zeros @'[0]) (T.zeros @'[0]) :: NN.LSTM 2 0 T.Tensor Double
                 (z, _) =
-                    T.run T.CPU $
+                    T.run T.defaultCPU $
                         runState (NN.lstm empty $ T.ones @'[2, 1, 2]) (NN.LSTMState (T.zeros @'[1, 0]) (T.zeros @'[1, 0]))
             map T.toList [r, g, l] H.=== [[], [], []]
             T.toList z H.=== []
@@ -305,7 +305,7 @@ tests =
                     NN.LSTM (T.zeros @'[1, 4]) (T.zeros @'[1, 4]) (T.fromList @'[4] [-1000, 1000, 0, -1000]) (T.zeros @'[4])
                         :: NN.LSTM 1 1 T.Tensor Float
                 input = (p, (T.ones @'[1, 1, 1], NN.LSTMState (T.zeros @'[1, 1]) (T.ones @'[1, 1])))
-                ((output, final), (gradient, _)) = T.run T.CPU $ AG.backprop (\(layer, (xs, s)) -> runState (NN.lstm layer xs) s) input
+                ((output, final), (gradient, _)) = T.run T.defaultCPU $ AG.backprop (\(layer, (xs, s)) -> runState (NN.lstm layer xs) s) input
             T.toList output H.=== [0]
             T.toList (NN.lstmCellState final) H.=== [1]
             H.assert $
@@ -317,7 +317,7 @@ tests =
                     , T.toList $ NN.lstmHiddenBias gradient
                     ]
         , testProperty "recurrent parameters materialize and round-trip through weight dictionaries" $ H.withTests 1 $ H.property $ do
-            let p = T.run T.CPU (rnnParameters, gruParameters, lstmParameters)
+            let p = T.run T.defaultCPU (rnnParameters, gruParameters, lstmParameters)
                 dictionary = NN.extractWeights p
             length ((Map.toAscList . Weights.weightsEntries) dictionary) H.=== 12
             (_, _, restored) <- H.evalEither $ NN.loadWeights dictionary p
@@ -329,18 +329,18 @@ tests =
                     arr tanh -< y
                 (p, (xs, s)) = lstmInput
                 input = T.slice @'[ 'T.At 0, 'T.All, 'T.All] xs
-                (actual, as) = T.run T.CPU $ runState (NN.forward network input) s
-                (expected, es) = T.run T.CPU $ runState (NN.lstmCell p input) s
+                (actual, as) = T.run T.defaultCPU $ runState (NN.forward network input) s
+                (expected, es) = T.run T.defaultCPU $ runState (NN.lstmCell p input) s
             approxList (T.toList actual) $ map tanh $ T.toList expected
             approxList (T.toList $ NN.lstmCellState as) $ T.toList $ NN.lstmCellState es
         , testProperty "SGD updates recurrent records and reduces a sequence objective" $ H.withTests 1 $ H.property $ do
             let (_, (xs, s)) = rnnInput
-                execute = T.run1 T.CPU $ \p ->
+                execute = T.run T.defaultCPU $ \p ->
                     let (loss, gradient) =
                             AG.backprop (\parameters -> T.sum $ NN.evalState (NN.rnn parameters $ AG.constant xs) (AG.constant s) ** 2) p
                         updated = NN.evalState (NN.optimizerStep (NN.SGD 0.01) p gradient) ()
                      in (loss, updated)
-                (before, next) = execute $ T.run T.CPU rnnParameters
+                (before, next) = execute $ T.run T.defaultCPU rnnParameters
                 (after, _) = execute next
             case (T.toList before, T.toList after) of
                 ([initialLoss], [nextLoss]) -> H.assert $ nextLoss < initialLoss

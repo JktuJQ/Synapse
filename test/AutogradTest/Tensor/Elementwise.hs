@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -121,7 +121,7 @@ tests =
             let input = T.fromList @'[3] [-1.5, 0, 2.25 :: Float]
                 weights = T.fromList @'[3] [2, 3, 5 :: Double]
                 gradient = AG.gradient (\x -> T.sum (T.toFloating x * AG.constant weights)) input
-            approxList (T.toList $ T.run T.CPU gradient) [2, 3, 5]
+            approxList (T.toList $ T.run T.defaultCPU gradient) [2, 3, 5]
         , testProperty "element expressions support decomposition and two-argument arctangent" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[1] [1.5 :: Double]
                 function x =
@@ -130,9 +130,9 @@ tests =
                      in T.scalar $ T.atan2 fraction 2
             approxList (values $ AG.gradient function input) [2 / 4.25]
         , testProperty "prepared functions reuse a mask-dependent backward graph" $ H.withTests 1 $ H.property $ do
-            let execute = T.run1 T.CPU (AG.backprop (\x -> T.select (x T.> 0) x 0))
-                (firstValue, firstGradient) = execute (T.run T.CPU (T.fromList @'[3] [-2, 0, 3 :: Double]))
-                (secondValue, secondGradient) = execute (T.run T.CPU (T.fromList @'[3] [2, -1, 0 :: Double]))
+            let execute = T.run T.defaultCPU (AG.backprop (\x -> T.select (x T.> 0) x 0))
+                (firstValue, firstGradient) = execute (T.run T.defaultCPU (T.fromList @'[3] [-2, 0, 3 :: Double]))
+                (secondValue, secondGradient) = execute (T.run T.defaultCPU (T.fromList @'[3] [2, -1, 0 :: Double]))
             T.toList firstValue H.=== [0, 0, 3]
             T.toList firstGradient H.=== [0, 0, 1]
             T.toList secondValue H.=== [2, 0, 0]

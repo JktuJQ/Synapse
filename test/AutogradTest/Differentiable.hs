@@ -41,7 +41,7 @@ components p =
     ]
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -69,7 +69,7 @@ tests =
         , testProperty "the same correspondence materializes wide records" $ H.withTests 1 $ H.property $ do
             let input :: Wide T.Tensor
                 input = Wide 1 2 3 4 5 6 7 8 9 10 11 12
-                output = T.run T.CPU input
+                output = T.run T.defaultCPU input
             map T.toList (components output) H.=== map (: []) [1 .. 12]
         , testProperty "ordinary numbers are not differentiable leaves" $
             H.withTests 1 $
@@ -85,7 +85,7 @@ tests =
                 Compiler.rejects (fixtures ++ "BackwardCapability.hs") "ReverseCapability"
         , testProperty "integer polynomial arithmetic produces integer gradients" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [-3, 0, 4 :: Int]
-                (output, gradient) = T.run T.CPU $ AG.backprop (\x -> x * x + x) input
+                (output, gradient) = T.run T.defaultCPU $ AG.backprop (\x -> x * x + x) input
             T.toList output H.=== [6, 0, 20]
             T.toList gradient H.=== [-5, 1, 9]
         , testProperty "integer tensor reshaping requires fractional gradient elements" $

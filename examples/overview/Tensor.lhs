@@ -19,9 +19,9 @@ GPU execution requires Synapse to be built with the Cabal flag -fgpu and a suppo
 > chooseBackend = do
 >     args <- getArgs
 >     case args of
->         [] -> pure T.CPU
->         ["--cpu"] -> pure T.CPU
->         ["--gpu"] -> pure T.GPU
+>         [] -> pure T.defaultCPU
+>         ["--cpu"] -> pure T.defaultCPU
+>         ["--gpu"] -> pure T.defaultGPU
 >         _ -> ioError $ userError "Usage: tensor-example [--cpu | --gpu]"
 
 The result contains an [n, m] matrix of squared distances and one nearest-center index per point.
@@ -66,7 +66,7 @@ The result has one index per point.
 
 For this run, choose four points and three centers.
 Create the input data, prepare the computation for the selected backend, and execute it.
-TensorData is materialized; its elements can be printed with toList.
+`TensorData` is materialized; its elements can be printed with `toList`.
 The distance matrix is displayed in row-major order.
 
 > main :: IO ()
@@ -76,7 +76,7 @@ The distance matrix is displayed in row-major order.
 >             [[0, 1], [3, 1], [4, 5], [-1, -1 :: Double]]
 >         centers = T.fromListData @'[3, 2] $ concat
 >             [[0, 0], [4, 0], [4, 4 :: Double]]
->         execute = T.run2 backend nearestCenters
+>         execute = T.run backend nearestCenters
 >         (distances, nearest) = execute points centers
 >
 >     putStrLn $ "Backend: " ++ show backend

@@ -14,8 +14,8 @@ evaluateModel backend dataset path = do
     weights <- either (fail . show) pure =<< readSafetensors path
     parameters <-
         either (fail . show) pure $
-            NN.loadWeights @(Parameters T.Tensor) weights (T.run T.CPU emptyParameters)
-    let evaluateBatch = T.run3 backend $ \p x y ->
+            NN.loadWeights @(Parameters T.Tensor) weights (T.run T.defaultCPU emptyParameters)
+    let evaluateBatch = T.run backend $ \p x y ->
             let logits = predict p x
              in (NN.unsafeCrossEntropy @1 T.mean logits y, NN.accuracy @1 logits y)
         (loss, accuracy) = evaluateBatch parameters features labels

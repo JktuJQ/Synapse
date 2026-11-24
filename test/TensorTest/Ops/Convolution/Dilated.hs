@@ -25,14 +25,14 @@ propGrouped = H.withTests 1 $ H.property $ do
                 (T.fromList @'[4, 2, 2, 2, 2] [1 .. 64])
         depthwise =
             T.conv1d @'[1] @'[1, 1] @'[2] @3 (T.fromList @'[1, 3, 3] [1 .. 9 :: Float]) (T.fromList @'[6, 1, 2] [1 .. 12])
-    approxList (T.toList $ T.run T.CPU one) $ R.convWith [2, 4, 5] [6, 2, 2] [2] [1, 1] [2] 2 [1 .. 40] [1 .. 24]
-    approxList (T.toList $ T.run T.CPU two) $
+    approxList (T.toList $ T.run T.defaultCPU one) $ R.convWith [2, 4, 5] [6, 2, 2] [2] [1, 1] [2] 2 [1 .. 40] [1 .. 24]
+    approxList (T.toList $ T.run T.defaultCPU two) $
         R.convWith [1, 4, 4, 5] [6, 2, 2, 3] [1, 2] [1, 0, 1, 1] [2, 1] 2 [1 .. 80] [1 .. 72]
-    approxList (T.toList $ T.run T.CPU three) $
+    approxList (T.toList $ T.run T.defaultCPU three) $
         R.convWith [1, 4, 2, 3, 3] [4, 2, 2, 2, 2] [1, 1, 2] [1, 0, 1, 1, 0, 1] [1, 2, 1] 2 [1 .. 72] [1 .. 64]
-    approxList (T.toList $ T.run T.CPU depthwise) $
+    approxList (T.toList $ T.run T.defaultCPU depthwise) $
         R.convWith [1, 3, 3] [6, 1, 2] [1] [1, 1] [2] 3 [1 .. 9] [1 .. 12]
-    T.toList (T.run T.CPU $ T.conv1d @'[1] @'[0, 0] @'[1] @2 (T.zeros @'[1, 0, 2] @Int) (T.zeros @'[2, 0, 1]))
+    T.toList (T.run T.defaultCPU $ T.conv1d @'[1] @'[0, 0] @'[1] @2 (T.zeros @'[1, 0, 2] @Int) (T.zeros @'[2, 0, 1]))
         H.=== replicate 4 0
 
 propTranspose :: H.Property
@@ -49,11 +49,11 @@ propTranspose = H.withTests 1 $ H.property $ do
             T.convTranspose3d @'[1, 2, 2] @'[0, 1, 0, 0, 1, 0] @'[2, 1, 2] @2 @'[0, 1, 1]
                 (T.fromList @'[1, 4, 1, 2, 2] [1 .. 16 :: Double])
                 (T.fromList @'[4, 1, 2, 1, 2] [1 .. 16])
-    approxList (T.toList $ T.run T.CPU one) $
+    approxList (T.toList $ T.run T.defaultCPU one) $
         R.transposedWith [1, 4, 2] [4, 3, 2] [2] [1, 0] [2] 2 [1] [1 .. 8] [1 .. 24]
-    approxList (T.toList $ T.run T.CPU two) $
+    approxList (T.toList $ T.run T.defaultCPU two) $
         R.transposedWith [1, 4, 2, 2] [4, 3, 2, 2] [2, 1] [1, 0, 0, 1] [2, 1] 2 [1, 0] [1 .. 16] [1 .. 48]
-    approxList (T.toList $ T.run T.CPU three) $
+    approxList (T.toList $ T.run T.defaultCPU three) $
         R.transposedWith
             [1, 4, 1, 2, 2]
             [4, 1, 2, 1, 2]
@@ -71,8 +71,8 @@ propPatches = H.withTests 1 $ H.property $ do
         extracted = T.extractPatches2d @'[2, 2] @'[1, 2] @'[1, 0, 1, 1] @'[2, 1] input
         expected = R.patchesWith [1, 2, 3, 4] [2, 2] [1, 2] [1, 0, 1, 1] [2, 1] [1 .. 24]
         combined = T.combinePatches2d @'[1, 2, 3, 4] @'[2, 2] @'[1, 2] @'[1, 0, 1, 1] @'[2, 1] extracted
-    approxList (T.toList $ T.run T.CPU extracted) expected
-    approxList (T.toList $ T.run T.CPU combined) $
+    approxList (T.toList $ T.run T.defaultCPU extracted) expected
+    approxList (T.toList $ T.run T.defaultCPU combined) $
         R.combineWith [1, 2, 3, 4] [2, 2] [1, 2] [1, 0, 1, 1] [2, 1] expected
 
 propPooling :: H.Property
@@ -80,16 +80,16 @@ propPooling = H.withTests 1 $ H.property $ do
     let input = T.fromList @'[1, 1, 4, 4] [-16 .. -1 :: Double]
         result = T.maxPool2d @'[2, 2] @'[1, 1] @'[1, 1, 1, 1] @'[2, 2] input
         (empty, gradient) = AG.backprop (T.maxPool1d @'[2] @'[1] @'[1, 1] @'[2]) $ T.fromList @'[1, 1, 1] [5 :: Double]
-    approxList (T.toList $ T.run T.CPU result) $
+    approxList (T.toList $ T.run T.defaultCPU result) $
         R.poolWith [1, 1, 4, 4] [2, 2] [1, 1] [1, 1, 1, 1] [2, 2] maximum [-16 .. -1]
-    T.toList (T.run T.CPU empty) H.=== [-(1 / 0)]
-    T.toList (T.run T.CPU gradient) H.=== [0]
-    T.toList (T.run T.CPU $ T.maxPool1d @'[2] @'[1] @'[1, 1] @'[2] $ T.fromList @'[1, 1, 1] [5 :: Int])
+    T.toList (T.run T.defaultCPU empty) H.=== [-(1 / 0)]
+    T.toList (T.run T.defaultCPU gradient) H.=== [0]
+    T.toList (T.run T.defaultCPU $ T.maxPool1d @'[2] @'[1] @'[1, 1] @'[2] $ T.fromList @'[1, 1, 1] [5 :: Int])
         H.=== [minBound]
 
 propPrepared :: H.Property
 propPrepared = H.withTests 1 $ H.property $ do
-    let execute = T.run2 T.CPU $ T.conv1d @'[1] @'[0, 0] @'[2] @2
+    let execute = T.run T.defaultCPU $ T.conv1d @'[1] @'[0, 0] @'[2] @2
         first = execute (T.fromListData @'[1, 2, 3] [1 .. 6 :: Double]) (T.fromListData @'[2, 1, 2] [1 .. 4])
         second = execute (T.fromListData [2 .. 7]) (T.fromListData [2 .. 5])
     T.toList first H.=== [7, 36]

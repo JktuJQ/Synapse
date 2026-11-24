@@ -31,7 +31,7 @@ instance T.TensorStructure (Shared T.Tensor Double) where
     type WithTensor t (Shared T.Tensor Double) = Shared t Double
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 parameters :: Parameters T.Tensor Double
 parameters =
@@ -75,7 +75,7 @@ tests =
                         (NN.Dense (T.fromList @'[2, 2] [1, -1, 2, 1]) (T.zeros @'[2]))
                         (NN.Dense (T.fromList @'[2, 1] [3, 4]) (T.fromList @'[1] [0.5]))
                         :: Parameters T.Tensor Float
-            T.toList (T.run T.CPU (network p (T.fromList @'[2] [1, 2]))) H.=== [19.5]
+            T.toList (T.run T.defaultCPU (network p (T.fromList @'[2] [1, 2]))) H.=== [19.5]
         , testProperty "arrows and ordinary function composition use the same parameters" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2] [1, 2 :: Double]
                 composed = NN.dense (hiddenLayer parameters) >>> NN.relu >>> NN.dense (outputLayer parameters)

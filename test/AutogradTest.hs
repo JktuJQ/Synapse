@@ -16,7 +16,7 @@ differentiate
     -> Double
     -> ([Double], [Double])
 differentiate f x =
-    let (value, gradient) = T.run T.CPU (AG.backprop f (T.full @'[] x))
+    let (value, gradient) = T.run T.defaultCPU (AG.backprop f (T.full @'[] x))
      in (T.toList value, T.toList gradient)
 
 tests :: TestTree

@@ -24,7 +24,7 @@ differentiate
 differentiate = AG.backprop
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 finiteDifferences
     :: (T.Shape from, T.Shape to)
@@ -88,7 +88,7 @@ tests =
             values gradient H.=== values generated
         , testProperty "host conversions construct constants in differentiation scopes" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [1, 2, 3 :: Double]
-                host = T.run T.CPU input
+                host = T.run T.defaultCPU input
                 (value, gradient) = differentiate (\x -> x * T.fromList [2, 3, 4] + T.unsafeFromList [5, 6, 7] + T.fromData host) input
                 (_, constantGradient) = differentiate (\_ -> T.fromList @'[3] [2, 3, 4] + T.unsafeFromList [5, 6, 7] + T.fromData host) input
             values value H.=== [8, 14, 22]
@@ -175,7 +175,7 @@ tests =
         , testProperty "arg extrema return ordinary indices that can be reshaped" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2, 3] [1, 5, 2, 4, 3, 6 :: Double]
                 (maxima, minima) =
-                    T.run T.CPU $
+                    T.run T.defaultCPU $
                         AG.evaluate (\x -> AG.constant (T.reshape @'[2, 1] (T.argmax @1 x), T.reshape @'[2, 1] (T.argmin @1 x))) input
             T.toList maxima H.=== [1, 2]
             T.toList minima H.=== [0, 1]
@@ -258,13 +258,13 @@ tests =
             values value H.=== [0]
             values gradient H.=== []
         , testProperty "prepared broadcast matmul gradients accept changing vectors" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ \lhs rhs ->
+            let execute = T.run T.defaultCPU $ \lhs rhs ->
                     let (output, (dl, dr)) = AG.backprop (uncurry T.matmul) (lhs, rhs)
                      in (output, dl, dr)
                 vector = T.fromList @'[3] [1, 2, 3 :: Double]
-                right = T.run T.CPU (T.ones @'[2, 3, 2] @Double)
-                (first, firstDL, firstDR) = execute (T.run T.CPU vector) right
-                (second, secondDL, secondDR) = execute (T.run T.CPU (2 * vector)) right
+                right = T.run T.defaultCPU (T.ones @'[2, 3, 2] @Double)
+                (first, firstDL, firstDR) = execute (T.run T.defaultCPU vector) right
+                (second, secondDL, secondDR) = execute (T.run T.defaultCPU (2 * vector)) right
             T.toList first H.=== replicate 4 6
             T.toList firstDL H.=== [4, 4, 4]
             T.toList firstDR H.=== [1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3]

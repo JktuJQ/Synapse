@@ -62,7 +62,7 @@ floatingElement =
         (\() seed -> T.fromGen $ \_ -> seed * sin 1)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -72,7 +72,7 @@ tests =
             let ordinary = floatingElement $ T.fromList @'[1] [True]
                 (_, backward) = AG.pullback (T.scalar . floatingElement) $ T.fromList @'[1] [2 :: Double]
                 gradient = backward $ T.full @'[] 3
-            T.toList (T.run T.CPU $ T.scalar ordinary) H.=== [True]
+            T.toList (T.run T.defaultCPU $ T.scalar ordinary) H.=== [True]
             approxList (values gradient) [3 * sin 1]
         , testProperty "records, independent shapes and a private cache preserve element cotangents" $ H.withTests 1 $ H.property $ do
             let input = Inputs (T.fromList [2, 3]) (T.fromList [5, 7, 11]) :: Inputs T.Tensor
@@ -88,7 +88,7 @@ tests =
             values output H.=== [6]
             values gradient H.=== [3, 2]
         , testProperty "prepared element residuals follow changing runtime inputs" $ H.withTests 1 $ H.property $ do
-            let execute = T.run1 T.CPU $ AG.backprop (T.scalar . productElement)
+            let execute = T.run T.defaultCPU $ AG.backprop (T.scalar . productElement)
                 (first, Inputs dx1 dy1) = execute $ Inputs (T.fromListData [2, 3]) (T.fromListData [5, 7, 11])
                 (second, Inputs dx2 dy2) = execute $ Inputs (T.fromListData [4, 6]) (T.fromListData [10, 14, 22])
             T.toList first H.=== [14]
@@ -106,7 +106,7 @@ tests =
                         (error "cache evaluated")
                         (error "pullback evaluated")
                         input
-            T.toList (T.run T.CPU $ T.scalar output) H.=== [3]
+            T.toList (T.run T.defaultCPU $ T.scalar output) H.=== [3]
         , testProperty "non-numeric elements need no numeric dictionaries" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2] [False, True]
                 output =
@@ -116,7 +116,7 @@ tests =
                         (error "cache evaluated")
                         (error "pullback evaluated")
                         input
-            T.toList (T.run T.CPU $ T.scalar output) H.=== [True]
+            T.toList (T.run T.defaultCPU $ T.scalar output) H.=== [True]
         , testProperty "element primitives can change the result element type" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[2] [2, 3 :: Int]
                 output =
@@ -126,7 +126,7 @@ tests =
                         (error "cache evaluated")
                         (error "pullback evaluated")
                         input
-            T.toList (T.run T.CPU $ T.scalar output) H.=== [True]
+            T.toList (T.run T.defaultCPU $ T.scalar output) H.=== [True]
         , testProperty "element expressions keep generator-local coordinate scope" $ H.withTests 1 $ H.property $ do
             let source = T.fromList @'[3] [2, 5, 11 :: Int]
                 at selected =
@@ -137,9 +137,9 @@ tests =
                         (error "pullback evaluated")
                         source
                 output = T.fromGen @'[3] at
-            T.toList (T.run T.CPU output) H.=== [2, 5, 11]
+            T.toList (T.run T.defaultCPU output) H.=== [2, 5, 11]
         , testProperty "runtime indices remain inputs to prepared element gradients" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ \(indices :: T.Tensor '[1] Int) (tensor :: T.Tensor '[3] Double) ->
+            let execute = T.run T.defaultCPU $ \(indices :: T.Tensor '[1] Int) (tensor :: T.Tensor '[3] Double) ->
                     let Raw.TensorElement i = T.index @'[0] indices
                         selected = Raw.TensorIndex $ A.index1 i
                      in AG.backprop (\x -> T.scalar $ T.dynamicIndexOr 13 x selected) tensor

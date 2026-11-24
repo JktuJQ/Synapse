@@ -18,10 +18,10 @@ parameters :: NN.Embedding 4 2 T.Tensor Double
 parameters = NN.Embedding $ T.fromList [1, 2, 3, 4, 5, 6, 7, 8]
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 seedGradient :: T.TensorData '[6] Int -> T.TensorData '[6, 2] Double -> NN.Embedding 4 2 T.TensorData Double
-seedGradient = T.run2 T.CPU $ \indices seed -> snd (AG.pullback (`NN.embedding` indices) parameters) seed
+seedGradient = T.run T.defaultCPU $ \indices seed -> snd (AG.pullback (`NN.embedding` indices) parameters) seed
 
 tests :: TestTree
 tests =
@@ -55,22 +55,22 @@ tests =
                 gradient = AG.gradient (\p -> T.sum $ NN.embedding p indices + NN.embedding p indices) parameters
             values (NN.embeddingWeights gradient) H.=== [4, 4, 0, 0, 2, 2, 0, 0]
         , testProperty "prepared lookup accepts changing weights and integer inputs" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ \p selected -> NN.embedding p (selected :: T.Tensor '[2] Int)
+            let execute = T.run T.defaultCPU $ \p selected -> NN.embedding p (selected :: T.Tensor '[2] Int)
                 first = T.fromListData @'[2] [2, 0]
                 second = T.fromListData @'[2] [1, 3]
-                original = T.run T.CPU parameters
-                doubled = T.run T.CPU $ NN.Embedding $ NN.embeddingWeights parameters * 2
+                original = T.run T.defaultCPU parameters
+                doubled = T.run T.defaultCPU $ NN.Embedding $ NN.embeddingWeights parameters * 2
             T.toList (execute original first) H.=== [5, 6, 1, 2]
             T.toList (execute doubled second) H.=== [6, 8, 14, 16]
         , testProperty "prepared SGD learns selected embeddings while preserving unused rows" $ H.withTests 1 $ H.property $ do
             let initial = NN.Embedding $ T.fromList @'[4, 2] [0, 0, 10, 20, 0, 0, 30, 40 :: Double]
                 targets = T.fromList @'[3, 2] [1, 2, 3, 4, 1, 2 :: Double]
-                execute = T.run2 T.CPU $ \p selected ->
+                execute = T.run T.defaultCPU $ \p selected ->
                     let (loss, gradients) = AG.backprop (\table -> NN.mse T.mean (NN.embedding table selected) (AG.constant targets)) p
                         updated = NN.evalState (NN.optimizerStep (NN.SGD 0.5) p gradients) ()
                      in (loss, updated)
                 indices = T.fromListData @'[3] [0, 2, 0]
-            trained <- foldM (\p _ -> pure $ snd $ execute p indices) (T.run T.CPU initial) [1 .. 12 :: Int]
+            trained <- foldM (\p _ -> pure $ snd $ execute p indices) (T.run T.defaultCPU initial) [1 .. 12 :: Int]
             let (loss, _) = execute trained indices
                 rows = T.toList $ NN.embeddingWeights trained
             H.assert $ all (< 0.1) $ T.toList loss
@@ -93,15 +93,15 @@ tests =
             let table = NN.Embedding $ T.fromList @'[3, 2] [1, 2, 3, 4, 5, 6 :: Float]
                 indices = T.fromList @'[2, 2] [2, 1, 2, 0]
                 (output, gradient) = AG.backprop (`NN.embedding` indices) table
-            T.toList (T.run T.CPU output) H.=== [5, 6, 3, 4, 5, 6, 1, 2]
-            T.toList (T.run T.CPU $ NN.embeddingWeights gradient) H.=== [1, 1, 1, 1, 2, 2]
+            T.toList (T.run T.defaultCPU output) H.=== [5, 6, 3, 4, 5, 6, 1, 2]
+            T.toList (T.run T.defaultCPU $ NN.embeddingWeights gradient) H.=== [1, 1, 1, 1, 2, 2]
         , testProperty "embedding composes as an arrow without changing model state" $ H.withTests 1 $ H.property $ do
             let indices = T.fromList @'[2] [1, 3]
                 (output, state) = NN.runState (NN.forward (NN.embedding parameters) indices) True
             state H.=== True
             values output H.=== [3, 4, 7, 8]
         , testProperty "materialized embedding weights round-trip through named weight storage" $ H.withTests 1 $ H.property $ do
-            let stored = NN.extractWeights $ T.run T.CPU parameters
+            let stored = NN.extractWeights $ T.run T.defaultCPU parameters
                 template = NN.Embedding $ T.fromListData @'[4, 2] $ replicate 8 (0 :: Double)
             map fst ((Map.toAscList . Weights.weightsEntries) stored) H.=== [["embeddingWeights"]]
             restored <- H.evalEither $ NN.loadWeights stored template

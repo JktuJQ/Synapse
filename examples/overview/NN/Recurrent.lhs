@@ -175,9 +175,9 @@ GPU execution requires Synapse to be built with the Cabal flag -fgpu and a suppo
 > chooseBackend = do
 >     args <- getArgs
 >     case args of
->         [] -> pure T.CPU
->         ["--cpu"] -> pure T.CPU
->         ["--gpu"] -> pure T.GPU
+>         [] -> pure T.defaultCPU
+>         ["--cpu"] -> pure T.defaultCPU
+>         ["--gpu"] -> pure T.defaultGPU
 >         _ -> ioError $ userError "Usage: recurrent-example [--cpu | --gpu]"
 
 Prepare one training executor for batches of 16 and one validation executor for batches of 32.
@@ -237,7 +237,7 @@ The table compares streaming predictions with the target moving average on a new
 
 >     (parameters, _) <- readIORef model
 >     let (inputs, targets) = sample 2000
->         cell = T.run3 backend streamingStep
+>         cell = T.run backend streamingStep
 >     recurrentState <- newIORef $ T.run backend (NN.LSTMState 0 0 :: NN.LSTMState 1 8 T.Tensor Double)
 >     putStrLn "\nStreaming inference on a new sequence:"
 >     putStrLn " input   target  predicted"

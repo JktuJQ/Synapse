@@ -15,7 +15,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 -- Ordinary cache metadata is not part of the differentiable tensor structure.
 data Metadata = Metadata Int String
@@ -117,14 +117,14 @@ tests =
         "custom tensor primitives"
         [ testProperty "user-defined backward constraints do not restrict ordinary evaluation" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [False, True, False]
-            T.toList (T.run T.CPU $ customIdentity input) H.=== [False, True, False]
+            T.toList (T.run T.defaultCPU $ customIdentity input) H.=== [False, True, False]
         , testProperty "autograd supplies the constraint selected by each reverse rule" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [1, 2, 3 :: Double]
                 (output, gradient) = AG.backprop customIdentity input
             values output H.=== [1, 2, 3]
             values gradient H.=== [2, 2, 2]
         , testProperty "private cache supports metadata and changing prepared inputs" $ H.withTests 1 $ H.property $ do
-            let execute = T.run1 T.CPU $ \x -> AG.backprop cachedSquare (x :: T.Tensor '[3] Double)
+            let execute = T.run T.defaultCPU $ \x -> AG.backprop cachedSquare (x :: T.Tensor '[3] Double)
                 (out1, g1) = execute $ T.fromListData [1, 2, 3]
                 (out2, g2) = execute $ T.fromListData [2, 4, 6]
             T.toList out1 H.=== [1, 4, 9]
@@ -168,15 +168,15 @@ tests =
                         (error "cache evaluated")
                         (error "pullback evaluated")
                         input
-            T.toList (T.run T.CPU output) H.=== [6]
+            T.toList (T.run T.defaultCPU output) H.=== [6]
         , testProperty "ordinary boolean inputs and type-changing results need no numeric instance" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [False, True, False]
                 output = customVJP (Proxy @(() :: Constraint)) id (error "cache evaluated") (error "pullback evaluated") input
                 integral = T.fromList @'[3] [0, 1, 2 :: Int]
                 mask =
                     customVJP (Proxy @(() :: Constraint)) (T.> 1) (error "cache evaluated") (error "pullback evaluated") integral
-            T.toList (T.run T.CPU output) H.=== [False, True, False]
-            T.toList (T.run T.CPU mask) H.=== [False, False, True]
+            T.toList (T.run T.defaultCPU output) H.=== [False, True, False]
+            T.toList (T.run T.defaultCPU mask) H.=== [False, False, True]
         , testProperty "pullback reuses the cached output" $ H.withTests 1 $ H.property $ do
             let operation :: TensorOps t Double => t '[2] Double -> t '[2] Double
                 operation = customVJP (Proxy @(() :: Constraint)) exp (\x -> let y = exp x in (y, y)) (*)

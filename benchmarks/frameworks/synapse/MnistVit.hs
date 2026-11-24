@@ -129,14 +129,14 @@ experiment =
                 , T.toList (NN.layerNormWeights (norm2 p))
                 , T.toList (NN.layerNormBias (norm2 p))
                 ]
-        , infer = T.run2 T.CPU predict
+        , infer = T.run T.defaultCPU predict
         , step = \parameters batch -> preparedStep parameters (features batch) (targets batch)
         , validate = \parameters batch -> preparedValidation parameters (features batch) (targets batch)
         }
   where
-    preparedStep = T.run3 T.CPU $ \parameters features targets ->
+    preparedStep = T.run T.defaultCPU $ \parameters features targets ->
         NN.runState (trainingStep features targets) parameters
-    preparedValidation = T.run3 T.CPU $ \parameters features targets ->
+    preparedValidation = T.run T.defaultCPU $ \parameters features targets ->
         let logits = predict parameters features
          in (NN.unsafeCrossEntropy @1 T.mean logits targets, NN.accuracy @1 logits targets)
 

@@ -15,7 +15,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: (T.Shape sh, T.DType a) => T.Tensor sh a -> [a]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 -- Nested products and different tensor ranks with a shared element type.
 data Gradients t a = Gradients
@@ -91,7 +91,7 @@ tests =
             let floats = Gradients (T.fromList [3, -4, 0, 0]) (T.fromList [12], 0) :: Gradients T.Tensor Float
             values (NN.gradientNormL1 floats) H.=== [19]
             approxList (values $ NN.gradientNormL2 floats) [13]
-            let clipped = T.run T.CPU $ NN.clipGradNormL2 6.5 floats
+            let clipped = T.run T.defaultCPU $ NN.clipGradNormL2 6.5 floats
             approxList (T.toList $ matrix clipped) [1.5, -2, 0, 0]
             approxList (T.toList $ fst $ nested clipped) [6]
             let emptyFields :: (T.Tensor '[0] Double, T.Tensor '[2, 0] Double)
@@ -102,29 +102,29 @@ tests =
             let l1 = NN.clipGradNormL1 9.5 gradients
                 l2 = NN.clipGradNormL2 6.5 gradients
                 expected = [1.5, -2, 0, 0, 6, 0]
-            approxList (components $ T.run T.CPU l1) expected
-            approxList (components $ T.run T.CPU l2) expected
+            approxList (components $ T.run T.defaultCPU l1) expected
+            approxList (components $ T.run T.defaultCPU l2) expected
             approxList (values $ NN.gradientNormL1 l1) [9.5]
             approxList (values $ NN.gradientNormL2 l2) [6.5]
         , testProperty "small gradients are preserved and a zero limit clears nonzero gradients" $ H.withTests 1 $ H.property $ do
-            let unchanged = components $ T.run T.CPU gradients
-            approxList (components $ T.run T.CPU $ NN.clipGradNormL1 20 gradients) unchanged
-            approxList (components $ T.run T.CPU $ NN.clipGradNormL2 20 gradients) unchanged
-            approxList (components $ T.run T.CPU $ NN.clipGradNormL1 0 gradients) $ replicate 6 0
-            approxList (components $ T.run T.CPU $ NN.clipGradNormL2 0 gradients) $ replicate 6 0
+            let unchanged = components $ T.run T.defaultCPU gradients
+            approxList (components $ T.run T.defaultCPU $ NN.clipGradNormL1 20 gradients) unchanged
+            approxList (components $ T.run T.defaultCPU $ NN.clipGradNormL2 20 gradients) unchanged
+            approxList (components $ T.run T.defaultCPU $ NN.clipGradNormL1 0 gradients) $ replicate 6 0
+            approxList (components $ T.run T.defaultCPU $ NN.clipGradNormL2 0 gradients) $ replicate 6 0
         , testProperty "zero and empty gradients remain finite even with a zero limit" $ H.withTests 1 $ H.property $ do
             let zero = Gradients 0 (0, 0)
                 empty = (T.zeros @'[0] @Double, T.zeros @'[2, 0] @Double)
             forM_ [NN.clipGradNormL1, NN.clipGradNormL2] $ \clip ->
-                approxList (components $ T.run T.CPU $ clip 0 zero) $ replicate 6 0
-            let (first, second) = T.run T.CPU $ NN.clipGradNormL2 0 empty
+                approxList (components $ T.run T.defaultCPU $ clip 0 zero) $ replicate 6 0
+            let (first, second) = T.run T.defaultCPU $ NN.clipGradNormL2 0 empty
             T.toList first H.=== []
             T.toList second H.=== []
         , testProperty "global L2 aggregation remains stable across large and tiny tensor fields" $ H.withTests 1 $ H.property $ do
             forM_ [1e200, 1e-200] $ \scale -> do
                 let g = (T.full @'[] (3 * scale :: Double), T.full @'[] (4 * scale :: Double))
                     clipped = NN.clipGradNormL2 (2.5 * scale) g
-                    (first, second) = T.run T.CPU clipped
+                    (first, second) = T.run T.defaultCPU clipped
                 approxList (map (/ scale) $ values $ NN.gradientNormL2 g) [5]
                 approxList (map (/ scale) $ T.toList first ++ T.toList second) [1.5, 2]
         , testProperty "Float clipping uses Float arithmetic for the scale" $ H.withTests 1 $ H.property $ do
@@ -132,7 +132,7 @@ tests =
                 clipped = NN.clipGradNormL2 1e-20 g
             values clipped H.=== [0]
         , testProperty "prepared differentiation clipping and SGD accept changing parameters" $ H.withTests 1 $ H.property $ do
-            let step = T.run1 T.CPU $ \p ->
+            let step = T.run T.defaultCPU $ \p ->
                     let gradient = AG.gradient (\(x, y) -> (x * x + y * y) / 2) p
                         clipped = NN.clipGradNormL2 1 gradient
                      in (NN.gradientNormL2 gradient, NN.evalState (NN.optimizerStep (NN.SGD 1) p clipped) ())

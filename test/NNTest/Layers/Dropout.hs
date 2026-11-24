@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -19,7 +19,7 @@ tests =
         [ testProperty "prepared dropout accepts changing external masks" $ H.withTests 1 $ H.property $ do
             let apply :: T.Tensor '[2] Double -> T.Tensor '[2] Bool -> T.Tensor '[2] Double
                 apply input mask = NN.dropoutWithMask NN.Train 0.5 mask input
-                execute = T.run2 T.CPU apply
+                execute = T.run T.defaultCPU apply
                 x = T.fromListData @'[2] [2, 4 :: Double]
                 first = T.fromListData @'[2] [True, False]
                 second = T.fromListData @'[2] [False, True]
@@ -39,9 +39,9 @@ tests =
             values (AG.gradient (NN.dropoutWithMask NN.Train 1 undefined) x) H.=== [0, 0]
         , testProperty "prepared dropout samples a fresh mask from each returned state" $ H.withTests 1 $ H.property $ do
             let (initial, _) = NN.initializeDropout $ mkStdGen 42
-                execute = T.run2 T.CPU $ \running features -> NN.runState (NN.dropout NN.Train 0.5 (features :: T.Tensor '[64] Double)) running
+                execute = T.run T.defaultCPU $ \running features -> NN.runState (NN.dropout NN.Train 0.5 (features :: T.Tensor '[64] Double)) running
                 input = T.fromListData @'[64] $ replicate 64 1
-                state = T.run T.CPU initial
+                state = T.run T.defaultCPU initial
                 (first, next) = execute state input
                 (second, _) = execute next input
                 (repeated, _) = execute state input
@@ -58,10 +58,10 @@ tests =
                 (mask, expectedState) = State.runState (T.bernoulli @'[4] 0.5) $ NN.dropoutGenerator state
                 (actualNext, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator next
                 (expectedNext, _) = State.runState (T.randomWords @'[4]) expectedState
-                retained = T.toList $ T.run T.CPU mask
+                retained = T.toList $ T.run T.defaultCPU mask
             values output H.=== zipWith (\keep x -> if keep then x * 2 else 0) retained [1, 2, 3, 4]
             values gradients H.=== map (\keep -> if keep then 2 else 0) retained
-            T.toList (T.run T.CPU actualNext) H.=== T.toList (T.run T.CPU expectedNext)
+            T.toList (T.run T.defaultCPU actualNext) H.=== T.toList (T.run T.defaultCPU expectedNext)
         , testProperty "evaluation and endpoint probabilities preserve state" $ H.withTests 1 $ H.property $ do
             let state = NN.DropoutState $ T.generatorFromSeed 42
                 input = T.fromList @'[2] [2, 4 :: Double]
@@ -73,7 +73,7 @@ tests =
                 ( \(mode, probability) -> do
                     let (_, next) = NN.runState (NN.dropout mode probability input) state
                         (actual, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator next
-                    T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
+                    T.toList (T.run T.defaultCPU actual) H.=== T.toList (T.run T.defaultCPU expected)
                 )
                 [(NN.Eval, 0.5), (NN.Train, 0), (NN.Train, 1)]
         , testProperty "empty dropout does not advance the generator and supports Float" $ H.withTests 1 $ H.property $ do
@@ -82,7 +82,7 @@ tests =
                 (actual, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator next
                 (expected, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator state
                 (output, _) = NN.runState (NN.dropout NN.Train 0.5 $ T.ones @'[16] @Float) state
-            T.toList (T.run T.CPU empty) H.=== []
-            T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
-            H.assert $ all (`elem` [0, 2]) $ T.toList $ T.run T.CPU output
+            T.toList (T.run T.defaultCPU empty) H.=== []
+            T.toList (T.run T.defaultCPU actual) H.=== T.toList (T.run T.defaultCPU expected)
+            H.assert $ all (`elem` [0, 2]) $ T.toList $ T.run T.defaultCPU output
         ]

@@ -71,14 +71,14 @@ experiment =
                     (NN.LSTM (T.fromListData w) (T.fromListData r) (T.fromListData b) (T.fromListData c))
                     (NN.Dense (T.fromListData o) (T.fromListData ob))
         , parameterValues = \(Parameters (NN.LSTM w r b c) (NN.Dense o ob)) -> concat [T.toList w, T.toList r, T.toList b, T.toList c, T.toList o, T.toList ob]
-        , infer = T.run2 T.CPU predict
+        , infer = T.run T.defaultCPU predict
         , step = \parameters batch -> preparedStep parameters (features batch) (targets batch)
         , validate = \parameters batch -> preparedValidation parameters (features batch) (targets batch)
         }
   where
-    preparedStep = T.run3 T.CPU $ \parameters features targets ->
+    preparedStep = T.run T.defaultCPU $ \parameters features targets ->
         NN.runState (trainingStep features targets) parameters
-    preparedValidation = T.run3 T.CPU $ \parameters features targets ->
+    preparedValidation = T.run T.defaultCPU $ \parameters features targets ->
         let logits = predict parameters features
          in (NN.unsafeCrossEntropy @1 T.mean logits targets, NN.accuracy @1 logits targets)
 

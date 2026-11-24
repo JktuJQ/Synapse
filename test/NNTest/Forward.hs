@@ -123,7 +123,7 @@ tests =
                              in NN.evalState (NN.forward pipeline 1 >> NN.forward pipeline 1) 1
                         )
                         input
-            approxList (T.toList $ T.run T.CPU result) [5]
+            approxList (T.toList $ T.run T.defaultCPU result) [5]
         , testProperty "stateful lenses update only the selected field" $ H.withTests 1 $ H.property $ do
             let operation input = state $ \previous -> (previous + input, previous + 1)
                 pipeline = NN.stateful firstLens operation
@@ -143,17 +143,17 @@ tests =
                 ordinary = stateless parameters input
                 (statefulOutput, nextState) = NN.runState (NN.forward (stateless parameters) input) True
             nextState H.=== True
-            T.toList (T.run T.CPU ordinary) H.=== T.toList (T.run T.CPU statefulOutput)
+            T.toList (T.run T.defaultCPU ordinary) H.=== T.toList (T.run T.defaultCPU statefulOutput)
         , testProperty "prepared training threads model state outside the differentiation tape" $ H.withTests 1 $ H.property $ do
-            let execute = T.run3 T.CPU $ \parametersInput runningInput featuresInput ->
+            let execute = T.run T.defaultCPU $ \parametersInput runningInput featuresInput ->
                     AG.backprop
                         ( \p ->
                             let (result, next) = NN.runState (NN.forward (predict NN.Train p) $ AG.constant featuresInput) runningInput
                              in (T.sum $ result * result, AG.constant next)
                         )
                         parametersInput
-                parameters = T.run T.CPU initialParameters
-                running = T.run T.CPU initialNetworkState
+                parameters = T.run T.defaultCPU initialParameters
+                running = T.run T.defaultCPU initialNetworkState
                 features = T.fromListData @'[2, 2] [1, 2, 3, 5 :: Double]
                 ((loss, first), gradients) = execute parameters running features
                 ((_, second), _) = execute parameters first features
@@ -167,11 +167,11 @@ tests =
                 (_, next) = NN.runState (NN.forward (predict NN.Eval initialParameters) input) initialNetworkState
                 (actual, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator $ randomness next
                 (expected, _) = State.runState (T.randomWords @'[4]) $ NN.dropoutGenerator $ randomness initialNetworkState
-            T.toList (T.run T.CPU actual) H.=== T.toList (T.run T.CPU expected)
-            T.toList (T.run T.CPU $ NN.batchNormMean $ statistics next) H.=== [0, 0]
+            T.toList (T.run T.defaultCPU actual) H.=== T.toList (T.run T.defaultCPU expected)
+            T.toList (T.run T.defaultCPU $ NN.batchNormMean $ statistics next) H.=== [0, 0]
         , testProperty "one prepared step combines model state, gradients and optimizer State" $ H.withTests 1 $ H.property $ do
             let optimizer = NN.Adam 0.01 0.9 0.999 1e-8
-                execute = T.run4 T.CPU $ \parametersInput runningInput optimizerInput featuresInput ->
+                execute = T.run T.defaultCPU $ \parametersInput runningInput optimizerInput featuresInput ->
                     let ((loss, nextModel), gradients) =
                             AG.backprop
                                 ( \p ->
@@ -181,9 +181,9 @@ tests =
                                 parametersInput
                         (updated, nextOptimizer) = NN.runState (NN.optimizerStep optimizer parametersInput gradients) optimizerInput
                      in (loss, (updated, (nextModel, nextOptimizer)))
-                parameters = T.run T.CPU initialParameters
-                running = T.run T.CPU initialNetworkState
-                optimizerState = T.run T.CPU $ NN.initialState optimizer initialParameters
+                parameters = T.run T.defaultCPU initialParameters
+                running = T.run T.defaultCPU initialNetworkState
+                optimizerState = T.run T.defaultCPU $ NN.initialState optimizer initialParameters
                 features = T.fromListData @'[2, 2] [1, 2, 3, 5 :: Double]
                 (_, (firstParameters, (firstModel, firstOptimizer))) = execute parameters running optimizerState features
                 (_, (_, (secondModel, (count, _)))) = execute firstParameters firstModel firstOptimizer features
@@ -203,6 +203,6 @@ tests =
                     first <- NN.optimizerStep optimizer parameters 2
                     NN.optimizerStep optimizer first 3
                 (updated, (count, _)) = NN.runState action $ NN.initialState optimizer parameters
-            T.toList (T.run T.CPU count) H.=== [2]
-            H.assert $ all (< 5) $ T.toList $ T.run T.CPU updated
+            T.toList (T.run T.defaultCPU count) H.=== [2]
+            H.assert $ all (< 5) $ T.toList $ T.run T.defaultCPU updated
         ]

@@ -18,7 +18,7 @@ import qualified Synapse.Tensor as T
 parameters :: Dense 2 1 T.Tensor Float
 parameters = Dense (T.fromList \@'[2, 1] [0.25, 0.5]) (T.zeros \@'[1])
 
-template = T.run T.CPU parameters
+template = T.run T.defaultCPU parameters
 weights = W.extractWeights template
 restored = W.loadWeights weights template
 @

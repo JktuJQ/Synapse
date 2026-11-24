@@ -59,9 +59,9 @@ tests =
         , testProperty "typed entries use ordinary tensor transformations" $ H.withTests 1 $ H.property $ do
             let source = Weights.weightTensorFromTensorData $ T.fromListData @'[3, 2] [1, 2, 3, 4, 5, 6 :: Double]
             matrix <- H.evalEither $ Weights.weightTensorToTensorData @'[3, 2] @Double source
-            let transposed = T.run T.CPU $ T.transpose $ T.fromData matrix
-                reshaped = T.run T.CPU $ T.reshape @'[6] $ T.transpose $ T.fromData matrix
-                middle = T.run T.CPU $ T.slice @'[ 'T.Range 1 2 1, 'T.All] $ T.fromData matrix
+            let transposed = T.run T.defaultCPU $ T.transpose $ T.fromData matrix
+                reshaped = T.run T.defaultCPU $ T.reshape @'[6] $ T.transpose $ T.fromData matrix
+                middle = T.run T.defaultCPU $ T.slice @'[ 'T.Range 1 2 1, 'T.All] $ T.fromData matrix
             T.toList transposed H.=== [1, 3, 5, 2, 4, 6]
             T.toList reshaped H.=== [1, 3, 5, 2, 4, 6]
             T.toList middle H.=== [3, 4]

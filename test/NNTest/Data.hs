@@ -71,10 +71,10 @@ train :: NN.LastBatch Double Double -> [Double]
 train policy =
     let samples = [(T.fromListData @'[1] [x], T.fromListData @'[1] [2 * x + 1]) | x <- [1 .. 5]]
         batches = sampleBatches 2 policy samples
-        initial = T.run T.CPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
+        initial = T.run T.defaultCPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
         update
             :: NN.Dense 1 1 T.TensorData Double -> NN.SomeBatch '[1] '[1] Double Double -> NN.Dense 1 1 T.TensorData Double
-        update parameters some = NN.withBatch some $ \batch -> T.run4 T.CPU step parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
+        update parameters some = NN.withBatch some $ \batch -> T.run T.defaultCPU step parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
         final = foldl' update initial (concat (replicate 3 batches))
      in T.toList (NN.denseWeights final) ++ T.toList (NN.denseBias final)
 
@@ -344,7 +344,7 @@ tests =
                     let x = fromIntegral (index + 1)
                      in pure (T.fromListData @'[1] [x], T.fromListData @'[1] [2 * x + 1 :: Double])
                 source = NN.Indexed 5 sample
-                initial = T.run T.CPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
+                initial = T.run T.defaultCPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
                 analytic (weight, bias) inputs =
                     let residual x = weight * x + bias - (2 * x + 1)
                         scale = 0.02 / fromIntegral (length inputs)
@@ -355,7 +355,7 @@ tests =
                     -> Identity (NN.SomeBatch '[1] '[1] Double Double)
                     -> IO (NN.Dense 1 1 T.TensorData Double)
                 update parameters load = NN.withBatch (runIdentity load) $ \(batch :: NN.Batch batch '[1] '[1] Double Double) -> do
-                    let updated = T.run4 T.CPU (step @batch) parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
+                    let updated = T.run T.defaultCPU (step @batch) parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
                     _ <- evaluate (sum (T.toList (NN.denseWeights updated)) + sum (T.toList (NN.denseBias updated)))
                     pure updated
             trained <- H.evalIO $ foldM update initial (concat (replicate 12 (NN.loadBatches 3 NN.KeepLast source)))
@@ -387,7 +387,7 @@ tests =
                         ( \i ->
                             let x = fromIntegral (i + 1) in pure (T.fromListData @'[1] [x], T.fromListData @'[1] [2 * x + 1 :: Double])
                         )
-                initial = T.run T.CPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
+                initial = T.run T.defaultCPU (NN.Dense (T.zeros @'[1, 1]) (T.zeros @'[1]) :: NN.Dense 1 1 T.Tensor Double)
                 update
                     :: NN.Dense 1 1 T.TensorData Double
                     -> IO (NN.SomeBatch '[1] '[1] Double Double)
@@ -395,7 +395,7 @@ tests =
                 update parameters load = do
                     some <- load
                     NN.withBatch some $ \batch -> do
-                        let updated = T.run4 T.CPU step parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
+                        let updated = T.run T.defaultCPU step parameters (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
                         _ <- evaluate (sum (T.toList (NN.denseWeights updated)) + sum (T.toList (NN.denseBias updated)))
                         pure updated
             final <- H.evalIO $ foldM update initial (concat (replicate 3 (NN.loadBatches 2 NN.KeepLast dataset)))

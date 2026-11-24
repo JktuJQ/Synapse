@@ -25,7 +25,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -95,7 +95,7 @@ lossTests =
             values (NN.unsafeCrossEntropySmoothed @1 T.sum 0.2 empty labels) H.=== [0]
             values (NN.smoothLabels @1 0.2 empty) H.=== []
             let floatTargets = T.fromList @'[2] [1, 0] :: T.Tensor '[2] Float
-            approxList (T.toList $ T.run T.CPU $ NN.smoothLabels @0 0.2 floatTargets) [0.9, 0.1]
+            approxList (T.toList $ T.run T.defaultCPU $ NN.smoothLabels @0 0.2 floatTargets) [0.9, 0.1]
         , testProperty "classification losses agree for one-hot and integer targets" $ H.withTests 1 $ H.property $ do
             let logits = T.fromList @'[2, 3] [1, 2, 3, 3, 2, 1 :: Double]
                 labels = T.fromList @'[2] [2, 0]
@@ -178,7 +178,7 @@ lossTests =
         , testProperty "mse preserves single-precision element types" $ H.withTests 1 $ H.property $ do
             let predictions = T.fromList @'[2] [1, 3 :: Float]
                 targets = T.fromList @'[2] [0, 1 :: Float]
-            T.toList (T.run T.CPU (NN.mse T.mean predictions targets)) H.=== [2.5]
+            T.toList (T.run T.defaultCPU (NN.mse T.mean predictions targets)) H.=== [2.5]
         , testProperty "mse differentiates predictions and targets with opposite gradients" $ H.withTests 1 $ H.property $ do
             let predictions = T.fromList @'[2, 2] [1, 2, 3, 4 :: Double]
                 targets = T.fromList @'[2, 2] [1, 0, 5, 1 :: Double]
@@ -199,9 +199,9 @@ lossTests =
             values loss H.=== [0]
             values gradient H.=== [0, 0, 0]
         , testProperty "prepared mse gradients accept changing predictions and targets" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ curry (AG.backprop (uncurry (NN.mse T.sum)))
-                first = T.run T.CPU (T.fromList @'[2] [1, 3 :: Double])
-                second = T.run T.CPU (T.fromList @'[2] [0, 1 :: Double])
+            let execute = T.run T.defaultCPU $ curry (AG.backprop (uncurry (NN.mse T.sum)))
+                first = T.run T.defaultCPU (T.fromList @'[2] [1, 3 :: Double])
+                second = T.run T.defaultCPU (T.fromList @'[2] [0, 1 :: Double])
                 (firstLoss, (firstDP, firstDT)) = execute first second
                 (secondLoss, (secondDP, secondDT)) = execute second first
             T.toList firstLoss H.=== [5]
@@ -263,8 +263,8 @@ lossTests =
             values (NN.smoothL1 T.sum 1 empty empty) H.=== [0]
             let floatPredictions = T.fromList @'[2] [1, 3 :: Float]
                 floatTargets = T.zeros @'[2] @Float
-            T.toList (T.run T.CPU (NN.huber T.mean 1 floatPredictions floatTargets)) H.=== [1.5]
-            T.toList (T.run T.CPU (NN.smoothL1 T.mean 2 floatPredictions floatTargets)) H.=== [1.125]
+            T.toList (T.run T.defaultCPU (NN.huber T.mean 1 floatPredictions floatTargets)) H.=== [1.5]
+            T.toList (T.run T.defaultCPU (NN.smoothL1 T.mean 2 floatPredictions floatTargets)) H.=== [1.125]
         , testProperty "robust losses reject invalid transition parameters" $ H.withTests 1 $ H.property $ do
             let input = T.zeros @'[1] @Double :: T.Tensor '[1] Double
                 rejects loss threshold = do

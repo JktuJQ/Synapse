@@ -11,7 +11,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 parameters :: NN.Dense 2 3 T.Tensor Double
 parameters = NN.Dense (T.fromList @'[2, 3] [1, 2, 3, 4, 5, 6]) (T.fromList @'[3] [0.5, -1, 2])
@@ -70,23 +70,23 @@ tests =
             let layer =
                     NN.Dense (NN.evalState (NN.xavierNormal @'[2, 3] 2 3 1) (mkStdGen64 2026)) (T.zeros @'[3])
                         :: NN.Dense 2 3 T.Tensor Float
-                output = T.toList (T.run T.CPU (NN.dense layer (T.ones @'[2])))
+                output = T.toList (T.run T.defaultCPU (NN.dense layer (T.ones @'[2])))
             length output H.=== 3
             H.assert (all (\x -> not (isNaN x || isInfinite x)) output)
         , testProperty "prepared dense inference accepts changing parameters" $ H.withTests 1 $ H.property $ do
-            let execute = T.run3 T.CPU $ \batch layerWeights layerBias -> NN.dense (NN.Dense layerWeights layerBias) batch
-                input = T.run T.CPU (T.fromList @'[2] [1, 2 :: Double])
-                w = T.run T.CPU (NN.denseWeights parameters)
-                b = T.run T.CPU (NN.denseBias parameters)
-                zeroBias = T.run T.CPU (T.zeros @'[3] @Double)
+            let execute = T.run T.defaultCPU $ \batch layerWeights layerBias -> NN.dense (NN.Dense layerWeights layerBias) batch
+                input = T.run T.defaultCPU (T.fromList @'[2] [1, 2 :: Double])
+                w = T.run T.defaultCPU (NN.denseWeights parameters)
+                b = T.run T.defaultCPU (NN.denseBias parameters)
+                zeroBias = T.run T.defaultCPU (T.zeros @'[3] @Double)
             T.toList (execute input w b) H.=== [9.5, 11, 17]
             T.toList (execute input w zeroBias) H.=== [9, 12, 15]
         , testProperty "prepared dense gradients keep the record registration separate from execution outputs" $ H.withTests 1 $ H.property $ do
-            let execute = T.run3 T.CPU $ \batch layerWeights layerBias ->
+            let execute = T.run T.defaultCPU $ \batch layerWeights layerBias ->
                     let (objective, gradient) = AG.backprop (\p -> T.sum (NN.dense p (AG.constant batch))) (NN.Dense layerWeights layerBias)
                      in (objective, NN.denseWeights gradient, NN.denseBias gradient)
-                input = T.run T.CPU (T.fromList @'[2] [1, 2 :: Double])
-                (loss, dw, db) = execute input (T.run T.CPU (NN.denseWeights parameters)) (T.run T.CPU (NN.denseBias parameters))
+                input = T.run T.defaultCPU (T.fromList @'[2] [1, 2 :: Double])
+                (loss, dw, db) = execute input (T.run T.defaultCPU (NN.denseWeights parameters)) (T.run T.defaultCPU (NN.denseBias parameters))
             T.toList loss H.=== [37.5]
             T.toList dw H.=== [1, 1, 1, 2, 2, 2]
             T.toList db H.=== [1, 1, 1]

@@ -47,7 +47,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import GHC.TypeNats (KnownNat, SomeNat (..), natVal, sameNat, someNatVal)
 import System.Random (RandomGen, uniformShuffleList)
 
-import Synapse.Tensor.Backend (Backend, Computation, run4)
+import Synapse.Tensor.Backend (Backend, RunnableTensor, run)
 import Synapse.Tensor.Representation (DType, Tensor, TensorData (..))
 import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
@@ -348,7 +348,7 @@ newtype UnexpectedSize = UnexpectedSize Int deriving (Eq, Show)
 
 {- | Prepare one computation for all expected sizes in a loading plan to be executed on a specified backend.
 
-The returned 'BatchStep' retains one function prepared by 'run4' for each planned batch size.
+The returned 'BatchStep' retains one function prepared by 'run' for each planned batch size.
 Bind it outside the batch loop and reuse it across epochs to share preparation and compiled operations
 between calls of the same size, including a smaller final batch.
 Preparation is lazy; compilation may occur when a specialization is first used.
@@ -358,7 +358,7 @@ you may do that yourself if needed.
 
 @
 let plan = planBatches 32 KeepLast dataset
-    step = prepareBatchStep CPU plan trainingStep
+    step = prepareBatchStep defaultCPU plan trainingStep
 forM_ (batchLoads plan) $ \\load -> do
   batch <- load
   case runBatch step parameters batch of
@@ -368,8 +368,8 @@ forM_ (batchLoads plan) $ \\load -> do
 -}
 prepareBatchStep
     :: forall args result m in_sh out_sh features targets
-     . ( Computation args
-       , Computation result
+     . ( RunnableTensor args
+       , RunnableTensor result
        , forall batch. KnownNat batch => Shape (batch ': in_sh)
        , forall batch. KnownNat batch => Shape (batch ': out_sh)
        , DType features
@@ -392,7 +392,7 @@ prepareBatchStep
 prepareBatchStep backend plan operation =
     let specialize size = case someNatVal $ fromIntegral size of
             SomeNat (proxy :: Proxy batch) ->
-                let execute = run4 backend $ operation @batch
+                let execute = run backend $ operation @batch
                  in Prepared proxy $ \args batch ->
                         execute args (batchInputs batch) (batchTargets batch) (batchMask batch)
         entries = Map.fromDistinctAscList [(size, specialize size) | size <- batchSizes plan]

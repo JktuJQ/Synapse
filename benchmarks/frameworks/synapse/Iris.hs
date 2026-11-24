@@ -106,9 +106,9 @@ runIris directory epochs = do
         targets = T.fromListData @'[120] trainTargets
         testInput = T.fromListData @'[30, 4] testFeatures
         testLabels = T.fromListData @'[30] testTargets
-        infer = T.run2 T.CPU $ \p x -> predict p x
-        step = T.run3 T.CPU trainingStep
-        validate = T.run3 T.CPU $ \p x y ->
+        infer = T.run T.defaultCPU $ \p x -> predict p x
+        step = T.run T.defaultCPU trainingStep
+        validate = T.run T.defaultCPU $ \p x y ->
             let logits = predict p x
              in (NN.unsafeCrossEntropy @1 T.mean logits y, NN.accuracy @1 logits y)
     _ <- evaluate $ sum trainFeatures + sum testFeatures + sum (parameterValues parameters)

@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 -- Independent host rotation of one head's sequence.
 rotate :: Double -> Int -> [[Double]] -> [[Double]]
@@ -50,7 +50,7 @@ tests =
                 (_, gradient) = AG.backprop (\x -> x + T.broadcast (NN.sinusoidalPositions @3 @4 0)) inputs
             values gradient H.=== replicate 24 1
             approxList
-                (map realToFrac $ T.toList $ T.run T.CPU (NN.sinusoidalPositions @2 @3 2 :: T.Tensor '[2, 3] Float))
+                (map realToFrac $ T.toList $ T.run T.defaultCPU (NN.sinusoidalPositions @2 @3 2 :: T.Tensor '[2, 3] Float))
                 $ values
                 $ NN.sinusoidalPositions @2 @3 2
         , testProperty "learned positions use embedding with ordinary gradient accumulation" $ H.withTests 1 $ H.property $ do
@@ -105,7 +105,7 @@ tests =
             H.assert $ any ((> 1e-6) . abs) $ values dq
             H.assert $ any ((> 1e-6) . abs) $ values dk
         , testProperty "RoPE supports Float changing prepared inputs and Forward" $ H.withTests 1 $ H.property $ do
-            let execute = T.run1 T.CPU $ NN.rope 10000 4
+            let execute = T.run T.defaultCPU $ \x -> NN.rope 10000 4 x
                 input = T.fromListData @'[1, 1, 2, 2] [1, 2, 3, 4 :: Float]
                 doubled = T.fromListData @'[1, 1, 2, 2] [2, 4, 6, 8 :: Float]
                 expected = concat $ rotate 10000 4 [[1, 2], [3, 4]]
@@ -113,7 +113,7 @@ tests =
             approxList (map realToFrac $ T.toList $ execute doubled) $ map (* 2) expected
             let (output, state) = NN.runState (NN.forward (NN.rope 10000 4) $ T.fromData input) True
             state H.=== True
-            approxList (T.toList $ T.run T.CPU output) $ T.toList $ execute input
+            approxList (T.toList $ T.run T.defaultCPU output) $ T.toList $ execute input
         , testProperty "RoPE preserves empty dimensions and their gradients" $ H.withTests 1 $ H.property $ do
             let empty = T.zeros @'[1, 2, 0, 4] @Double
                 (output, gradient) = AG.backprop (NN.rope 10000 5) empty

@@ -28,11 +28,11 @@ It is the boundary between host data and staged computation:
 'fromListData' prepares input data,
 'fromData' embeds data in a graph,
 and 'toList' reads materialized results.
-Calling 'run' executes a graph on the selected 'Backend' and returns 'TensorData'.
+Calling 'run' on a closed graph executes it on the selected 'Backend' and returns its 'TensorData'.
 The backend compiles and optimizes the graph, allowing operations to be fused
 rather than requiring an intermediate array for every expression.
 
-'run1' through 'run9' prepare staged functions for repeated execution.
+With a staged function, 'run' prepares it for repeated execution and preserves its argument list.
 Bind the returned function once and pass changing data as its arguments.
 Captured values remain fixed; preparation may compile lazily on the first invocation.
 Shapes remain part of the types of both the computation and its materialized inputs and outputs.
@@ -53,7 +53,7 @@ affine weights bias input =
     (input `T.matmul` weights) + T.broadcast bias
 
 -- Prepare once; weights, bias, and inputs can change between invocations.
-step = T.run3 T.CPU affine
+step = T.run T.defaultCPU affine
 
 weights :: T.TensorData '[3, 2] Float
 weights = T.fromListData $ concat

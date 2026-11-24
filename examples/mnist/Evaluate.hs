@@ -16,7 +16,7 @@ evaluateModel backend dataset path = do
     weights <- either (fail . show) pure =<< readSafetensors path
     parameters <-
         either (fail . show) pure $
-            NN.loadWeights @(Parameters T.Tensor) weights (T.run T.CPU emptyParameters)
+            NN.loadWeights @(Parameters T.Tensor) weights (T.run T.defaultCPU emptyParameters)
     let plan = NN.planBatches 100 NN.KeepLast testing
         measure = NN.prepareBatchStep backend plan $ \p x y _ ->
             let logits = predict p x

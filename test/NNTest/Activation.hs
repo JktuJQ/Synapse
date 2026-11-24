@@ -9,7 +9,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -97,8 +97,8 @@ tests =
         , testProperty "activations support Float, empty tensors, and element expressions" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [-100, 0, 100 :: Float]
                 empty = T.zeros @'[0, 2] @Double
-            approxList (T.toList (T.run T.CPU (NN.sigmoid input))) [0, 0.5, 1]
-            approxList (T.toList (T.run T.CPU (NN.softplus input))) [0, log 2, 100]
+            approxList (T.toList (T.run T.defaultCPU (NN.sigmoid input))) [0, 0.5, 1]
+            approxList (T.toList (T.run T.defaultCPU (NN.softplus input))) [0, log 2, 100]
             values (NN.relu empty) H.=== []
             values (NN.leakyRelu 0.1 empty) H.=== []
             values (NN.sigmoid empty) H.=== []
@@ -117,8 +117,8 @@ tests =
                 (_, backward) = AG.pullback (NN.sigmoid . NN.relu) input
                 gradient = backward (T.fromList @'[3] [2, 3, 4])
                 s = 1 / (1 + exp (-1 :: Double))
-                execute = T.run1 T.CPU (AG.backprop (T.sum . NN.softplus))
-                (output, preparedGradient) = execute (T.run T.CPU input)
+                execute = T.run T.defaultCPU (AG.backprop (T.sum . NN.softplus))
+                (output, preparedGradient) = execute (T.run T.defaultCPU input)
             approxList (values gradient) [0, 0, 4 * s * (1 - s)]
             approxList (T.toList output) [log (1 + exp (-1)) + log 2 + log (1 + exp 1)]
             approxList (T.toList preparedGradient) [1 - s, 0.5, s]

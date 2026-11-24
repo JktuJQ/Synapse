@@ -22,7 +22,7 @@ instance T.TensorStructure (Wrapped T.Tensor) where
     type WithTensor t (Wrapped T.Tensor) = Wrapped t
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -57,9 +57,9 @@ tests =
                 (value, backward) = AG.pullback @_ @(T.Tensor '[] Double, T.Tensor '[2] Float) (\(x, y) -> (x * x, y * y)) input
                 (dx, dy) = backward (2, 3)
             values (fst value) H.=== [9]
-            T.toList (T.run T.CPU (snd value)) H.=== [16, 16]
+            T.toList (T.run T.defaultCPU (snd value)) H.=== [16, 16]
             values dx H.=== [12]
-            T.toList (T.run T.CPU dy) H.=== [24, 24]
+            T.toList (T.run T.defaultCPU dy) H.=== [24, 24]
         , testProperty "unused tensor inputs receive shape-correct zeros" $ H.withTests 1 $ H.property $ do
             let input = (T.ones @'[2] @Double, T.ones @'[2, 3] @Double)
                 (_, unused) = AG.gradient (T.sum . fst) input
@@ -85,9 +85,9 @@ tests =
         , testProperty "autograd runs inside a prepared function" $ H.withTests 1 $ H.property $ do
             let function :: T.Tensor '[3] Double -> (T.Tensor '[] Double, T.Tensor '[3] Double)
                 function = AG.backprop (\x -> T.sum (x * x))
-                execute = T.run1 T.CPU function
-                (first, df) = execute (T.run T.CPU (T.fromList @'[3] [1, 2, 3 :: Double]))
-                (second, ds) = execute (T.run T.CPU (T.fromList @'[3] [4, 5, 6 :: Double]))
+                execute = T.run T.defaultCPU function
+                (first, df) = execute (T.run T.defaultCPU (T.fromList @'[3] [1, 2, 3 :: Double]))
+                (second, ds) = execute (T.run T.defaultCPU (T.fromList @'[3] [4, 5, 6 :: Double]))
             T.toList first H.=== [14]
             T.toList df H.=== [2, 4, 6]
             T.toList second H.=== [77]

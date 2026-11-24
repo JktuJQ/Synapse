@@ -33,22 +33,22 @@ tests =
 
 propArangeSteps :: H.Property
 propArangeSteps = H.property $ do
-    T.toList (T.run T.CPU (T.arange @4 (5 :: Int) (-2))) H.=== [5, 3, 1, -1]
-    T.toList (T.run T.CPU (T.arange @4 (5 :: Int) 0)) H.=== [5, 5, 5, 5]
-    approxList (T.toList (T.run T.CPU (T.arange @4 (0.5 :: Double) 0.25))) [0.5, 0.75, 1, 1.25]
+    T.toList (T.run T.defaultCPU (T.arange @4 (5 :: Int) (-2))) H.=== [5, 3, 1, -1]
+    T.toList (T.run T.defaultCPU (T.arange @4 (5 :: Int) 0)) H.=== [5, 5, 5, 5]
+    approxList (T.toList (T.run T.defaultCPU (T.arange @4 (0.5 :: Double) 0.25))) [0.5, 0.75, 1, 1.25]
 
 propDescendingLinspace :: H.Property
 propDescendingLinspace = H.property $ do
-    approxList (T.toList (T.run T.CPU (T.linspace @4 (3 :: Double) 0))) [3, 2, 1, 0]
+    approxList (T.toList (T.run T.defaultCPU (T.linspace @4 (3 :: Double) 0))) [3, 2, 1, 0]
 
 propTallEye :: H.Property
 propTallEye = H.property $ do
-    T.toList (T.run T.CPU (T.eye @3 @2 :: T.Tensor '[3, 2] Int)) H.=== [1, 0, 0, 1, 0, 0]
+    T.toList (T.run T.defaultCPU (T.eye @3 @2 :: T.Tensor '[3, 2] Int)) H.=== [1, 0, 0, 1, 0, 0]
 
 propFromGen :: H.Property
 propFromGen = H.property $ do
     let tensor = T.fromGen @'[2, 3] (\ix -> T.coordinate @0 ix * 3 + T.coordinate @1 ix)
-    T.toList (T.run T.CPU tensor) H.=== [0, 1, 2, 3, 4, 5]
+    T.toList (T.run T.defaultCPU tensor) H.=== [0, 1, 2, 3, 4, 5]
 
 propElementExpressions :: H.Property
 propElementExpressions = H.property $ do
@@ -56,37 +56,37 @@ propElementExpressions = H.property $ do
             let i :: T.TensorElement Int
                 i = T.coordinate @0 ix * 3 + T.coordinate @1 ix
              in sqrt (T.fromIntegral i + T.element (4 :: Float)) / 2
-    approxList (T.toList (T.run T.CPU tensor)) (map (\i -> sqrt (i + 4) / 2) [0 .. 5])
+    approxList (T.toList (T.run T.defaultCPU tensor)) (map (\i -> sqrt (i + 4) / 2) [0 .. 5])
 
 propConstructorEdges :: H.Property
 propConstructorEdges = H.property $ do
-    T.toList (T.run T.CPU (T.fromGen @'[] (\_ -> T.element (7 :: Int)))) H.=== [7]
-    T.toList (T.run T.CPU (T.fromGen @'[2, 0] (\_ -> T.element (7 :: Int)))) H.=== []
-    T.toList (T.run T.CPU (T.eye @2 @0 :: T.Tensor '[2, 0] Int)) H.=== []
-    T.toList (T.run T.CPU (T.linspace @0 (2 :: Float) 5)) H.=== []
-    T.toList (T.run T.CPU (T.linspace @1 (2 :: Float) 5)) H.=== [2]
-    T.toList (T.run T.CPU (T.logspace @0 (2 :: Float) 5 10)) H.=== []
-    T.toList (T.run T.CPU (T.logspace @1 (2 :: Float) 5 10)) H.=== [100]
+    T.toList (T.run T.defaultCPU (T.fromGen @'[] (\_ -> T.element (7 :: Int)))) H.=== [7]
+    T.toList (T.run T.defaultCPU (T.fromGen @'[2, 0] (\_ -> T.element (7 :: Int)))) H.=== []
+    T.toList (T.run T.defaultCPU (T.eye @2 @0 :: T.Tensor '[2, 0] Int)) H.=== []
+    T.toList (T.run T.defaultCPU (T.linspace @0 (2 :: Float) 5)) H.=== []
+    T.toList (T.run T.defaultCPU (T.linspace @1 (2 :: Float) 5)) H.=== [2]
+    T.toList (T.run T.defaultCPU (T.logspace @0 (2 :: Float) 5 10)) H.=== []
+    T.toList (T.run T.defaultCPU (T.logspace @1 (2 :: Float) 5 10)) H.=== [100]
 
 propFull :: H.Property
 propFull = H.property $ do
     let tensor = T.full @'[2, 3] (7 :: Int)
-    T.toList (T.run T.CPU tensor) H.=== replicate 6 7
+    T.toList (T.run T.defaultCPU tensor) H.=== replicate 6 7
 
 propFill :: H.Property
 propFill = H.property $ do
     let tensor = T.fill @'[2, 3] (7 :: Int)
-    T.toList (T.run T.CPU tensor) H.=== replicate 6 7
+    T.toList (T.run T.defaultCPU tensor) H.=== replicate 6 7
 
 propZeros :: H.Property
 propZeros = H.property $ do
     let tensor = T.zeros @'[2, 3] :: T.Tensor '[2, 3] Int
-    T.toList (T.run T.CPU tensor) H.=== replicate 6 0
+    T.toList (T.run T.defaultCPU tensor) H.=== replicate 6 0
 
 propOnes :: H.Property
 propOnes = H.property $ do
     let tensor = T.ones @'[2, 3] :: T.Tensor '[2, 3] Int
-    T.toList (T.run T.CPU tensor) H.=== replicate 6 1
+    T.toList (T.run T.defaultCPU tensor) H.=== replicate 6 1
 
 propLikeConstructors :: H.Property
 propLikeConstructors = H.property $ do
@@ -94,49 +94,49 @@ propLikeConstructors = H.property $ do
         fullLike = T.fullLike source (5 :: Int)
         zerosLike = T.zerosLike source :: T.Tensor '[2, 2] Int
         onesLike = T.onesLike source :: T.Tensor '[2, 2] Int
-    T.toList (T.run T.CPU fullLike) H.=== [5, 5, 5, 5]
-    T.toList (T.run T.CPU zerosLike) H.=== [0, 0, 0, 0]
-    T.toList (T.run T.CPU onesLike) H.=== [1, 1, 1, 1]
+    T.toList (T.run T.defaultCPU fullLike) H.=== [5, 5, 5, 5]
+    T.toList (T.run T.defaultCPU zerosLike) H.=== [0, 0, 0, 0]
+    T.toList (T.run T.defaultCPU onesLike) H.=== [1, 1, 1, 1]
 
 propArange :: H.Property
 propArange = H.property $ do
     let tensor = T.arange @5 (2 :: Int) 3
-    T.toList (T.run T.CPU tensor) H.=== [2, 5, 8, 11, 14]
+    T.toList (T.run T.defaultCPU tensor) H.=== [2, 5, 8, 11, 14]
 
 propLinspace :: H.Property
 propLinspace = H.property $ do
     let tensor = T.linspace @3 (0 :: Float) 1
-    T.toList (T.run T.CPU tensor) H.=== [0.0, 0.5, 1.0]
+    T.toList (T.run T.defaultCPU tensor) H.=== [0.0, 0.5, 1.0]
 
 propLogspace :: H.Property
 propLogspace = H.property $ do
     let tensor = T.logspace @3 (0 :: Float) 2 10
-    T.toList (T.run T.CPU tensor) H.=== [1.0, 10.0, 100.0]
+    T.toList (T.run T.defaultCPU tensor) H.=== [1.0, 10.0, 100.0]
 
 propEye :: H.Property
 propEye = H.property $ do
     let tensor = T.eye @2 @3 :: T.Tensor '[2, 3] Int
-    T.toList (T.run T.CPU tensor) H.=== [1, 0, 0, 0, 1, 0]
+    T.toList (T.run T.defaultCPU tensor) H.=== [1, 0, 0, 0, 1, 0]
 
 propIdentity :: H.Property
 propIdentity = H.property $ do
     let tensor = T.identity @3 :: T.Tensor '[3, 3] Int
-    T.toList (T.run T.CPU tensor) H.=== [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    T.toList (T.run T.defaultCPU tensor) H.=== [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
 propHighRankGenerator :: H.Property
 propHighRankGenerator = H.property $ do
     let tensor = T.fromGen @'[1, 1, 1, 1, 1, 1, 1, 1, 1, 2] (T.coordinate @9)
-    T.toList (T.run T.CPU tensor) H.=== [0, 1]
+    T.toList (T.run T.defaultCPU tensor) H.=== [0, 1]
 
 propLinspaceEndpoint :: H.Property
 propLinspaceEndpoint = H.property $ do
-    let result = T.toList (T.run T.CPU (T.linspace @3 (1e8 :: Float) 1))
+    let result = T.toList (T.run T.defaultCPU (T.linspace @3 (1e8 :: Float) 1))
     take 1 result H.=== [1e8]
     drop 2 result H.=== [1]
 
 propWideLinspace :: H.Property
 propWideLinspace = H.property $ do
-    approxList (T.toList (T.run T.CPU (T.linspace @3 (-1e308 :: Double) 1e308))) [-1e308, 0, 1e308]
-    approxList (T.toList (T.run T.CPU (T.linspace @3 (1e308 :: Double) (-1e308)))) [1e308, 0, -1e308]
-    approxList (T.toList (T.run T.CPU (T.linspace @5 (-3e38 :: Float) 3e38))) [-3e38, -1.5e38, 0, 1.5e38, 3e38]
-    approxList (T.toList (T.run T.CPU (T.linspace @3 (1e308 :: Double) 1e308))) [1e308, 1e308, 1e308]
+    approxList (T.toList (T.run T.defaultCPU (T.linspace @3 (-1e308 :: Double) 1e308))) [-1e308, 0, 1e308]
+    approxList (T.toList (T.run T.defaultCPU (T.linspace @3 (1e308 :: Double) (-1e308)))) [1e308, 0, -1e308]
+    approxList (T.toList (T.run T.defaultCPU (T.linspace @5 (-3e38 :: Float) 3e38))) [-3e38, -1.5e38, 0, 1.5e38, 3e38]
+    approxList (T.toList (T.run T.defaultCPU (T.linspace @3 (1e308 :: Double) 1e308))) [1e308, 1e308, 1e308]

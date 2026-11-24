@@ -17,7 +17,7 @@ For example, @f(x) = x * x@ has derivative @2 * x@:
 
 @
 let input = T.full \@'[] (3 :: Double)
-    (value, derivative) = T.run T.CPU $ AG.backprop (\\x -> x * x) input
+    (value, derivative) = T.run T.defaultCPU $ AG.backprop (\\x -> x * x) input
 
 T.toList value       -- [9.0]
 T.toList derivative  -- [6.0]
@@ -40,7 +40,7 @@ let input = T.fromList \@'[3] [1, 2, 3 :: Double]
     (_, backward) = AG.pullback (\\x -> x * x) input
     seed = T.fromList \@'[3] [0, 1, 0 :: Double]
 
-T.toList $ T.run T.CPU $ backward seed  -- [0.0, 4.0, 0.0]
+T.toList $ T.run T.defaultCPU $ backward seed  -- [0.0, 4.0, 0.0]
 @
 
 The seed must have the same tensor shapes and structure as the result.
@@ -70,7 +70,7 @@ For example, a loss can close over training data and differentiate only its para
 let input = T.full \@'[] (3 :: Double)
     derivative = AG.gradient (\\x -> x * AG.stopGrad x) input
 
-T.toList $ T.run T.CPU derivative  -- [3.0]
+T.toList $ T.run T.defaultCPU derivative  -- [3.0]
 @
 
 Other uses of the same variable retain their differentiation history.

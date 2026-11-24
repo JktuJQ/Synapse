@@ -11,9 +11,9 @@ main :: IO ()
 main = do
     arguments <- getArgs
     let (backend, args) = case arguments of
-            "--cpu" : rest -> (T.CPU, rest)
-            "--gpu" : rest -> (T.GPU, rest)
-            _ -> (T.CPU, arguments)
+            "--cpu" : rest -> (T.defaultCPU, rest)
+            "--gpu" : rest -> (T.defaultGPU, rest)
+            _ -> (T.defaultCPU, arguments)
     case args of
         ["train", dataset, weights] -> train backend dataset weights 3
         ["train", dataset, weights, count]

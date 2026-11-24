@@ -30,7 +30,7 @@ instance (AG.Differentiable p, Structure.FieldConstraints Fractional p) => O.Opt
         pure $ Structure.zipWithFields @Fractional (\_ p g -> p + realToFrac lr * g) parameters gradients
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -61,7 +61,7 @@ tests =
                 expected2 = expected1 - 0.1 * (m2 / (1 - 0.9 ** 2)) / (sqrt (v2 / (1 - 0.99 ** 2)) + 1e-8)
                 adamW = NN.AdamW adam 0.2
                 (decayed, _) = runState (NN.optimizerStep adamW p 2) (NN.initialState adamW p)
-            T.toList (T.run T.CPU count) H.=== [2]
+            T.toList (T.run T.defaultCPU count) H.=== [2]
             approxList (values p1) [expected1]
             approxList (values p2) [expected2]
             approxList (values m) [m2]
@@ -69,21 +69,21 @@ tests =
             approxList (values decayed) [expected1 - 0.1]
         , testProperty "RMSprop accumulates squared gradients across prepared calls" $ H.withTests 1 $ H.property $ do
             let optimizer = NN.RMSprop 0.1 0.9 1e-8
-                execute = T.run3 T.CPU $ \parameters gradient state -> runState (NN.optimizerStep optimizer parameters gradient) state
-                p0 = T.run T.CPU $ T.full @'[] (5 :: Double)
-                g = T.run T.CPU $ T.full @'[] (2 :: Double)
-                v0 = T.run T.CPU $ NN.initialState optimizer $ T.full @'[] (5 :: Double)
+                execute = T.run T.defaultCPU $ \parameters gradient state -> runState (NN.optimizerStep optimizer parameters gradient) state
+                p0 = T.run T.defaultCPU $ T.full @'[] (5 :: Double)
+                g = T.run T.defaultCPU $ T.full @'[] (2 :: Double)
+                v0 = T.run T.defaultCPU $ NN.initialState optimizer $ T.full @'[] (5 :: Double)
                 (p1, v1) = execute p0 g v0
                 (p2, v2) = execute p1 g v1
             approxList (T.toList p2) [5 - 0.2 / (sqrt 0.4 + 1e-8) - 0.2 / (sqrt 0.76 + 1e-8)]
             approxList (T.toList v2) [0.76]
         , testProperty "Adam state passes through repeated prepared backend calls" $ H.withTests 1 $ H.property $ do
             let optimizer = NN.Adam 0.1 0.9 0.999 1e-8
-                execute = T.run3 T.CPU $ \parameters gradient state -> runState (NN.optimizerStep optimizer parameters gradient) state
+                execute = T.run T.defaultCPU $ \parameters gradient state -> runState (NN.optimizerStep optimizer parameters gradient) state
                 p = T.full @'[] (5 :: Double)
-                p0 = T.run T.CPU p
-                g = T.run T.CPU $ T.full @'[] (2 :: Double)
-                state0 = T.run T.CPU $ NN.initialState optimizer p
+                p0 = T.run T.defaultCPU p
+                g = T.run T.defaultCPU $ T.full @'[] (2 :: Double)
+                state0 = T.run T.defaultCPU $ NN.initialState optimizer p
                 (p1, state1) = execute p0 g state0
                 (p2, state2) = execute p1 g state1
             approxList (T.toList p2) [5 - 0.4 / (2 + 1e-8)]
@@ -134,7 +134,7 @@ tests =
         , testProperty "SGD preserves Float tensors and empty tensors" $ H.withTests 1 $ H.property $ do
             let (tensor, ()) = runState (NN.optimizerStep (NN.SGD 0.5) (T.full @'[2] (3 :: Float)) 2) ()
                 (empty, ()) = runState (NN.optimizerStep (NN.SGD 0.1) (T.zeros @'[0] @Double) 1) ()
-            T.toList (T.run T.CPU tensor) H.=== [2, 2]
+            T.toList (T.run T.defaultCPU tensor) H.=== [2, 2]
             values empty H.=== []
         , testProperty "SGD applies gradients of a dense regression objective" $ H.withTests 1 $ H.property $ do
             let parameters :: Parameters T.Tensor Double
@@ -160,8 +160,8 @@ tests =
                 function p =
                     let g = AG.gradient (\x -> (x - 3) * (x - 3)) p
                      in evalState (NN.optimizerStep (NN.SGD 0.25) p g) ()
-                execute = T.run1 T.CPU function
-                initial = T.run T.CPU (T.full @'[] (0 :: Double))
+                execute = T.run T.defaultCPU function
+                initial = T.run T.defaultCPU (T.full @'[] (0 :: Double))
             approxList (T.toList (iterate execute initial !! 12)) [3 * (1 - 0.5 ** 12)]
         , testProperty "SGD rejects integral tensor parameters" $
             H.withTests 1 $

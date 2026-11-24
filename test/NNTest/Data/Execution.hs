@@ -52,7 +52,7 @@ tests =
                 NN.batchSizes plan H.=== sort (nub actual)
         , testProperty "custom plans normalize sizes without inspecting their actions" $ H.withTests 1 $ H.property $ do
             let plan = NN.batchPlan [16, 3, 16] (error "loading schedule evaluated") :: NN.BatchPlan IO '[1] '[1] Double Double
-                step = NN.prepareBatchStep T.CPU plan objective
+                step = NN.prepareBatchStep T.defaultCPU plan objective
                 batch =
                     NN.SomeBatch $
                         NN.Batch
@@ -69,7 +69,7 @@ tests =
             let first = NN.planBatches 16 NN.KeepLast $ source 23
                 second = NN.planBatches 5 NN.KeepLast $ source 8
                 combined = first <> second
-                step = NN.prepareBatchStep T.CPU combined objective
+                step = NN.prepareBatchStep T.defaultCPU combined objective
                 weight = T.fromListData @'[] [1 :: Double]
                 sizes :: NN.BatchPlan Identity '[1] '[1] Double Double -> [Int]
                 sizes plan = map (\load -> NN.withBatch (runIdentity load) NN.batchSize) $ NN.batchLoads plan
@@ -81,7 +81,7 @@ tests =
         , testProperty "prepared gradients exclude padding and accept changing arguments across epochs" $ H.withTests 1 $ H.property $ do
             let kept = NN.planBatches 16 NN.KeepLast $ source 23
                 padded = NN.planBatches 16 (NN.PadLast 99999 (-12345)) $ source 23
-                step = NN.prepareBatchStep T.CPU (kept <> padded) objective
+                step = NN.prepareBatchStep T.defaultCPU (kept <> padded) objective
                 initial = T.fromListData @'[] [1 :: Double]
                 moved = T.fromListData @'[] [3 :: Double]
                 expected first count =
@@ -96,9 +96,9 @@ tests =
                             Right (loss, gradient) -> do
                                 approxList (T.toList loss) [square]
                                 approxList (T.toList gradient) [factor * square]
-        , testProperty "unknown sizes are reported and the caller can fall back to runN" $ H.withTests 1 $ H.property $ do
+        , testProperty "unknown sizes are reported and the caller can fall back to run" $ H.withTests 1 $ H.property $ do
             let plan = NN.planBatches 16 NN.DropLast $ source 32
-                step = NN.prepareBatchStep T.CPU plan objective
+                step = NN.prepareBatchStep T.defaultCPU plan objective
                 other = map runIdentity $ NN.loadBatches 3 NN.DropLast $ source 3
                 weight = T.fromListData @'[] [1 :: Double]
             forM_ other $ \packed -> case NN.runBatch step weight packed of
@@ -106,12 +106,12 @@ tests =
                 Left unexpected -> do
                     unexpected H.=== NN.UnexpectedSize 3
                     let (loss, gradient) = NN.withBatch packed $ \batch ->
-                            T.run4 T.CPU objective weight (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
+                            T.run T.defaultCPU objective weight (NN.batchInputs batch) (NN.batchTargets batch) (NN.batchMask batch)
                     approxList (T.toList loss) [14 / 3]
                     approxList (T.toList gradient) [negate $ 28 / 3]
         , testProperty "an empty executor rejects batches without evaluating its computation" $ H.withTests 1 $ H.property $ do
             let plan = mempty :: NN.BatchPlan Identity '[1] '[1] Double Double
-                step = NN.prepareBatchStep T.CPU plan $ \(_ :: T.Tensor '[] Double) _ _ _ -> error "unexpected preparation" :: T.Tensor '[] Double
+                step = NN.prepareBatchStep T.defaultCPU plan $ \(_ :: T.Tensor '[] Double) _ _ _ -> error "unexpected preparation" :: T.Tensor '[] Double
             NN.batchSizes plan H.=== []
             forM_ (NN.loadBatches 1 NN.KeepLast $ source 1) $ \load ->
                 case NN.runBatch step (T.fromListData @'[] [1]) $ runIdentity load of
@@ -127,7 +127,7 @@ tests =
                             2
                 load = modifyIORef' count (+ 1) >> pure batch
                 plan = NN.batchPlan [2] [load, load]
-                step = NN.prepareBatchStep T.CPU plan objective
+                step = NN.prepareBatchStep T.defaultCPU plan objective
             _ <- H.evalIO $ evaluate step
             before <- H.evalIO $ readIORef count
             before H.=== 0

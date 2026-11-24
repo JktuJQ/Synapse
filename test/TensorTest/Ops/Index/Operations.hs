@@ -20,11 +20,11 @@ tests =
                 indices = T.fromList @'[2, 2] [2, 0, 1, 2]
                 output :: T.Tensor '[2, 2, 2] Int
                 output = T.unsafeLookupRows table indices
-            T.toList (T.run T.CPU output) H.=== [30, 31, 10, 11, 20, 21, 30, 31]
+            T.toList (T.run T.defaultCPU output) H.=== [30, 31, 10, 11, 20, 21, 30, 31]
         , testProperty "row lookup supports non-numeric tensor elements" $ H.withTests 1 $ H.property $ do
             let table = T.fromList @'[2, 2] [True, False, False, True]
                 indices = T.fromList @'[3] [1, 0, 1]
-            T.toList (T.run T.CPU $ T.unsafeLookupRows table indices) H.=== [False, True, True, False, False, True]
+            T.toList (T.run T.defaultCPU $ T.unsafeLookupRows table indices) H.=== [False, True, True, False, False, True]
         , testProperty "dynamic indexing and fallback respect individual coordinates" (H.withTests 1 propDynamic)
         , testProperty "gather selects each axis and safely handles empty inputs" (H.withTests 1 propGather)
         , testProperty "index operators read coordinates and elements" (H.withTests 1 propOperators)
@@ -45,82 +45,82 @@ propIndex :: H.Property
 propIndex = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 24) (Gen.int (Range.linear (-100) 100))
     let source = T.fromList @'[2, 3, 4] xs
-    T.toList (T.run T.CPU (T.scalar (T.index @'[0, 0, 0] source))) H.=== take 1 xs
-    T.toList (T.run T.CPU (T.scalar (T.index @'[1, 2, 3] source))) H.=== drop 23 xs
+    T.toList (T.run T.defaultCPU (T.scalar (T.index @'[0, 0, 0] source))) H.=== take 1 xs
+    T.toList (T.run T.defaultCPU (T.scalar (T.index @'[1, 2, 3] source))) H.=== drop 23 xs
 
 propIndexExpression :: H.Property
 propIndexExpression = H.property $ do
     let source = T.fromList @'[2, 3] [0 .. 5 :: Int]
         value = T.index @'[1, 2] (source + 1)
         repeated = T.fromGen @'[3] (\ix -> value + T.coordinate @0 ix)
-    T.toList (T.run T.CPU (T.scalar (value * 2))) H.=== [12]
-    T.toList (T.run T.CPU repeated) H.=== [6, 7, 8]
+    T.toList (T.run T.defaultCPU (T.scalar (value * 2))) H.=== [12]
+    T.toList (T.run T.defaultCPU repeated) H.=== [6, 7, 8]
 
 propMixedSlice :: H.Property
 propMixedSlice = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 24) (Gen.int (Range.linear (-100) 100))
     let source = T.fromList @'[2, 3, 4] xs
-        result = T.run T.CPU (T.slice @'[ 'T.All, 'T.At 1, 'T.Range 0 4 2] source)
+        result = T.run T.defaultCPU (T.slice @'[ 'T.All, 'T.At 1, 'T.Range 0 4 2] source)
     A.arrayShape (Internal.unTensorData result) H.=== (A.Z A.:. (2 :: Int) A.:. (2 :: Int))
     T.toList result H.=== [xs !! ((i * 3 + 1) * 4 + k) | i <- [0, 1], k <- [0, 2]]
 
 propRange :: H.Property
 propRange = H.property $ do
     let source = T.fromList @'[3, 4] [0 .. 11 :: Int]
-        result = T.run T.CPU (T.slice @'[ 'T.Range 1 2 1, 'T.Range 1 4 1] source)
+        result = T.run T.defaultCPU (T.slice @'[ 'T.Range 1 2 1, 'T.Range 1 4 1] source)
     A.arrayShape (Internal.unTensorData result) H.=== (A.Z A.:. (1 :: Int) A.:. (3 :: Int))
     T.toList result H.=== [5, 6, 7]
 
 propRangeStep :: H.Property
 propRangeStep = H.property $ do
     let source = T.arange @8 (0 :: Int) 1
-    T.toList (T.run T.CPU (T.slice @'[ 'T.Range 1 8 3] source)) H.=== [1, 4, 7]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.Range 1 7 10] source)) H.=== [1]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.Range 2 2 3] source)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.Range 1 8 3] source)) H.=== [1, 4, 7]
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.Range 1 7 10] source)) H.=== [1]
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.Range 2 2 3] source)) H.=== []
 
 propRangeReverse :: H.Property
 propRangeReverse = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 24) (Gen.int (Range.linear (-100) 100))
     let source = T.fromList @'[2, 3, 4] xs
         reversed = T.slice @'[ 'T.RangeReverse 0 2 1, 'T.All, 'T.RangeReverse 0 4 1] source
-    T.toList (T.run T.CPU reversed)
+    T.toList (T.run T.defaultCPU reversed)
         H.=== [xs !! ((i * 3 + j) * 4 + k) | i <- [1, 0], j <- [0 .. 2], k <- [3, 2 .. 0]]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.RangeReverse 0 2 1, 'T.All, 'T.RangeReverse 0 4 1] reversed)) H.=== xs
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 0 2 1, 'T.All, 'T.RangeReverse 0 4 1] reversed)) H.=== xs
 
 propAllAt :: H.Property
 propAllAt = H.property $ do
     let source = T.fromList @'[2, 3] [0 .. 5 :: Int]
         result = T.slice @'[ 'T.At 1, 'T.At 2] source
-    T.toList (T.run T.CPU result) H.=== T.toList (T.run T.CPU (T.scalar (T.index @'[1, 2] source)))
+    T.toList (T.run T.defaultCPU result) H.=== T.toList (T.run T.defaultCPU (T.scalar (T.index @'[1, 2] source)))
 
 propReverseRange :: H.Property
 propReverseRange = H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton 8) (Gen.int (Range.linear (-100) 100))
     let source = T.fromList @'[8] xs
-        reversed = T.run T.CPU (T.slice @'[ 'T.RangeReverse 1 7 2] source)
+        reversed = T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 1 7 2] source)
     A.arrayShape (Internal.unTensorData reversed) H.=== (A.Z A.:. (3 :: Int))
     T.toList reversed H.=== [xs !! 5, xs !! 3, xs !! 1]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.RangeReverse 1 8 3] source)) H.=== [xs !! 7, xs !! 4, xs !! 1]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.RangeReverse 1 7 10] source)) H.=== [xs !! 1]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.RangeReverse 4 4 2] source)) H.=== []
-    T.toList (T.run T.CPU (T.slice @'[ 'T.RangeReverse 3 1 2] source)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 1 8 3] source)) H.=== [xs !! 7, xs !! 4, xs !! 1]
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 1 7 10] source)) H.=== [xs !! 1]
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 4 4 2] source)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.RangeReverse 3 1 2] source)) H.=== []
 
 propEdges :: H.Property
 propEdges = H.property $ do
     let scalar = T.scalar (T.element (7 :: Int))
         vector = T.arange @4 (0 :: Int) 1
         empty = T.zeros @'[2, 0, 3] :: T.Tensor '[2, 0, 3] Int
-    T.toList (T.run T.CPU (T.scalar (T.index @'[] scalar))) H.=== [7]
-    T.toList (T.run T.CPU (T.slice @'[] scalar)) H.=== [7]
-    T.toList (T.run T.CPU (T.slice @'[ 'T.Range 4 4 1] vector)) H.=== []
-    T.toList (T.run T.CPU (T.slice @'[ 'T.Range 3 1 1] vector)) H.=== []
-    T.toList (T.run T.CPU (T.slice @'[ 'T.All, 'T.All, 'T.All] empty)) H.=== []
-    T.toList (T.run T.CPU (T.slice @'[ 'T.All, 'T.RangeReverse 0 0 1, 'T.All] empty)) H.=== []
+    T.toList (T.run T.defaultCPU (T.scalar (T.index @'[] scalar))) H.=== [7]
+    T.toList (T.run T.defaultCPU (T.slice @'[] scalar)) H.=== [7]
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.Range 4 4 1] vector)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.Range 3 1 1] vector)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.All, 'T.All, 'T.All] empty)) H.=== []
+    T.toList (T.run T.defaultCPU (T.slice @'[ 'T.All, 'T.RangeReverse 0 0 1, 'T.All] empty)) H.=== []
 
 propBoolean :: H.Property
 propBoolean = H.property $ do
     let source = T.fromList @'[2] [False, True]
-    T.toList (T.run T.CPU (T.scalar (T.index @'[1] source))) H.=== [True]
+    T.toList (T.run T.defaultCPU (T.scalar (T.index @'[1] source))) H.=== [True]
 
 propOperators :: H.Property
 propOperators = H.property $ do
@@ -128,10 +128,10 @@ propOperators = H.property $ do
         generated = T.fromGen @'[2, 3] (\ix -> (ix T.!! Proxy @0) * 10 + ix T.!! Proxy @1)
         copied = T.fromGen @'[2, 3] (source T.!!)
         scalar = T.scalar (T.element True)
-    T.toList (T.run T.CPU (T.scalar (source T.!! Proxy @'[1, 2]))) H.=== [5]
-    T.toList (T.run T.CPU generated) H.=== [0, 1, 2, 10, 11, 12]
-    T.toList (T.run T.CPU copied) H.=== [0 .. 5]
-    T.toList (T.run T.CPU (T.scalar (scalar T.!! Proxy @('[] :: [Nat])))) H.=== [True]
+    T.toList (T.run T.defaultCPU (T.scalar (source T.!! Proxy @'[1, 2]))) H.=== [5]
+    T.toList (T.run T.defaultCPU generated) H.=== [0, 1, 2, 10, 11, 12]
+    T.toList (T.run T.defaultCPU copied) H.=== [0 .. 5]
+    T.toList (T.run T.defaultCPU (T.scalar (scalar T.!! Proxy @('[] :: [Nat])))) H.=== [True]
 
 propHighRankIndex :: H.Property
 propHighRankIndex = H.property $ do
@@ -139,23 +139,23 @@ propHighRankIndex = H.property $ do
         selected =
             T.slice @'[ 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.All, 'T.RangeReverse 1 4 2]
                 source
-    T.toList (T.run T.CPU (T.scalar (T.index @'[0, 0, 0, 0, 0, 0, 0, 0, 0, 2] source))) H.=== [3]
-    T.toList (T.run T.CPU selected) H.=== [4, 2]
+    T.toList (T.run T.defaultCPU (T.scalar (T.index @'[0, 0, 0, 0, 0, 0, 0, 0, 0, 2] source))) H.=== [3]
+    T.toList (T.run T.defaultCPU selected) H.=== [4, 2]
 
 propDynamic :: H.Property
 propDynamic = H.property $ do
     let input = T.fromList @'[2, 3] [0 .. 5 :: Int]
         selected row col = Internal.TensorIndex (A.index2 (A.constant row) (A.constant col))
-        evaluateIndex ix = T.toList (T.run T.CPU (T.scalar (T.dynamicIndexOr (-1) input ix)))
-    T.toList (T.run T.CPU (T.scalar (T.unsafeDynamicIndex input (selected 1 2)))) H.=== [5]
+        evaluateIndex ix = T.toList (T.run T.defaultCPU (T.scalar (T.dynamicIndexOr (-1) input ix)))
+    T.toList (T.run T.defaultCPU (T.scalar (T.unsafeDynamicIndex input (selected 1 2)))) H.=== [5]
     evaluateIndex (selected 0 3) H.=== [-1]
     evaluateIndex (selected 1 (-1)) H.=== [-1]
     evaluateIndex (selected minBound maxBound) H.=== [-1]
     evaluateIndex (selected 1 1) H.=== [4]
     T.toList
-        (T.run T.CPU (T.scalar (T.dynamicIndexOr True (T.fromList @'[0] []) (Internal.TensorIndex (A.index1 0)))))
+        (T.run T.defaultCPU (T.scalar (T.dynamicIndexOr True (T.fromList @'[0] []) (Internal.TensorIndex (A.index1 0)))))
         H.=== [True]
-    T.toList (T.run T.CPU (T.scalar (T.dynamicIndexOr False (T.full @'[] True) (Internal.TensorIndex A.index0))))
+    T.toList (T.run T.defaultCPU (T.scalar (T.dynamicIndexOr False (T.full @'[] True) (Internal.TensorIndex A.index0))))
         H.=== [True]
 
 propGather :: H.Property
@@ -163,13 +163,13 @@ propGather = H.property $ do
     let input = T.fromList @'[2, 3] [0 .. 5 :: Int]
         indices = T.fromList @'[2, 2] [2, 0, 1, 1]
         invalid = T.fromList @'[2, 2] [-1, 3, minBound, maxBound]
-    T.toList (T.run T.CPU (T.unsafeGather @1 input indices)) H.=== [2, 0, 4, 4]
-    T.toList (T.run T.CPU (T.gatherOr @1 (-1) input indices)) H.=== [2, 0, 4, 4]
-    T.toList (T.run T.CPU (T.gatherOr @1 (-1) input invalid)) H.=== replicate 4 (-1)
-    T.toList (T.run T.CPU (T.unsafeGather @0 input (T.fromList @'[1, 3] [1, 0, 1]))) H.=== [3, 1, 5]
-    T.toList (T.run T.CPU (T.gatherOr @1 True (T.fromList @'[2, 0] []) invalid)) H.=== replicate 4 True
-    T.toList (T.run T.CPU (T.gatherOr @1 (-1) input (T.fromList @'[2, 0] []))) H.=== []
-    let execute = T.run2 T.CPU (T.unsafeGather @1 :: T.Tensor '[2, 3] Int -> T.Tensor '[2, 2] Int -> T.Tensor '[2, 2] Int)
-        host = T.run T.CPU input
-    T.toList (execute host (T.run T.CPU indices)) H.=== [2, 0, 4, 4]
-    T.toList (execute host (T.run T.CPU (T.fromList [0, 0, 2, 0]))) H.=== [0, 0, 5, 3]
+    T.toList (T.run T.defaultCPU (T.unsafeGather @1 input indices)) H.=== [2, 0, 4, 4]
+    T.toList (T.run T.defaultCPU (T.gatherOr @1 (-1) input indices)) H.=== [2, 0, 4, 4]
+    T.toList (T.run T.defaultCPU (T.gatherOr @1 (-1) input invalid)) H.=== replicate 4 (-1)
+    T.toList (T.run T.defaultCPU (T.unsafeGather @0 input (T.fromList @'[1, 3] [1, 0, 1]))) H.=== [3, 1, 5]
+    T.toList (T.run T.defaultCPU (T.gatherOr @1 True (T.fromList @'[2, 0] []) invalid)) H.=== replicate 4 True
+    T.toList (T.run T.defaultCPU (T.gatherOr @1 (-1) input (T.fromList @'[2, 0] []))) H.=== []
+    let execute = T.run T.defaultCPU (T.unsafeGather @1 :: T.Tensor '[2, 3] Int -> T.Tensor '[2, 2] Int -> T.Tensor '[2, 2] Int)
+        host = T.run T.defaultCPU input
+    T.toList (execute host (T.run T.defaultCPU indices)) H.=== [2, 0, 4, 4]
+    T.toList (execute host (T.run T.defaultCPU (T.fromList [0, 0, 2, 0]))) H.=== [0, 0, 5, 3]

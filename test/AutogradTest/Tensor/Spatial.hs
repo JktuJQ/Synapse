@@ -23,7 +23,7 @@ checkUnary
 checkUnary f reference xs = do
     let seeds = take (T.shapeSize @out) $ cycle [0.3, -0.5, 0.8, 0.2]
         (output, backward) = AG.pullback f $ T.fromList @input xs
-        (actual, gradient) = T.run T.CPU (output, backward $ T.fromList seeds)
+        (actual, gradient) = T.run T.defaultCPU (output, backward $ T.fromList seeds)
         objective = sum . zipWith (*) seeds . reference
     approxList (T.toList actual) $ reference xs
     approxList (T.toList gradient) $ differences objective xs
@@ -40,7 +40,7 @@ checkBinary f reference = do
         seeds = take (T.shapeSize @out) $ cycle [0.3, -0.5, 0.8, 0.2]
         (output, backward) = AG.pullback (uncurry f) (T.fromList @input xs, T.fromList @kernel ws)
         (dx, dw) = backward $ T.fromList seeds
-        (actual, inputGradient, weightGradient) = T.run T.CPU (output, dx, dw)
+        (actual, inputGradient, weightGradient) = T.run T.defaultCPU (output, dx, dw)
         objective x w = sum $ zipWith (*) seeds $ reference x w
     approxList (T.toList actual) $ reference xs ws
     approxList (T.toList inputGradient) $ differences (`objective` ws) xs
@@ -55,14 +55,14 @@ propSelection = H.withTests 1 $ H.property $ do
         (_, nan) =
             AG.backprop (T.maxPool2d @'[2, 2] @'[1, 1] @'[0, 0, 0, 0] @'[1, 1]) $
                 T.fromList @'[1, 1, 2, 2] [0, 0 / 0, 0 / 0, 2 :: Double]
-        (a, b, c) = T.run T.CPU (tied, overlap, nan)
+        (a, b, c) = T.run T.defaultCPU (tied, overlap, nan)
     T.toList a H.=== [1, 0, 0, 0]
     T.toList b H.=== [0, 0, 0, 0, 4, 0, 0, 0, 0]
     T.toList c H.=== [0, 1, 0, 0]
 
 propPrepared :: H.Property
 propPrepared = H.withTests 1 $ H.property $ do
-    let execute = T.run1 T.CPU $ AG.backprop (T.maxPool2d @'[2, 2] @'[1, 1] @'[0, 0, 0, 0] @'[1, 1])
+    let execute = T.run T.defaultCPU $ AG.backprop (T.maxPool2d @'[2, 2] @'[1, 1] @'[0, 0, 0, 0] @'[1, 1])
         (first, dx) = execute $ T.fromListData @'[1, 1, 2, 2] [1, 4, 2, 3 :: Double]
         (second, dx2) = execute $ T.fromListData [8, 4, 2, 3]
     T.toList first H.=== [4]

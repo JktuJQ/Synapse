@@ -11,7 +11,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 seed :: StdGen
 seed = mkStdGen64 2026
@@ -129,7 +129,7 @@ tests =
             values (NN.evalState (NN.kaimingUniform @'[0] 2 0) seed) H.=== []
             values (NN.evalState (NN.kaimingNormal @'[0] 2 0) seed) H.=== []
         , testProperty "initializers preserve Float precision and support all initialization variants" $ H.withTests 1 $ H.property $ do
-            let runFloat = T.toList . T.run T.CPU :: T.Tensor '[8] Float -> [Float]
+            let runFloat = T.toList . T.run T.defaultCPU :: T.Tensor '[8] Float -> [Float]
                 finite xs = length xs == 8 && all (\x -> not (isNaN x || isInfinite x)) xs
             H.assert (finite (runFloat (NN.evalState (NN.uniform (-1) 1) seed)))
             runFloat (NN.evalState (NN.normal 0 1) seed)

@@ -214,9 +214,9 @@ GPU execution requires Synapse to be built with the Cabal flag -fgpu and a suppo
 > chooseBackend = do
 >     args <- getArgs
 >     case args of
->         [] -> pure T.CPU
->         ["--cpu"] -> pure T.CPU
->         ["--gpu"] -> pure T.GPU
+>         [] -> pure T.defaultCPU
+>         ["--cpu"] -> pure T.defaultCPU
+>         ["--gpu"] -> pure T.defaultGPU
 >         _ -> ioError $ userError "Usage: transformer-example [--cpu | --gpu]"
 
 The 128 training motifs fit in one batch; validation uses 32 different motifs.
@@ -278,7 +278,7 @@ Finally, prepare inference for one sequence and reuse it for several held-out ex
 Print predictions only after the first three tokens have been observed, matching the training objective.
 
 >     (trained, _) <- readIORef model
->     let infer = T.run2 backend $ \p x -> T.argmax @2 $ predict p x
+>     let infer = T.run backend $ \p x -> T.argmax @2 $ predict p x
 >     putStrLn "\nHeld-out motifs (next-token predictions after observing the first three tokens):"
 >     forM_ [400, 407, 419, 431] $ \index -> do
 >         let (input, labels) = sample index

@@ -149,9 +149,9 @@ GPU execution requires Synapse to be built with the Cabal flag -fgpu and a suppo
 > chooseBackend = do
 >     args <- getArgs
 >     case args of
->         [] -> pure T.CPU
->         ["--cpu"] -> pure T.CPU
->         ["--gpu"] -> pure T.GPU
+>         [] -> pure T.defaultCPU
+>         ["--cpu"] -> pure T.defaultCPU
+>         ["--gpu"] -> pure T.defaultGPU
 >         _ -> ioError $ userError "Usage: classification-example [--cpu | --gpu]"
 
 Prepare the training and validation computations outside the loop.

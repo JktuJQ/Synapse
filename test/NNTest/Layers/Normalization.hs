@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 finiteDifference :: ([Double] -> Double) -> [Double] -> [Double]
 finiteDifference objective input =
@@ -56,7 +56,7 @@ tests =
                 p = NN.LayerNorm (T.full @'[2, 2] 1) (T.zeros @'[2, 2])
                 result = NN.layerNorm 0.75 p x
             approxList
-                (map realToFrac (T.toList $ T.run T.CPU result) :: [Double])
+                (map realToFrac (T.toList $ T.run T.defaultCPU result) :: [Double])
                 (concat $ replicate 2 $ map (/ sqrt 2) [-1.5, -0.5, 0.5, 1.5])
         , testProperty "BatchNorm training uses population variance and updates unbiased running variance" $ H.withTests 1 $ H.property $ do
             let p = NN.BatchNorm (T.full @'[2] (1 :: Double)) 0
@@ -92,15 +92,15 @@ tests =
             approxList (values $ NN.batchNormWeights dp) [3 / sqrt 1.1, 9 / sqrt 2.35]
             approxList (values $ NN.batchNormBias dp) [5, 10]
         , testProperty "BatchNorm state and auxiliary autograd output pass through a prepared training step" $ H.withTests 1 $ H.property $ do
-            let execute = T.run3 T.CPU $ \parametersInput running features ->
+            let execute = T.run T.defaultCPU $ \parametersInput running features ->
                     AG.backprop
                         ( \parameters ->
                             let (output, next) = NN.runState (NN.batchNorm @1 NN.Train 1 0.5 parameters $ AG.constant features) running
                              in (T.sum (output * output), AG.constant next)
                         )
                         parametersInput
-                p = T.run T.CPU $ NN.BatchNorm (T.full @'[1] (1 :: Double)) 0
-                state = T.run T.CPU $ NN.initialBatchNormState @1 @Double
+                p = T.run T.defaultCPU $ NN.BatchNorm (T.full @'[1] (1 :: Double)) 0
+                state = T.run T.defaultCPU $ NN.initialBatchNormState @1 @Double
                 x = T.fromListData @'[2, 1] [1, 3 :: Double]
                 ((loss, first), gradients) = execute p state x
                 ((_, second), _) = execute p first x

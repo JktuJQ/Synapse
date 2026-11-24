@@ -11,7 +11,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 tests :: TestTree
 tests =
@@ -32,14 +32,14 @@ tests =
             approxList (values $ NN.precision @1 NN.Weighted logits targets) [0.75]
             approxList (values $ NN.recall @1 NN.Weighted logits targets) [2 / 3]
             approxList (values $ NN.f1 @1 NN.Weighted logits targets) [61 / 90]
-            T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== [2, 1, 0, 0, 1, 1, 0, 0, 1]
+            T.toList (T.run T.defaultCPU $ NN.confusionMatrix @1 logits targets) H.=== [2, 1, 0, 0, 1, 1, 0, 0, 1]
         , testProperty "classification metrics preserve axis conventions and probability predictions" $ H.withTests 1 $ H.property $ do
             let logits = T.fromList @'[3, 3] [4, 0, 0, 0, 4, 0, 0, 4, 0] :: T.Tensor '[3, 3] Double
                 targets = T.fromList @'[3] [0, 1, 2]
             approxList (values $ NN.precision @0 NN.Macro (T.transpose logits) targets) [0.5]
             approxList (values $ NN.recall @1 NN.Macro (T.softmax @1 logits) targets) [2 / 3]
             approxList (values $ NN.f1PerClass @1 logits targets) [1, 2 / 3, 0]
-            T.toList (T.run T.CPU $ NN.confusionMatrix @0 (T.transpose logits) targets) H.=== [1, 0, 0, 0, 1, 0, 0, 1, 0]
+            T.toList (T.run T.defaultCPU $ NN.confusionMatrix @0 (T.transpose logits) targets) H.=== [1, 0, 0, 0, 1, 0, 0, 1, 0]
         , testProperty "absent classes contribute zero to macro and no weight to weighted scores" $ H.withTests 1 $ H.property $ do
             let logits = T.fromList @'[2, 4] [3, 0, 0, 0, 0, 3, 0, 0] :: T.Tensor '[2, 4] Double
                 targets = T.fromList @'[2] [0, 1]
@@ -56,13 +56,13 @@ tests =
             values (NN.precision @1 NN.Micro logits targets) H.=== [0]
             values (NN.recall @1 NN.Macro logits targets) H.=== [0]
             values (NN.f1 @1 NN.Weighted logits targets) H.=== [0]
-            T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0
+            T.toList (T.run T.defaultCPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0
         , testProperty "invalid target labels cannot index outside class statistics" $ H.withTests 1 $ H.property $ do
             let logits = T.full @'[4, 3] 0 :: T.Tensor '[4, 3] Double
                 targets = T.fromList @'[4] [minBound, -1, 3, maxBound]
             values (NN.precision @1 NN.Micro logits targets) H.=== [0]
             values (NN.f1PerClass @1 logits targets) H.=== [0, 0, 0]
-            T.toList (T.run T.CPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0
+            T.toList (T.run T.defaultCPU $ NN.confusionMatrix @1 logits targets) H.=== replicate 9 0
         , testProperty "binary precision recall and F1 count the positive label" $ H.withTests 1 $ H.property $ do
             let logits = T.fromList @'[6] [1, 2, -1, 3, 4, -2] :: T.Tensor '[6] Double
                 targets = T.fromList @'[6] [1, 1, 1, 0, 0, 0]
@@ -89,7 +89,7 @@ tests =
             values score H.=== [1]
             values gradient H.=== replicate 6 0
         , testProperty "prepared class metrics accept changing inputs and preserve Float" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ \predictions targets ->
+            let execute = T.run T.defaultCPU $ \predictions targets ->
                     (NN.f1 @1 NN.Micro (predictions :: T.Tensor '[2, 2] Float) targets, NN.confusionMatrix @1 predictions targets)
                 logits = T.fromListData @'[2, 2] [3, 0, 0, 3 :: Float]
                 (perfect, matrix) = execute logits $ T.fromListData @'[2] [0, 1]
@@ -116,7 +116,7 @@ tests =
             values (NN.rmse id empty empty) H.=== []
             H.assert (all isNaN (values (NN.rmse T.mean empty empty)))
             let floatInput = T.fromList @'[2] [1, 3 :: Float]
-            approxList (T.toList (T.run T.CPU (NN.rmse T.mean floatInput (T.zeros @'[2])))) [sqrt 5]
+            approxList (T.toList (T.run T.defaultCPU (NN.rmse T.mean floatInput (T.zeros @'[2])))) [sqrt 5]
         , testProperty "r2 measures perfect, mean-baseline, and worse predictions" $ H.withTests 1 $ H.property $ do
             let targets = T.fromList @'[3] [1, 2, 3 :: Double]
             values (NN.r2 targets targets) H.=== [1]
@@ -131,7 +131,7 @@ tests =
                 predictions = T.fromList @'[2, 2] [2, 2, 2, 2 :: Double]
             approxList (values (NN.r2 predictions targets)) [-0.2]
             let floatTargets = T.fromList @'[3] [1, 2, 3 :: Float]
-            T.toList (T.run T.CPU (NN.r2 floatTargets floatTargets)) H.=== [1]
+            T.toList (T.run T.defaultCPU (NN.r2 floatTargets floatTargets)) H.=== [1]
         , testProperty "r2 keeps undefined constant-target scores explicit" $ H.withTests 1 $ H.property $ do
             let targets = T.full @'[3] (2 :: Double)
             H.assert (all isNaN (values (NN.r2 targets targets)))
@@ -161,10 +161,10 @@ tests =
             approxList (values dp) [1, 0, -1]
             approxList (values dt) [-2, 0, 2]
         , testProperty "prepared metrics accept changing predictions" $ H.withTests 1 $ H.property $ do
-            let execute = T.run2 T.CPU $ \predictions targets ->
+            let execute = T.run T.defaultCPU $ \predictions targets ->
                     (NN.rmse T.mean predictions targets, NN.r2 predictions targets)
-                targetData = T.run T.CPU (T.fromList @'[3] [1, 2, 3 :: Double])
-                baseline = T.run T.CPU (T.full @'[3] (2 :: Double))
+                targetData = T.run T.defaultCPU (T.fromList @'[3] [1, 2, 3 :: Double])
+                baseline = T.run T.defaultCPU (T.full @'[3] (2 :: Double))
                 (perfectError, perfectScore) = execute targetData targetData
                 (baselineError, baselineScore) = execute baseline targetData
             T.toList perfectError H.=== [0]

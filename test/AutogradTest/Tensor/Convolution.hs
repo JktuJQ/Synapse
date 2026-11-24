@@ -37,7 +37,7 @@ check = H.withTests 1 $ H.property $ do
         differences f values =
             let perturb i delta = zipWith (\j value -> if i == j then value + delta else value) [0 ..] values
              in [(f (perturb i 1e-5) - f (perturb i (-1e-5))) / 2e-5 | i <- [0 .. length values - 1]]
-        (result, inputGradient, weightGradient) = T.run T.CPU (output, dx, dw)
+        (result, inputGradient, weightGradient) = T.run T.defaultCPU (output, dx, dw)
     approxList (T.toList result) $
         reference (T.shape @input) (T.shape @kernel) (T.shape @stride) (T.shape @padding) xs ws
     approxList (T.toList inputGradient) $ differences (`objective` ws) xs
@@ -45,7 +45,7 @@ check = H.withTests 1 $ H.property $ do
 
 propPrepared :: H.Property
 propPrepared = H.withTests 1 $ H.property $ do
-    let execute = T.run2 T.CPU $ \input weights ->
+    let execute = T.run T.defaultCPU $ \input weights ->
             let (output, (inputGradient, weightGradient)) = AG.backprop (uncurry $ T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1) (input, weights)
              in (output, inputGradient, weightGradient)
         (first, dx, dw) = execute (T.fromListData @'[1, 1, 2, 2] [1 .. 4 :: Double]) (T.fromListData @'[1, 1, 1, 1] [2])
@@ -61,7 +61,7 @@ propShared :: H.Property
 propShared = H.withTests 1 $ H.property $ do
     let input = T.fromList @'[1, 1, 1, 1] [3 :: Double]
         (_, gradient) = AG.backprop (\x -> T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 x x) input
-    T.toList (T.run T.CPU gradient) H.=== [6]
+    T.toList (T.run T.defaultCPU gradient) H.=== [6]
 
 tests :: TestTree
 tests =

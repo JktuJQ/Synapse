@@ -29,7 +29,7 @@ train :: T.Backend -> FilePath -> FilePath -> Int -> IO ()
 train backend dataset weights epochs = do
     unless (epochs > 0) $ fail "Epoch count must be positive"
     ((features, labels), _) <- readDataset dataset
-    let step = T.run3 backend trainingStep
+    let step = T.run backend trainingStep
         epoch parameters number = do
             let (loss, updated) = step parameters features labels
             printf "Epoch %3d | train loss %.4f\n" number (sum $ T.toList loss)

@@ -15,7 +15,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
 
 values :: T.Shape sh => T.Tensor sh Double -> [Double]
-values = T.toList . T.run T.CPU
+values = T.toList . T.run T.defaultCPU
 
 rows :: Int -> [a] -> [[a]]
 rows _ [] = []
@@ -101,8 +101,8 @@ tests =
                 H.=== [1, 2, 5, 6, 9, 10, 3, 4, 7, 8, 11, 12, 13, 14, 17, 18, 21, 22, 15, 16, 19, 20, 23, 24]
         , testProperty "head reshaping supports single heads, empty axes and integral elements" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[1, 2, 3] [1 .. 6 :: Int]
-            T.toList (T.run T.CPU $ NN.splitHeads @1 input) H.=== [1 .. 6]
-            T.toList (T.run T.CPU $ NN.mergeHeads $ NN.splitHeads @3 input) H.=== [1 .. 6]
+            T.toList (T.run T.defaultCPU $ NN.splitHeads @1 input) H.=== [1 .. 6]
+            T.toList (T.run T.defaultCPU $ NN.mergeHeads $ NN.splitHeads @3 input) H.=== [1 .. 6]
             values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[0, 3, 4] @Double) H.=== []
             values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[2, 0, 4] @Double) H.=== []
             values (NN.mergeHeads $ NN.splitHeads @2 $ T.zeros @'[2, 3, 0] @Double) H.=== []
@@ -135,7 +135,7 @@ tests =
                 q = T.zeros @'[1, 1, 3, 2] @Double
                 v = T.fromList @'[1, 1, 3, 1] [2, 6, 100 :: Double]
                 (output, (_, _, gradient)) = AG.backprop (\(query, key, value) -> NN.attention (Just allowed) query key value) (q, q, v)
-            T.toList (T.run T.CPU $ NN.causalMask @2 @3) H.=== [True, False, False, True, True, False]
+            T.toList (T.run T.defaultCPU $ NN.causalMask @2 @3) H.=== [True, False, False, True, True, False]
             approxList (values output) [2, 4, 4]
             approxList (values gradient) [2, 1, 0]
         , testProperty "fully masked rows give finite zero outputs and gradients even for huge scores" $ H.withTests 1 $ H.property $ do
@@ -156,7 +156,7 @@ tests =
             approxList (values dk) [0, 0]
             approxList (values dv) [0, 1]
         , testProperty "prepared attention accepts changing masks and Float inputs" $ H.withTests 1 $ H.property $ do
-            let execute = T.run4 T.CPU $ \mask query key value -> NN.attention (Just mask) query key value
+            let execute = T.run T.defaultCPU $ \mask query key value -> NN.attention (Just mask) query key value
                 q = T.fromListData @'[1, 1, 1, 1] [1 :: Float]
                 k = T.fromListData @'[1, 1, 2, 1] [1000, -1000 :: Float]
                 v = T.fromListData @'[1, 1, 2, 1] [3, 7 :: Float]
@@ -214,10 +214,10 @@ tests =
                 (output, state) = NN.runState (NN.forward graph x) True
             state H.=== True
             approxList (values output) $ values $ NN.multiHeadAttention p Nothing (x, x, x)
-            case NN.loadWeights (NN.extractWeights $ T.run T.CPU p) (T.run T.CPU $ parameters $ replicate 24 0) of
+            case NN.loadWeights (NN.extractWeights $ T.run T.defaultCPU p) (T.run T.defaultCPU $ parameters $ replicate 24 0) of
                 Left failure -> H.annotateShow failure >> H.failure
                 Right restored ->
-                    let actual = T.run1 T.CPU (\weights -> NN.multiHeadAttention weights Nothing (x, x, x)) restored
+                    let actual = T.run T.defaultCPU (\weights -> NN.multiHeadAttention weights Nothing (x, x, x)) restored
                      in approxList (T.toList actual) $ values output
         , testProperty "heads with multiple features preserve batch and feature ordering" $ H.withTests 1 $ H.property $ do
             let projection = NN.Dense (T.eye @4 @4) 0
@@ -234,7 +234,7 @@ tests =
                     rows 8 input
         , testProperty "prepared SGD updates attention parameters and reduces loss" $ H.withTests 1 $ H.property $ do
             let x = T.fromListData @'[1, 2, 2] [0.2, -0.4, 0.7, 0.3 :: Double]
-                step = T.run2 T.CPU $ \p input ->
+                step = T.run T.defaultCPU $ \p input ->
                     let (loss, gradient) =
                             AG.backprop
                                 ( \weights ->
@@ -244,7 +244,7 @@ tests =
                                 )
                                 p
                      in (loss, NN.evalState (NN.optimizerStep (NN.SGD 0.1) p gradient) ())
-                initial = T.run T.CPU $ parameters parameterValues
+                initial = T.run T.defaultCPU $ parameters parameterValues
                 (firstLoss, _) = step initial x
             trained <- foldM (\p _ -> pure $ snd $ step p x) initial [1 .. 5 :: Int]
             let (lastLoss, _) = step trained x

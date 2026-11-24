@@ -21,9 +21,9 @@ GPU execution requires Synapse to be built with the Cabal flag -fgpu and a suppo
 > chooseBackend = do
 >     args <- getArgs
 >     case args of
->         [] -> pure T.CPU
->         ["--cpu"] -> pure T.CPU
->         ["--gpu"] -> pure T.GPU
+>         [] -> pure T.defaultCPU
+>         ["--cpu"] -> pure T.defaultCPU
+>         ["--gpu"] -> pure T.defaultGPU
 >         _ -> ioError $ userError "Usage: autograd-example [--cpu | --gpu]"
 
 Each coefficient is a scalar tensor.
@@ -76,7 +76,7 @@ The observations are supplied separately so the same step can work with other va
 >         next = (a - learningRate * da, b - learningRate * db, c - learningRate * dc)
 >     in (value, (da, db, dc), next)
 
-Prepare the training step once with run3.
+Prepare the training step once with run.
 Each execution accepts materialized inputs, targets, and parameters, and returns materialized results.
 This run uses five observations; another input size requires a separately prepared step,
 although internal cache can reuse compiled kernels across different shapes.
@@ -89,7 +89,7 @@ First inspect the initial gradient, then use the same prepared step throughout t
 >         targets = T.fromListData @'[5] [1, 0, 1, 4, 9 :: Double]
 >         zero = T.fromListData @'[] [0 :: Double]
 >         initial = (zero, zero, zero)
->         step = T.run3 backend trainingStep
+>         step = T.run backend trainingStep
 >         (initialLoss, (da, db, dc), _) = step inputs targets initial
 >
 >     putStrLn $ "Backend: " ++ show backend

@@ -27,10 +27,10 @@ input = T.fromList \@'[2] [2, 3 :: Double]
 (value, derivative) = AG.backprop (\\x -> x * x) input
 
 -- [4, 9]
-squares = T.toList $ T.run T.CPU value
+squares = T.toList $ T.run T.defaultCPU value
 
 -- [4, 6]
-gradients = T.toList $ T.run T.CPU derivative
+gradients = T.toList $ T.run T.defaultCPU derivative
 @
 
 Use 'constant' for tensors that participate in the calculation but are not differentiation inputs.

@@ -27,7 +27,7 @@ check = H.withTests 10 $ H.property $ do
     xs <- H.forAll $ Gen.list (Range.singleton $ T.shapeSize @input) $ Gen.int $ Range.linear (-5) 5
     ws <- H.forAll $ Gen.list (Range.singleton $ T.shapeSize @kernel) $ Gen.int $ Range.linear (-5) 5
     let output = T.conv2d @stride @padding @'[1, 1] @1 (T.fromList @input xs) (T.fromList @kernel ws)
-    T.toList (T.run T.CPU output)
+    T.toList (T.run T.defaultCPU output)
         H.=== reference (T.shape @input) (T.shape @kernel) (T.shape @stride) (T.shape @padding) xs ws
 
 propDTypes :: H.Property
@@ -35,35 +35,35 @@ propDTypes = H.withTests 1 $ H.property $ do
     let input = T.fromList @'[1, 1, 2, 2] [1, 2, 3, 4 :: Float]
         weights = T.fromList @'[1, 1, 1, 1] [0.5]
     approxList
-        (T.toList $ T.run T.CPU $ T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 input weights)
+        (T.toList $ T.run T.defaultCPU $ T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 input weights)
         [0.5, 1, 1.5, 2]
 
 propEmpty :: H.Property
 propEmpty = H.withTests 1 $ H.property $ do
     T.toList
-        ( T.run T.CPU $
+        ( T.run T.defaultCPU $
             T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 (T.zeros @'[0, 2, 3, 3] @Int) (T.ones @'[4, 2, 2, 2])
         )
         H.=== []
     T.toList
-        ( T.run T.CPU $
+        ( T.run T.defaultCPU $
             T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 (T.ones @'[2, 2, 3, 3] @Int) (T.zeros @'[0, 2, 2, 2])
         )
         H.=== []
     T.toList
-        ( T.run T.CPU $
+        ( T.run T.defaultCPU $
             T.conv2d @'[1, 1] @'[0, 0, 0, 0] @'[1, 1] @1 (T.zeros @'[1, 0, 3, 3] @Int) (T.zeros @'[2, 0, 2, 2])
         )
         H.=== replicate 8 0
     T.toList
-        ( T.run T.CPU $
+        ( T.run T.defaultCPU $
             T.conv2d @'[1, 1] @'[1, 1, 1, 1] @'[1, 1] @1 (T.zeros @'[1, 1, 0, 0] @Int) (T.ones @'[2, 1, 1, 1])
         )
         H.=== replicate 8 0
 
 propPrepared :: H.Property
 propPrepared = H.withTests 1 $ H.property $ do
-    let execute = T.run2 T.CPU $ T.conv2d @'[2, 1] @'[1, 0, 0, 1] @'[1, 1] @1
+    let execute = T.run T.defaultCPU $ T.conv2d @'[2, 1] @'[1, 0, 0, 1] @'[1, 1] @1
         input = T.fromListData @'[2, 2, 3, 4] [1 .. 48 :: Double]
         weights = T.fromListData @'[3, 2, 2, 3] [1 .. 36 :: Double]
         expected = reference [2, 2, 3, 4] [3, 2, 2, 3] [2, 1] [1, 0, 0, 1] [1 .. 48] [1 .. 36]

@@ -183,7 +183,7 @@ tests =
                                 if path == ["denseWeights"]
                                     then do
                                         matrix <- W.weightTensorToTensorData @'[2, 3] @Double tensor
-                                        pure $ W.weightTensorFromTensorData $ T.run T.CPU $ T.transpose $ T.fromData matrix
+                                        pure $ W.weightTensorFromTensorData $ T.run T.defaultCPU $ T.transpose $ T.fromData matrix
                                     else Right tensor
                             )
                             (W.weightsEntries renamed)

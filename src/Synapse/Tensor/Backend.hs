@@ -1,31 +1,58 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 
--- | Execution of tensor computations and preparation of reusable tensor functions.
+{- | Execute staged tensor computations on the CPU or a CUDA device.
+
+Choose 'defaultCPU' or 'defaultGPU' for the backend's default target.
+To select a worker count or device explicitly, create a target once and wrap it in 'CPU' or 'GPU'.
+Reuse that backend to prepare as many computations as needed.
+
+'run' accepts a closed tensor expression or a function with any number of arguments.
+Each argument and the result may be a single tensor, a tuple, or a record with a 'TensorStructure' instance.
+The prepared function takes and returns the same structures with 'TensorData' in place of 'Tensor'.
+-}
 module Synapse.Tensor.Backend
-    ( -- * Backends
+    ( -- * Targets
       Backend (..)
+    , CPUTarget
+    , GPUTarget
+    , defaultCPU
+    , defaultGPU
+    , createCPUTarget
+    , createGPUTarget
 
-      -- * Supported tensor structures
-    , Computation
-
-      -- * Closed computations
+      -- * Execution
+    , RunnableTensor
+    , Runnable
+    , RunResult
     , run
+    , run'
 
-      -- * Prepared functions
-    , run1
-    , run2
-    , run3
-    , run4
-    , run5
-    , run6
-    , run7
-    , run8
-    , run9
+      -- * Asynchronous execution
+    , Async
+    , RunAsyncResult
+    , runAsync
+    , runAsync'
+    , waitAsync
+    , pollAsync
+    , cancelAsync
     ) where
+
+import Control.Applicative ((<|>))
+import Control.Monad (unless)
+import Data.Proxy (Proxy (..))
+import GHC.Conc (getNumCapabilities)
+
+import Data.Array.Accelerate.LLVM.Native qualified as Native
+#ifdef SYNAPSE_GPU
+import Control.Concurrent (runInBoundThread)
+import Data.Array.Accelerate.LLVM.PTX qualified as PTX
+import Foreign.CUDA.Driver qualified as CUDA
+#endif
 
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorData (..))
 import Synapse.Tensor.Shapes.Backend (ShapeToDIM)
@@ -39,24 +66,100 @@ import Synapse.Tensor.Structure
     , rebuild
     )
 
-import qualified Data.Array.Accelerate as A
-import qualified Data.Array.Accelerate.LLVM.Native as CPU
+import Data.Array.Accelerate qualified as A
+import Language.Haskell.TH qualified as TH
+import Language.Haskell.TH.Syntax qualified as TH
+import Text.Read (readMaybe)
+import Type.Reflection qualified as Reflection
+
+-- | Select an execution target for 'run'.
+data Backend
+    = CPU CPUTarget
+    | GPU GPUTarget
+    deriving stock (Show)
+
+-- | A CPU worker pool shared by computations prepared with the same target.
+data CPUTarget = DefaultCPU | CPUWorkers Int Native.Native
+
+instance Show CPUTarget where
+    showsPrec _ DefaultCPU = showString "default"
+    showsPrec _ (CPUWorkers workers _) = showString "workers=" . shows workers
+
+-- | The default CUDA device pool or a context on one explicitly selected device.
+data GPUTarget
+    = DefaultGPU
 #ifdef SYNAPSE_GPU
-import qualified Data.Array.Accelerate.LLVM.PTX as GPU
+    | GPUDevice Int PTX.PTX
 #endif
 
-{- | Backend used to compile and execute a tensor computation.
+instance Show GPUTarget where
+    showsPrec _ DefaultGPU = showString "default"
+#ifdef SYNAPSE_GPU
+    showsPrec _ (GPUDevice device _) = showString "device=" . shows device
+#endif
 
-'CPU' is always available.
-'GPU' requires building Synapse with the Cabal @gpu@ flag and a supported CUDA device.
-Selecting 'GPU' in a build without GPU support raises an error when execution is demanded.
+{- | Use the default CPU worker pool.
+
+Set @ACCELERATE_LLVM_NATIVE_THREADS@ before the first CPU execution to override its worker count.
 -}
-data Backend
-    = -- | Native CPU execution through LLVM.
-      CPU
-    | -- | CUDA GPU execution through LLVM and PTX.
-      GPU
-    deriving stock (Eq, Show)
+defaultCPU :: Backend
+defaultCPU = CPU DefaultCPU
+
+{- | Use the default pool of visible CUDA devices.
+
+To restrict the pool, set @ACCELERATE_LLVM_PTX_DEVICES@ before the first GPU execution.
+Use a list of device ordinals such as @[0]@.
+-}
+defaultGPU :: Backend
+defaultGPU = GPU DefaultGPU
+
+{- | Create a pool with one worker per capability, starting at capability zero.
+
+The worker count must be positive and be at most the number of RTS capabilities.
+-}
+createCPUTarget
+    :: Int
+    -> IO CPUTarget
+createCPUTarget workers = do
+    capabilities <- getNumCapabilities
+    unless (workers > 0 && workers <= capabilities) $
+        fail "createCPUTarget: worker count must be between 1 and the number of RTS capabilities"
+    CPUWorkers workers <$> Native.createTarget [0 .. workers - 1]
+
+{- | Create a CUDA context for a device visible to the process, numbered from zero.
+
+Fails if the device is unavailable or Synapse was built without the Cabal @gpu@ flag.
+-}
+createGPUTarget
+    :: Int
+    -> IO GPUTarget
+#ifdef SYNAPSE_GPU
+createGPUTarget ordinal = runInBoundThread $ do
+    CUDA.initialise []
+    count <- CUDA.count
+    unless (ordinal >= 0 && ordinal < count) $
+        fail "createGPUTarget: CUDA device is not visible to this process"
+    device <- CUDA.device ordinal
+    properties <- CUDA.props device
+    GPUDevice ordinal <$> PTX.createTargetForDevice device properties [CUDA.SchedAuto]
+#else
+createGPUTarget _ = fail "createGPUTarget: Synapse was built without GPU support"
+#endif
+
+-- | Prepare an Accelerate program using the selected pool or context.
+execute
+    :: Native.Afunction f
+    => Backend
+    -> f
+    -> Native.AfunctionR f
+execute (CPU DefaultCPU) = Native.runN
+execute (CPU (CPUWorkers _ target)) = Native.runNWith target
+#ifdef SYNAPSE_GPU
+execute (GPU DefaultGPU) = PTX.runN
+execute (GPU (GPUDevice _ target)) = PTX.runNWith target
+#else
+execute (GPU _) = error "run: Synapse was built without GPU support"
+#endif
 
 {- | Convert a tensor or a binary product of tensors to its backend array representation.
 
@@ -65,7 +168,6 @@ Each tensor becomes an Accelerate array; each pair becomes a pair of backend rep
 Conversions preserve shapes, element types, and contents.
 
 'pack' and 'unpack' must preserve the meaning of the staged computation in either direction.
-Paths are omitted from backend values; reconstruction ignores paths and flattening restores canonical names.
 -}
 class A.Arrays (BackendLeaves a) => BackendTree a where
     {- | Materialized Accelerate arrays corresponding to a staged tensor product.
@@ -79,7 +181,6 @@ class A.Arrays (BackendLeaves a) => BackendTree a where
     {- | Materialized Synapse tensors with the same binary product structure.
 
     A @TensorField (Tensor sh a)@ becomes @TensorField (TensorData sh a)@; pairs are converted recursively.
-    Unlike 'BackendLeaves', this representation retains Synapse's shape-indexed wrappers.
     -}
     type MaterialLeaves a
 
@@ -118,415 +219,253 @@ instance (BackendTree a, BackendTree b) => BackendTree (a, b) where
     toBackend (a, b) = (toBackend @a a, toBackend @b b)
     fromBackend (a, b) = (fromBackend @a a, fromBackend @b b)
 
-{- | Tensor structures that can be executed as one backend computation.
+-- | Translate a closed expression or function to its staged backend type.
+type family BackendProgram f where
+    BackendProgram (arg -> rest) = A.Acc (BackendLeaves (TensorProduct Tensor arg)) -> BackendProgram rest
+    BackendProgram a = A.Acc (BackendLeaves (TensorProduct Tensor a))
 
-Instances are inferred for tensors and supported tensor records; no explicit instance is needed.
-'WithTensor' replaces each staged tensor with its materialized counterpart.
-The structure may contain tensors with different shapes and element types.
--}
-class (TensorStructure a, BackendTree (TensorProduct Tensor a)) => Computation a where
-    -- | Convert a tensor data structure to its array product.
-    inputData
-        :: WithTensor TensorData a
-        -> BackendLeaves (TensorProduct Tensor a)
+-- | Replace each argument and the result with its materialized tensor structure.
+type family RunResult f where
+    RunResult (arg -> rest) = WithTensor TensorData arg -> RunResult rest
+    RunResult a = WithTensor TensorData a
 
-    -- | Reconstruct a tensor data structure from its array product.
-    outputData
-        :: BackendLeaves (TensorProduct Tensor a)
-        -> WithTensor TensorData a
+-- Bundle arguments so the public unary Accelerate async entry point suffices.
+type family AsyncInputs f where
+    AsyncInputs (arg -> rest) = (BackendLeaves (TensorProduct Tensor arg), AsyncInputs rest)
+    AsyncInputs a = ()
+
+type family AsyncOutput f where
+    AsyncOutput (arg -> rest) = AsyncOutput rest
+    AsyncOutput a = BackendLeaves (TensorProduct Tensor a)
+
+-- | The type of the asynchronous runner for a staged program.
+type family RunAsyncResult f where
+    RunAsyncResult (arg -> rest) = WithTensor TensorData arg -> RunAsyncResult rest
+    RunAsyncResult a = IO (Async (WithTensor TensorData a))
+
+-- | A staged tensor structure or a function taking tensor structures and returning one.
+class
+    (Native.Afunction (BackendProgram f), A.Arrays (AsyncInputs f), A.Arrays (AsyncOutput f)) =>
+    Runnable f
+    where
+    -- | Rebuild arguments from staged arrays and pack the staged result.
+    toBackendProgram
+        :: f
+        -> BackendProgram f
+
+    -- | Adapt a prepared backend function to accept tensor data, or rebuild a closed expression's result.
+    fromBackendResult
+        :: Proxy f
+        -> Native.AfunctionR (BackendProgram f)
+        -> RunResult f
+
+    -- | Build the staged program with all inputs in a single array product.
+    toBackendAsyncProgram
+        :: f
+        -> A.Acc (AsyncInputs f)
+        -> A.Acc (AsyncOutput f)
+
+    -- | Pack the curried inputs and defer adapting the result until it is requested.
+    fromBackendAsyncProgram
+        :: Proxy f
+        -> (AsyncInputs f -> IO (Native.Async (AsyncOutput f)))
+        -> RunAsyncResult f
 
 instance
+    ( TensorStructure arg
+    , BackendTree (TensorProduct Tensor arg)
+    , TensorProduct TensorData arg ~ MaterialLeaves (TensorProduct Tensor arg)
+    , Runnable rest
+    )
+    => Runnable (arg -> rest)
+    where
+    toBackendProgram f = toBackendProgram . f . rebuild @arg @Tensor . unpack
+    fromBackendResult _ f =
+        fromBackendResult (Proxy @rest) . f . toBackend @(TensorProduct Tensor arg) . flatten @arg @TensorData
+    toBackendAsyncProgram f inputs =
+        let (arg, rest) = A.unlift inputs
+         in toBackendAsyncProgram (f $ rebuild @arg @Tensor $ unpack arg) rest
+    fromBackendAsyncProgram _ f arg =
+        fromBackendAsyncProgram (Proxy @rest) $ \rest ->
+            f (toBackend @(TensorProduct Tensor arg) (flatten @arg @TensorData arg), rest)
+instance
+    {-# OVERLAPPABLE #-}
     ( TensorStructure a
     , BackendTree (TensorProduct Tensor a)
     , TensorProduct TensorData a ~ MaterialLeaves (TensorProduct Tensor a)
+    , RunResult a ~ WithTensor TensorData a
+    , BackendProgram a ~ A.Acc (BackendLeaves (TensorProduct Tensor a))
+    , A.Arrays (AsyncOutput a)
+    , AsyncInputs a ~ ()
+    , AsyncOutput a ~ BackendLeaves (TensorProduct Tensor a)
+    , RunAsyncResult a ~ IO (Async (WithTensor TensorData a))
     )
-    => Computation a
+    => Runnable a
     where
-    inputData = toBackend @(TensorProduct Tensor a) . flatten @a @TensorData
-    outputData = rebuild @a @TensorData . fromBackend @(TensorProduct Tensor a)
+    toBackendProgram = pack . flatten @a @Tensor
+    fromBackendResult _ = rebuild @a @TensorData . fromBackend @(TensorProduct Tensor a)
+    toBackendAsyncProgram f _ = toBackendProgram f
+    fromBackendAsyncProgram shape f = Async (fromBackendResult shape) <$> f ()
 
--- | Evaluate a tensor computation and return its tensor data.
+{- | A runnable tensor, tuple, or record of tensors with no function arguments.
+
+Use this constraint when the result structure is abstract.
+It fixes @RunResult a@ to @WithTensor TensorData a@ without needing to inspect the concrete type @a@.
+-}
+type RunnableTensor a =
+    ( TensorStructure a
+    , BackendTree (TensorProduct Tensor a)
+    , TensorProduct TensorData a ~ MaterialLeaves (TensorProduct Tensor a)
+    , Runnable a
+    , RunResult a ~ WithTensor TensorData a
+    , RunAsyncResult a ~ IO (Async (WithTensor TensorData a))
+    )
+
+{- | Execute a closed expression or prepare a staged function for repeated execution.
+
+For a function, bind the result outside the loop.
+Reuse it with new data of the same types and shapes.
+Compilation may take place on the first call.
+
+@
+result = run defaultCPU expression
+step = run defaultCPU trainingStep
+next = step parameters batch
+@
+-}
 run
-    :: forall a
-     . Computation a
+    :: forall f
+     . Runnable f
     => Backend
-    -> a
-    -> WithTensor TensorData a
-run backend = outputData @a . execute . pack . flatten @_ @Tensor
+    -> f
+    -> RunResult f
+run backend f = fromBackendResult (Proxy @f) (execute backend (toBackendProgram f))
+
+-- | A running backend computation.
+data Async a where
+    Async :: (result -> a) -> Native.Async result -> Async a
+
+-- | Wait for the computation and rethrow any exception it raised.
+waitAsync
+    :: Async a
+    -> IO a
+waitAsync (Async convert job) = convert <$> Native.wait job
+
+-- | Return the result if ready. Rethrow any exception from a completed computation.
+pollAsync
+    :: Async a
+    -> IO (Maybe a)
+pollAsync (Async convert job) = fmap convert <$> Native.poll job
+
+-- | Request cancellation of the task. Submitted device work may still finish.
+cancelAsync
+    :: Async a
+    -> IO ()
+cancelAsync (Async _ job) = Native.cancel job
+
+{- | Prepare a graph for asynchronous execution. Apply all arguments to start a job.
+
+Reuse the prepared function across calls. Its first use may compile the graph.
+-}
+runAsync
+    :: forall f
+     . Runnable f
+    => Backend
+    -> f
+    -> RunAsyncResult f
+runAsync backend f = fromBackendAsyncProgram (Proxy @f) (launch (toBackendAsyncProgram f))
   where
-    execute = case backend of
-        CPU -> CPU.runN
+    launch = case backend of
+        CPU DefaultCPU -> Native.run1Async
+        CPU (CPUWorkers _ target) -> Native.run1AsyncWith target
 #ifdef SYNAPSE_GPU
-        GPU -> GPU.runN
+        GPU DefaultGPU -> PTX.run1Async
+        GPU (GPUDevice _ target) -> PTX.run1AsyncWith target
 #else
-        GPU -> error "Synapse.Tensor.run: GPU backend is not enabled in this build"
+        GPU _ -> error "runAsync: Synapse was built without GPU support"
 #endif
 
--- | Prepare a function of one tensor argument for repeated execution.
-run1
-    :: forall a1 result
-     . (Computation a1, Computation result)
-    => Backend
-    -> (a1 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData result
-run1 backend f = outputData @result . execute . inputData @a1
+-- | Embed backend code and specialize its adapter to the original Synapse program.
+compile
+    :: forall f program
+     . (Reflection.Typeable f, Native.Afunction program)
+    => Bool
+    -> TH.Name
+    -> Backend
+    -> program
+    -> TH.ExpQ
+compile asynchronous adapter backend program =
+    TH.appE (pure $ TH.AppE (TH.VarE adapter) witness) (compiled backend)
   where
-    program x1 = pack $ flatten @_ @Tensor $ f $ rebuild @_ @Tensor $ unpack x1
-    execute = case backend of
-        CPU -> CPU.runN program
+    witness = TH.SigE (TH.ConE 'Proxy) (TH.AppT (TH.ConT ''Proxy) programTy)
+    programTy = programType $ Reflection.SomeTypeRep $ Reflection.typeRep @f
+
+    programType (Reflection.SomeTypeRep (Reflection.Fun arg rest)) =
+        TH.AppT
+            (TH.AppT TH.ArrowT (programType $ Reflection.SomeTypeRep arg))
+            (programType $ Reflection.SomeTypeRep rest)
+    programType (Reflection.SomeTypeRep rep) = foldl TH.AppT headType (map programType args)
+      where
+        (con, args) = Reflection.splitApps rep
+        packageName = Reflection.tyConPackage con
+        moduleName = Reflection.tyConModule con
+        name = Reflection.tyConName con
+        headType
+            | moduleName == "GHC.TypeLits"
+            , Just literal <- typeLiteral name =
+                TH.LitT literal
+            | name == "':" = TH.PromotedConsT
+            | name == "'[]" = TH.PromotedNilT
+            | '\'' : constructor <- name = TH.PromotedT $ TH.mkNameG_d packageName moduleName constructor
+            | otherwise = TH.ConT $ TH.mkNameG_tc packageName moduleName name
+        typeLiteral value =
+            (TH.NumTyLit <$> readMaybe value)
+                <|> (TH.StrTyLit <$> readMaybe value)
+                <|> (TH.CharTyLit <$> readMaybe value)
+
+    compiled (CPU DefaultCPU) =
+        if asynchronous then Native.runQAsync program else Native.runQ program
+    compiled (CPU (CPUWorkers _ _)) =
+        fail "AOT compilation requires defaultCPU for CPU programs"
 #ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
+    compiled (GPU DefaultGPU) =
+        if asynchronous then PTX.runQAsync program else PTX.runQ program
+    compiled (GPU (GPUDevice _ _)) =
+        fail "AOT compilation requires defaultGPU for GPU programs"
 #else
-        GPU -> error "Synapse.Tensor.run1: GPU backend is not enabled in this build"
+    compiled (GPU _) =
+        fail "AOT compilation: Synapse was built without GPU support"
 #endif
 
--- | Prepare a function of two tensor arguments for repeated execution.
-run2
-    :: forall a1 a2 result
-     . (Computation a1, Computation a2, Computation result)
-    => Backend
-    -> (a1 -> a2 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData result
-run2 backend f = \x1 x2 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-  where
-    program x1 x2 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run2: GPU backend is not enabled in this build"
-#endif
+{- | Compile a monomorphic staged program in a Template Haskell splice ahead of time.
 
--- | Prepare a function of three tensor arguments for repeated execution.
-run3
-    :: forall a1 a2 a3 result
-     . (Computation a1, Computation a2, Computation a3, Computation result)
-    => Backend
-    -> (a1 -> a2 -> a3 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData result
-run3 backend f = \x1 x2 x3 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-  where
-    program x1 x2 x3 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run3: GPU backend is not enabled in this build"
-#endif
+@step = $(run' defaultCPU trainingStep)@.
 
--- | Prepare a function of four tensor arguments for repeated execution.
-run4
-    :: forall a1 a2 a3 a4 result
-     . (Computation a1, Computation a2, Computation a3, Computation a4, Computation result)
-    => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData result
-run4 backend f = \x1 x2 x3 x4 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-  where
-    program x1 x2 x3 x4 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run4: GPU backend is not enabled in this build"
-#endif
+Use 'defaultCPU' or 'defaultGPU' to select the backend at build time.
+Configure the default target through the build environment.
+Set @ACCELERATE_LLVM_NATIVE_THREADS@ for CPU workers or
+@ACCELERATE_LLVM_PTX_DEVICES@ for CUDA device ordinals.
 
--- | Prepare a function of five tensor arguments for repeated execution.
-run5
-    :: forall a1 a2 a3 a4 a5 result
-     . (Computation a1, Computation a2, Computation a3, Computation a4, Computation a5, Computation result)
+For a CPU splice, list @accelerate-llvm-native@ directly in the Cabal @build-depends@ of the component that contains the splice.
+GHC loads the compiler plugin from that package when building the component.
+GPU does not need this to be compiled ahead of time.
+-}
+run'
+    :: forall f
+     . (Runnable f, Reflection.Typeable f)
     => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> a5 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData a5
-    -> WithTensor TensorData result
-run5 backend f = \x1 x2 x3 x4 x5 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-            (inputData @a5 x5)
-  where
-    program x1 x2 x3 x4 x5 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-                    (rebuild @_ @Tensor $ unpack x5)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run5: GPU backend is not enabled in this build"
-#endif
+    -> f
+    -> TH.ExpQ
+run' backend = compile @f False 'fromBackendResult backend . toBackendProgram
 
--- | Prepare a function of six tensor arguments for repeated execution.
-run6
-    :: forall a1 a2 a3 a4 a5 a6 result
-     . ( Computation a1
-       , Computation a2
-       , Computation a3
-       , Computation a4
-       , Computation a5
-       , Computation a6
-       , Computation result
-       )
-    => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData a5
-    -> WithTensor TensorData a6
-    -> WithTensor TensorData result
-run6 backend f = \x1 x2 x3 x4 x5 x6 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-            (inputData @a5 x5)
-            (inputData @a6 x6)
-  where
-    program x1 x2 x3 x4 x5 x6 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-                    (rebuild @_ @Tensor $ unpack x5)
-                    (rebuild @_ @Tensor $ unpack x6)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run6: GPU backend is not enabled in this build"
-#endif
+{- | Compile a monomorphic graph for asynchronous execution in a Template Haskell splice ahead of time.
 
--- | Prepare a function of seven tensor arguments for repeated execution.
-run7
-    :: forall a1 a2 a3 a4 a5 a6 a7 result
-     . ( Computation a1
-       , Computation a2
-       , Computation a3
-       , Computation a4
-       , Computation a5
-       , Computation a6
-       , Computation a7
-       , Computation result
-       )
+The build and runtime requirements are the same as for @run'@.
+-}
+runAsync'
+    :: forall f
+     . (Runnable f, Reflection.Typeable f)
     => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData a5
-    -> WithTensor TensorData a6
-    -> WithTensor TensorData a7
-    -> WithTensor TensorData result
-run7 backend f = \x1 x2 x3 x4 x5 x6 x7 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-            (inputData @a5 x5)
-            (inputData @a6 x6)
-            (inputData @a7 x7)
-  where
-    program x1 x2 x3 x4 x5 x6 x7 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-                    (rebuild @_ @Tensor $ unpack x5)
-                    (rebuild @_ @Tensor $ unpack x6)
-                    (rebuild @_ @Tensor $ unpack x7)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run7: GPU backend is not enabled in this build"
-#endif
-
--- | Prepare a function of eight tensor arguments for repeated execution.
-run8
-    :: forall a1 a2 a3 a4 a5 a6 a7 a8 result
-     . ( Computation a1
-       , Computation a2
-       , Computation a3
-       , Computation a4
-       , Computation a5
-       , Computation a6
-       , Computation a7
-       , Computation a8
-       , Computation result
-       )
-    => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> a8 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData a5
-    -> WithTensor TensorData a6
-    -> WithTensor TensorData a7
-    -> WithTensor TensorData a8
-    -> WithTensor TensorData result
-run8 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-            (inputData @a5 x5)
-            (inputData @a6 x6)
-            (inputData @a7 x7)
-            (inputData @a8 x8)
-  where
-    program x1 x2 x3 x4 x5 x6 x7 x8 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-                    (rebuild @_ @Tensor $ unpack x5)
-                    (rebuild @_ @Tensor $ unpack x6)
-                    (rebuild @_ @Tensor $ unpack x7)
-                    (rebuild @_ @Tensor $ unpack x8)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run8: GPU backend is not enabled in this build"
-#endif
-
--- | Prepare a function of nine tensor arguments for repeated execution.
-run9
-    :: forall a1 a2 a3 a4 a5 a6 a7 a8 a9 result
-     . ( Computation a1
-       , Computation a2
-       , Computation a3
-       , Computation a4
-       , Computation a5
-       , Computation a6
-       , Computation a7
-       , Computation a8
-       , Computation a9
-       , Computation result
-       )
-    => Backend
-    -> (a1 -> a2 -> a3 -> a4 -> a5 -> a6 -> a7 -> a8 -> a9 -> result)
-    -> WithTensor TensorData a1
-    -> WithTensor TensorData a2
-    -> WithTensor TensorData a3
-    -> WithTensor TensorData a4
-    -> WithTensor TensorData a5
-    -> WithTensor TensorData a6
-    -> WithTensor TensorData a7
-    -> WithTensor TensorData a8
-    -> WithTensor TensorData a9
-    -> WithTensor TensorData result
-run9 backend f = \x1 x2 x3 x4 x5 x6 x7 x8 x9 ->
-    outputData @result $
-        execute
-            (inputData @a1 x1)
-            (inputData @a2 x2)
-            (inputData @a3 x3)
-            (inputData @a4 x4)
-            (inputData @a5 x5)
-            (inputData @a6 x6)
-            (inputData @a7 x7)
-            (inputData @a8 x8)
-            (inputData @a9 x9)
-  where
-    program x1 x2 x3 x4 x5 x6 x7 x8 x9 =
-        pack $
-            flatten @_ @Tensor $
-                f
-                    (rebuild @_ @Tensor $ unpack x1)
-                    (rebuild @_ @Tensor $ unpack x2)
-                    (rebuild @_ @Tensor $ unpack x3)
-                    (rebuild @_ @Tensor $ unpack x4)
-                    (rebuild @_ @Tensor $ unpack x5)
-                    (rebuild @_ @Tensor $ unpack x6)
-                    (rebuild @_ @Tensor $ unpack x7)
-                    (rebuild @_ @Tensor $ unpack x8)
-                    (rebuild @_ @Tensor $ unpack x9)
-    execute = case backend of
-        CPU -> CPU.runN program
-#ifdef SYNAPSE_GPU
-        GPU -> GPU.runN program
-#else
-        GPU -> error "Synapse.Tensor.run9: GPU backend is not enabled in this build"
-#endif
+    -> f
+    -> TH.ExpQ
+runAsync' backend = compile @f True 'fromBackendAsyncProgram backend . toBackendAsyncProgram

@@ -54,10 +54,10 @@ prepareStep
     -> T.TensorData '[4, 1] Double
     -> T.TensorData '[4, 1] Double
     -> (T.TensorData '[] Double, Regression T.TensorData Double)
-prepareStep optimizer = T.run3 T.CPU (step optimizer)
+prepareStep optimizer = T.run T.defaultCPU (step optimizer)
 
 materialize :: Regression T.Tensor Double -> Regression T.TensorData Double
-materialize = T.run T.CPU
+materialize = T.run T.defaultCPU
 
 initialParameters :: Regression T.TensorData Double
 initialParameters = materialize $ NN.evalState initialize $ mkStdGen 19
@@ -68,10 +68,10 @@ initialParameters = materialize $ NN.evalState initialize $ mkStdGen 19
         pure $ Regression $ NN.Dense weights bias
 
 trainingInputs :: T.TensorData '[4, 1] Double
-trainingInputs = T.run T.CPU (T.fromList @'[4, 1] [-1.5, -0.5, 0.5, 1.5])
+trainingInputs = T.run T.defaultCPU (T.fromList @'[4, 1] [-1.5, -0.5, 0.5, 1.5])
 
 trainingTargets :: T.TensorData '[4, 1] Double
-trainingTargets = T.run T.CPU (T.fromList @'[4, 1] [-4, -2, 0, 2])
+trainingTargets = T.run T.defaultCPU (T.fromList @'[4, 1] [-4, -2, 0, 2])
 
 history
     :: Int
@@ -113,8 +113,8 @@ tests =
         , testProperty "initialized dense regression learns its coefficients and predicts unseen inputs" $ H.withTests 1 $ H.property $ do
             let execute = prepareStep (NN.SGD 0.2)
                 snapshots = history 32 execute initialParameters
-                predict = T.run3 T.CPU $ \weights bias inputs -> forward (Regression (NN.Dense weights bias)) inputs
-                unseen = T.run T.CPU (T.fromList @'[4, 1] [-2, 0, 2, 4 :: Double])
+                predict = T.run T.defaultCPU $ \weights bias inputs -> forward (Regression (NN.Dense weights bias)) inputs
+                unseen = T.run T.defaultCPU (T.fromList @'[4, 1] [-2, 0, 2, 4 :: Double])
             case reverse snapshots of
                 (lastLoss, learned@(Regression parameters)) : _ -> do
                     approxList (coefficients learned) [2, -1]
@@ -128,8 +128,8 @@ tests =
             let execute = prepareStep (NN.SGD 0.2)
                 initial = materialize (Regression (NN.Dense 0 0))
                 (firstLoss, first) = execute initial trainingInputs trainingTargets
-                otherInputs = T.run T.CPU (T.fromList @'[4, 1] [-3, -1, 1, 3 :: Double])
-                otherTargets = T.run T.CPU (T.fromList @'[4, 1] [5, 3, 1, -1 :: Double])
+                otherInputs = T.run T.defaultCPU (T.fromList @'[4, 1] [-3, -1, 1, 3 :: Double])
+                otherTargets = T.run T.defaultCPU (T.fromList @'[4, 1] [5, 3, 1, -1 :: Double])
                 (secondLoss, second) = execute first otherInputs otherTargets
             approxList (T.toList firstLoss) [6]
             approxList (coefficients first) [1, -0.4]
