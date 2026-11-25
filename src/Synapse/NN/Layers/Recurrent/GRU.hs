@@ -10,13 +10,12 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, type (*))
 import Synapse.NN.Activation (sigmoid)
 import Synapse.NN.Layers.Recurrent.Sequence (sequenceHidden)
-import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
-import qualified Synapse.Tensor.Ops.Logic as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast, split3)
 import Synapse.Tensor.Representation (TensorLike)
-import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Representation qualified as T
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Packed reset, update and candidate projections, in that order.
@@ -55,10 +54,10 @@ gruCell
        , KnownNat batch
        , KnownNat (3 * hidden)
        , TensorOps t a
-       , NumDType a
+       , FloatingDType a
+       , OrdDType a
        , Num (t '[batch, 3 * hidden] a)
        , Floating (t '[batch, hidden] a)
-       , E.Ord (t '[batch, hidden] a)
        )
     => GRU input hidden t a
     -> t '[batch, input] a

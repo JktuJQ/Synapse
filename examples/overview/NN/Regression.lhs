@@ -21,7 +21,6 @@ A separate set of points measures how well the model generalizes.
 > import qualified Synapse.Autograd as AG
 > import qualified Synapse.NN as NN
 > import qualified Synapse.Tensor as T
-> import Synapse.Tensor.Ops.Logic (Comparison, Condition)
 > import System.Random (mkStdGen)
 > import System.Environment (getArgs)
 > import Text.Printf (printf)
@@ -46,7 +45,6 @@ The batch size is part of the input and output tensor shapes.
 > predict
 >     :: ( KnownNat batch_size
 >        , T.RealFloatTensorOps t Double
->        , Condition (t '[batch_size, 32] Double) ~ Comparison (t '[batch_size, 32] Double)
 >        )
 >     => Parameters t
 >     -> t '[batch_size, 1] Double

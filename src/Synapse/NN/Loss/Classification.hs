@@ -13,20 +13,23 @@ module Synapse.NN.Loss.Classification
     , unsafeCrossEntropySmoothed
     ) where
 
+import Data.Array.Accelerate qualified as A
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
-import Synapse.NN.Activation (softplus)
 import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
-import Synapse.Tensor.Ops.Definition (TensorOps, withVJP)
-import Synapse.Tensor.Representation (Tensor, TensorElement, TensorLike)
+import Synapse.Tensor.Ops.Definition (TensorOps, withCachedVJP, withVJP)
+import Synapse.Tensor.Representation (Tensor (..), TensorElement (..), TensorLike)
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduceNonEmpty, ReduceShape, RemoveAxis)
+import Synapse.Tensor.Shapes.Backend (backendCoordinates, backendIndex)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 
-import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
-import qualified Synapse.Tensor.Ops.Logic as E
-import qualified Synapse.Tensor.Ops.Raw.Index as Raw
-import qualified Synapse.Tensor.Ops.Reduction as R
+import Synapse.Autograd.Tensor.Ops.Pullback.Index qualified as Pullback
+import Synapse.Tensor.Ops.Logic qualified as E
+import Synapse.Tensor.Ops.Raw.Elementwise qualified as Elementwise
+import Synapse.Tensor.Ops.Raw.Index qualified as Raw
+import Synapse.Tensor.Ops.Raw.Reduction qualified as RawReduction
+import Synapse.Tensor.Ops.Reduction qualified as R
 
 -- | Reflect the size of an axis whose validity is established by the calling loss.
 classCount
@@ -83,18 +86,33 @@ Suitable for both binary classification and independent multi-label predictions.
 Keep the model's final output unnormalized and apply sigmoid separately when probabilities are needed.
 -}
 binaryCrossEntropyWithLogits
-    :: forall {t :: TensorLike} in_sh out_sh a
-     . ( Floating (t in_sh a)
-       , E.Ord (t in_sh a)
-       , E.Conditional (t in_sh a)
-       , E.Condition (t in_sh a) ~ E.Comparison (t in_sh a)
-       )
-    => (t in_sh a -> t out_sh a)
-    -> t in_sh a
-    -> t in_sh a
+    :: forall {t :: TensorLike} sh out_sh a
+     . (TensorOps t a, Shape sh, FloatingDType a, OrdDType a)
+    => (t sh a -> t out_sh a)
+    -> t sh a
+    -> t sh a
     -> t out_sh a
 binaryCrossEntropyWithLogits reduce logits targets =
-    reduce $ E.max logits 0 - logits * targets + softplus (negate (abs logits))
+    reduce $ withVJP (Proxy @(() :: Constraint)) forward backward (logits, targets)
+  where
+    forward (x, y) = Elementwise.zipWith loss x y
+    loss
+        :: TensorElement a
+        -> TensorElement a
+        -> TensorElement a
+    loss x y =
+        let z = exp (negate (abs x))
+         in E.max x 0 - x * y + 2 * atanh (z / (2 + z))
+    backward (x, y) _ seed = (Elementwise.zipWith3 logitGradient x y seed, negate (seed * x))
+    logitGradient
+        :: TensorElement a
+        -> TensorElement a
+        -> TensorElement a
+        -> TensorElement a
+    logitGradient x y seed =
+        let z = exp (negate (abs x))
+            tailProbability = z / (1 + z)
+         in seed * E.select (x E.>= 0) ((1 - y) - tailProbability) (tailProbability - y)
 
 {- | Negative log likelihood @-sum (targets * logProbabilities)@ along the supplied class axis, followed by the caller's reduction.
 
@@ -198,8 +216,23 @@ unsafeCrossEntropy
     -> t sh a
     -> Tensor (RemoveAxis axis sh) Int
     -> t out_sh a
-unsafeCrossEntropy reduce logits =
-    unsafeNegativeLogLikelihood @axis reduce (R.logSoftmax @axis logits)
+unsafeCrossEntropy reduce logits targets =
+    reduce $ withCachedVJP (Proxy @(() :: Constraint)) forward backward logits
+  where
+    forward input =
+        let logProbabilities = RawReduction.logSoftmax @axis input
+         in (negate (Raw.unsafeGatherReduced @axis logProbabilities targets), logProbabilities)
+    backward (Tensor logProbabilities) (Tensor seeds) =
+        Tensor $ A.generate (A.shape logProbabilities) $ \ix ->
+            let coords = backendCoordinates @sh ix
+                observation = backendIndex @(RemoveAxis axis sh) (take classAxis coords ++ drop (classAxis + 1) coords)
+                Tensor labels = targets
+                selected = coords !! classAxis A.== labels A.! observation
+                logProbability = TensorElement $ logProbabilities A.! ix
+                indicator = TensorElement $ A.cond selected (unTensorElement (1 :: TensorElement a)) (unTensorElement 0)
+                seed = TensorElement $ seeds A.! observation
+             in unTensorElement $ seed * (exp logProbability - indicator)
+    classAxis = fromIntegral (natVal (Proxy @axis))
 
 {- | Mix class probabilities with a uniform distribution: @(1 - smoothing) * targets + smoothing / classes@.
 

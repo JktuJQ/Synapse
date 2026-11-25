@@ -31,7 +31,7 @@ import Synapse.Tensor.Ops.Constraints (FloatingDType, FractionalDType, NumDType)
 import Synapse.Tensor.Ops.Conversion (FromIntegral)
 import Synapse.Tensor.Ops.Definition (TensorOps (Element, fromElement, fromTensor))
 import Synapse.Tensor.Ops.Raw.Construction (element)
-import qualified Synapse.Tensor.Ops.Raw.Construction as Raw
+import Synapse.Tensor.Ops.Raw.Construction qualified as Raw
 import Synapse.Tensor.Representation (TensorElement, TensorIndex, TensorLike)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 

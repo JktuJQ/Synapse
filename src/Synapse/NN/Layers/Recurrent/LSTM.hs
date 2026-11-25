@@ -9,14 +9,13 @@ import Control.Monad.Trans.State.Strict (State, runState, state)
 import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, type (*))
 import Synapse.NN.Activation (sigmoid)
-import Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory)
-import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
+import Synapse.NN.Layers.Recurrent.LSTMSequence (sequenceLSTM)
+import Synapse.Tensor.Ops.Constraints (FloatingDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps)
-import qualified Synapse.Tensor.Ops.Logic as E
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast, split4)
 import Synapse.Tensor.Representation (TensorLike)
-import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Representation qualified as T
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Packed input, forget, candidate and output projections, in that order.
@@ -61,10 +60,10 @@ lstmCell
        , KnownNat batch
        , KnownNat (4 * hidden)
        , TensorOps t a
-       , NumDType a
+       , FloatingDType a
+       , OrdDType a
        , Num (t '[batch, 4 * hidden] a)
        , Floating (t '[batch, hidden] a)
-       , E.Ord (t '[batch, hidden] a)
        )
     => LSTM input hidden t a
     -> t '[batch, input] a
@@ -101,14 +100,5 @@ lstm parameters inputs = state $ \(LSTMState hidden memory) ->
             , (lstmInputBias parameters, lstmHiddenBias parameters)
             )
         (outputs, (finalHidden, finalMemory)) =
-            runState
-                ( sequenceMemory
-                    ( \((w, r), (b, c)) x -> state $ \(h, m) ->
-                        let (output, LSTMState nextHidden nextMemory) = runState (lstmCell (LSTM w r b c) x) $ LSTMState h m
-                         in (output, (nextHidden, nextMemory))
-                    )
-                    weights
-                    inputs
-                )
-                (hidden, memory)
+            runState (sequenceLSTM weights inputs) (hidden, memory)
      in (outputs, LSTMState finalHidden finalMemory)

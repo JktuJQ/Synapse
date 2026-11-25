@@ -14,17 +14,17 @@ module Synapse.Tensor.Ops.Raw.Construction
     , element
     ) where
 
-import qualified Data.Array.Accelerate as A
+import Data.Array.Accelerate qualified as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.Ops.Conversion (FromIntegral)
-import qualified Synapse.Tensor.Ops.Conversion as E (fromIntegral)
+import Synapse.Tensor.Ops.Conversion qualified as E (fromIntegral)
 import Synapse.Tensor.Ops.Raw.Elementwise (map)
 import Synapse.Tensor.Ops.Raw.Index (coordinate)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorIndex (..))
 import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Prelude hiding (map)
-import qualified Prelude as P
+import Prelude qualified as P
 
 -- | Generate each element from its multidimensional index.
 fromGen
@@ -86,9 +86,7 @@ linspace start end =
         count ->
             fromGen @'[n] $ \ix ->
                 let i = unTensorElement (coordinate @0 ix)
-                    weight
-                        :: TensorElement a
-                    weight = E.fromIntegral (coordinate @0 ix :: TensorElement Int) / element (fromIntegral (count - 1))
+                    weight = E.fromIntegral (coordinate @0 ix) / element (fromIntegral (count - 1))
                     value = (1 - weight) * element start + weight * element end
                  in TensorElement $
                         A.cond (i A.== 0) (A.constant start) $

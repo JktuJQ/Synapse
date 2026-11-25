@@ -24,19 +24,21 @@ module Synapse.Tensor.Ops.Raw.Window
     , convolutionWindow
     , groupCount
 
-      -- * Convolution and gradients
+      -- * Convolution
     , convolve
     , transposeConvolve
-    , kernelGradient
+    , transposeMatrix
+    , outputMatrix
     , convolution
+    , convolutionCached
     , convTranspose
 
       -- * Pooling geometry and contributions
     , poolWindow
     , poolLocation
     , maxWindows
+    , nonOverlapping
     , divisors
-    , poolPatches
 
       -- * Pooling
     , maxPool
@@ -53,13 +55,13 @@ import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Backend (backendShape, strides)
 import Synapse.Tensor.Shapes.Dimensions (Shape (..))
 
-import qualified Data.Array.Accelerate as A
-import qualified Data.Array.Accelerate.Representation.Type as R
-import qualified Data.Array.Accelerate.Sugar.Elt as Sugar
-import qualified Data.Array.Accelerate.Type as AT
-import qualified Prelude as P
+import Data.Array.Accelerate qualified as A
+import Data.Array.Accelerate.Representation.Type qualified as R
+import Data.Array.Accelerate.Sugar.Elt qualified as Sugar
+import Data.Array.Accelerate.Type qualified as AT
+import Prelude qualified as P
 
-import qualified Synapse.Tensor.Ops.Logic as E
+import Synapse.Tensor.Ops.Logic qualified as E
 
 {- | Spatial window geometry in channels-first order.
 Strides, dilation, and padding ranks must already be validated by the caller.
@@ -148,6 +150,7 @@ extract
     -> A.Acc (A.Matrix a)
 extract dims input
     | 0 `elem` inputSizes dims = A.fill extent zero
+    | interiorWindow dims = extractInterior dims input
     | otherwise = A.generate extent $ \ix ->
         let (valid, source) = windowLocation dims (A.indexHead ix) (A.indexHead $ A.indexTail ix)
          in A.cond valid (input A.! A.index1 source) zero
@@ -158,6 +161,52 @@ extract dims input
                 A.:. (channels dims * product (kernelSizes dims))
                 A.:. (batches dims * product (outputSizes dims))
     zero = unTensorElement (0 :: TensorElement a)
+
+interiorWindow :: Window -> Bool
+interiorWindow dims =
+    all (== 0) (beforePadding dims)
+        && and
+            ( zipWith4
+                fits
+                (inputSizes dims)
+                (outputSizes dims)
+                (kernelSizes dims)
+                (zip (steps dims) (spacing dims))
+            )
+  where
+    fits size outputs kernel (stride, dilation) =
+        outputs > 0 && kernel > 0 && (outputs - 1) * stride + (kernel - 1) * dilation < size
+
+-- | Separate the stride-dependent window bases from the dilated kernel offsets.
+extractInterior
+    :: DType a
+    => Window
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Matrix a)
+extractInterior dims input = A.generate (A.constant $ A.Z A.:. shared A.:. positions) $ \ix ->
+    let k = A.indexHead (A.indexTail ix)
+        p = A.indexHead ix
+     in input A.! A.index1 (bases A.! A.index1 p + offsets A.! A.index1 k)
+  where
+    spatial = product (outputSizes dims)
+    plane = product (inputSizes dims)
+    volume = product (kernelSizes dims)
+    positions = batches dims * spatial
+    shared = channels dims * volume
+    bases = A.compute $ A.generate (A.index1 $ A.constant positions) $ \ix ->
+        let p = A.unindex1 ix
+            b = p `A.quot` A.constant spatial
+            coords = coordinates (outputSizes dims) (p `A.rem` A.constant spatial)
+            shifted = zipWith (*) coords (map A.constant $ steps dims)
+         in b * A.constant (channels dims * plane) + offset (inputSizes dims) shifted
+    offsets =
+        A.use $
+            A.fromList
+                (A.Z A.:. shared)
+                [ c * plane + sum (zipWith3 (\x d stride -> x * d * stride) coords (spacing dims) (strides $ inputSizes dims))
+                | c <- [0 .. channels dims - 1]
+                , coords <- traverse (\k -> [0 .. k - 1]) (kernelSizes dims)
+                ]
 
 -- | Sum patch contributions for each input element by gathering its overlapping windows.
 combine
@@ -327,7 +376,17 @@ convolve
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector a)
-convolve dims cout groups input weights = A.generate (A.constant $ A.Z A.:. (batches dims * cout * spatial)) $ \ix ->
+convolve dims cout groups input = convolveWindows dims cout groups (A.flatten $ extract dims input)
+
+convolveWindows
+    :: (DType a, Num (TensorElement a), P.Num a)
+    => Window
+    -> Int
+    -> Int
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+convolveWindows dims cout groups windows weights = A.generate (A.constant $ A.Z A.:. (batches dims * cout * spatial)) $ \ix ->
     let linear = A.unindex1 ix
         position = (linear `A.quot` A.constant (cout * spatial)) * A.constant spatial + linear `A.rem` A.constant spatial
         o = (linear `A.quot` A.constant spatial) `A.rem` A.constant cout
@@ -337,9 +396,7 @@ convolve dims cout groups input weights = A.generate (A.constant $ A.Z A.:. (bat
     positions = batches dims * spatial
     shared = channels dims `div` groups * product (kernelSizes dims)
     result =
-        matrixProduct [groups] [groups] [groups] (cout `div` groups) shared positions weights $
-            A.flatten $
-                extract dims input
+        matrixProduct [groups] [groups] [groups] (cout `div` groups) shared positions weights windows
 
 -- | Apply the transpose of a convolution's linear input mapping.
 transposeConvolve
@@ -365,24 +422,6 @@ transposeConvolve dims cout groups weights input = combine dims $ A.reshape (A.c
             (transposeMatrix groups (cout `div` groups) shared weights)
             (outputMatrix dims cout input)
 
--- | Contract an input's windows with channels-first output contributions.
-kernelGradient
-    :: (DType a, Num (TensorElement a), P.Num a)
-    => Window
-    -> Int
-    -> Int
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-kernelGradient dims cout groups input seed =
-    matrixProduct [groups] [groups] [groups] (cout `div` groups) positions shared (outputMatrix dims cout seed) $
-        transposeMatrix groups shared positions $
-            A.flatten $
-                extract dims input
-  where
-    shared = channels dims `div` groups * product (kernelSizes dims)
-    positions = batches dims * product (outputSizes dims)
-
 -- | Apply grouped cross-correlation with the validated output shape.
 convolution
     :: forall stride padding dilation groups input kernel out a
@@ -406,6 +445,33 @@ convolution (Tensor input) (Tensor weights) =
             convolve dims (product $ take 1 $ shape @kernel) (groupCount @groups) (A.flatten input) (A.flatten weights)
   where
     dims = convolutionWindow @input @kernel @stride @padding @dilation
+
+-- | Retain the extracted windows for the kernel gradient.
+convolutionCached
+    :: forall stride padding dilation groups input kernel out a
+     . ( Shape input
+       , Shape kernel
+       , Shape stride
+       , Shape padding
+       , Shape dilation
+       , KnownNat groups
+       , Shape out
+       , DType a
+       , Num (TensorElement a)
+       , P.Num a
+       )
+    => Tensor input a
+    -> Tensor kernel a
+    -> (Tensor out a, A.Acc (A.Vector a))
+convolutionCached (Tensor input) (Tensor weights) =
+    ( Tensor $
+        A.reshape (A.constant $ backendShape $ Proxy @out) $
+            convolveWindows dims (product $ take 1 $ shape @kernel) (groupCount @groups) windows (A.flatten weights)
+    , windows
+    )
+  where
+    dims = convolutionWindow @input @kernel @stride @padding @dilation
+    windows = A.compute $ A.flatten $ extract dims $ A.flatten input
 
 -- | Apply the transpose input mapping with the requested output shape.
 convTranspose
@@ -473,6 +539,16 @@ paddingMinimum = A.constant $ Sugar.toElt @a $ lower $ Sugar.eltR @a
         AT.FloatingDict -> -(1 / 0)
     lower (R.TupRsingle (AT.VectorScalarType _)) = error "Max pooling requires scalar numeric elements"
 
+-- | Check whether the pooling windows tile the input.
+nonOverlapping :: Window -> Bool
+nonOverlapping dims =
+    all (> 0) (kernelSizes dims)
+        && steps dims == kernelSizes dims
+        && all (== 1) (spacing dims)
+        && all (== 0) (beforePadding dims)
+        && and (zipWith (\i k -> i `mod` k == 0) (inputSizes dims) (kernelSizes dims))
+        && outputSizes dims == zipWith div (inputSizes dims) (kernelSizes dims)
+
 -- | Select the first row-major maximum, or the first NaN, from valid input positions.
 maxWindows
     :: forall a
@@ -480,10 +556,23 @@ maxWindows
     => Window
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector (Int, a))
-maxWindows dims input = A.map discardValidity $ A.fold1 choose $ A.generate extent $ \ix ->
-    let k = A.indexHead ix
-        (valid, source) = poolLocation dims (A.indexHead $ A.indexTail ix) k
-     in A.lift (valid, k, A.cond valid (input A.! A.index1 source) zero)
+maxWindows dims input
+    | nonOverlapping dims && product (kernelSizes dims) <= 25 =
+        A.generate (A.constant $ A.Z A.:. (batches dims * channels dims * product (outputSizes dims))) $ \ix ->
+            let row = A.unindex1 ix
+                plane = row `A.quot` A.constant (product $ outputSizes dims)
+                position = row `A.rem` A.constant (product $ outputSizes dims)
+                output = coordinates (outputSizes dims) position
+                pick k =
+                    let kernel = coordinates (kernelSizes dims) (A.constant k)
+                        coords = zipWith3 (\o stride kx -> o * A.constant stride + kx) output (kernelSizes dims) kernel
+                        source = plane * A.constant (product $ inputSizes dims) + offset (inputSizes dims) coords
+                     in A.lift (A.constant True, A.constant k, input A.! A.index1 source)
+             in discardValidity $ foldl choose (pick 0) [pick k | k <- [1 .. product (kernelSizes dims) - 1]]
+    | otherwise = A.map discardValidity $ A.fold1 choose $ A.generate extent $ \ix ->
+        let k = A.indexHead ix
+            (valid, source) = poolLocation dims (A.indexHead $ A.indexTail ix) k
+         in A.lift (valid, k, A.cond valid (input A.! A.index1 source) zero)
   where
     extent =
         A.constant $
@@ -521,24 +610,6 @@ divisors includePadding dims
             (unTensorElement (0 :: TensorElement a))
   where
     count = batches dims * channels dims * product (outputSizes dims)
-    volume = product $ kernelSizes dims
-
--- | Arrange per-output kernel contributions for overlap accumulation.
-poolPatches
-    :: DType a
-    => Window
-    -> (A.Exp Int -> A.Exp Int -> A.Exp a)
-    -> A.Acc (A.Matrix a)
-poolPatches dims contribution = A.generate (A.constant $ A.Z A.:. (channels dims * volume) A.:. (batches dims * spatial)) $ \ix ->
-    let inner = A.indexHead $ A.indexTail ix
-        position = A.indexHead ix
-        b = position `A.quot` A.constant spatial
-        c = inner `A.quot` A.constant volume
-        p = position `A.rem` A.constant spatial
-        k = inner `A.rem` A.constant volume
-     in contribution ((b * A.constant (channels dims) + c) * A.constant spatial + p) k
-  where
-    spatial = product $ outputSizes dims
     volume = product $ kernelSizes dims
 
 -- | Reduce each valid window to its maximum value.

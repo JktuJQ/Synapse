@@ -6,17 +6,21 @@
 module Synapse.NN.Layers.Normalization.LayerNorm (LayerNorm (..), layerNorm) where
 
 import Control.Arrow (Arrow, arr)
+import Data.Array.Accelerate qualified as A
+import Data.Kind (Constraint)
+import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import GHC.TypeLits (Nat)
 import Synapse.Tensor.Ops.Constraints (FloatingDType)
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
-import qualified Synapse.Tensor.Ops.Reduction as R
-import qualified Synapse.Tensor.Ops.Shape as T
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP)
+import Synapse.Tensor.Ops.Raw.Reduction qualified as RawReduction
+import Synapse.Tensor.Ops.Reduction qualified as R
+import Synapse.Tensor.Ops.Shape qualified as T
 import Synapse.Tensor.Representation (TensorLike)
-import qualified Synapse.Tensor.Representation as Tensor
+import Synapse.Tensor.Representation qualified as Tensor
 import Synapse.Tensor.Shapes.Axes (Axes, CanReduce, NonEmpty, ReduceShape)
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
-import Synapse.Tensor.Shapes.Dimensions (Shape)
+import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Synapse.Tensor.Shapes.Normalization (LayerNormAxes)
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
@@ -55,7 +59,37 @@ layerNorm
     -> LayerNorm normalized t a
     -> arrow (t sh a) (t sh a)
 layerNorm epsilon parameters = arr $ \input ->
-    let mean = R.meanAxes @xs input
-        variance = R.varianceAxes @xs 0 input
-        normalized = (input - T.expandReduced @xs input mean) / sqrt (T.expandReduced @xs input variance + realToFrac epsilon)
-     in normalized * T.broadcast (layerNormWeights parameters) + T.broadcast (layerNormBias parameters)
+    withCachedVJP
+        (Proxy @(() :: Constraint))
+        forward
+        backward
+        (input, layerNormWeights parameters, layerNormBias parameters)
+  where
+    expand = RawReduction.expandReduced @xs @sh
+    forward (input, gamma, beta) =
+        let mean = R.meanAxes @xs input
+            centered = input - expand mean
+            variance = R.meanAxes @xs (centered * centered)
+            inv = recip $ sqrt $ variance + realToFrac epsilon
+            normalized = centered * expand inv
+         in (normalized * T.broadcast gamma + T.broadcast beta, (normalized, inv, gamma))
+    backward (normalized, inv, gamma) seed =
+        let weighted = seed * T.broadcast gamma
+            dx =
+                expand inv
+                    * (weighted - expand (R.meanAxes @xs weighted) - normalized * expand (R.meanAxes @xs (weighted * normalized)))
+         in (dx, sumParameters gamma (seed * normalized), sumParameters gamma seed)
+    sumParameters
+        :: Tensor.Tensor normalized a
+        -> Tensor.Tensor sh a
+        -> Tensor.Tensor normalized a
+    sumParameters (Tensor.Tensor gamma) (Tensor.Tensor values) =
+        Tensor.Tensor $
+            A.reshape (A.shape gamma) $
+                A.fold plus zero $
+                    A.transpose $
+                        A.reshape (A.constant $ A.Z A.:. shapeSize @(ReduceShape xs sh) A.:. shapeSize @normalized) values
+      where
+        zero = Tensor.unTensorElement (0 :: Tensor.TensorElement a)
+        plus :: A.Exp a -> A.Exp a -> A.Exp a
+        plus x y = Tensor.unTensorElement (Tensor.TensorElement x + Tensor.TensorElement y)

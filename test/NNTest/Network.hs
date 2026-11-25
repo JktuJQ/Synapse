@@ -10,7 +10,6 @@ import qualified Hedgehog as H
 import qualified Synapse.Autograd as AG
 import qualified Synapse.NN as NN
 import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Ops.Logic as E
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -44,9 +43,7 @@ network
        , T.NumDType a
        , Num (t '[2] a)
        , Num (t '[1] a)
-       , E.Ord (t '[2] a)
-       , E.Conditional (t '[2] a)
-       , E.Condition (t '[2] a) ~ E.Comparison (t '[2] a)
+       , T.OrdDType a
        )
     => Parameters t a
     -> t '[2] a

@@ -83,7 +83,6 @@ The forward pass is a `Forward` arrow: it produces logits while threading model 
 >     :: forall batch_size t
 >      . ( KnownNat batch_size
 >        , T.RealFloatTensorOps t Double
->        , T.Condition (t '[batch_size, 4, 8, 8] Double) ~ T.Comparison (t '[batch_size, 4, 8, 8] Double)
 >        )
 >     => NN.ForwardMode
 >     -> Parameters t

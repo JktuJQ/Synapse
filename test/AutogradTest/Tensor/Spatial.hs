@@ -1,9 +1,9 @@
 module AutogradTest.Tensor.Spatial (tests) where
 
-import qualified Hedgehog as H
-import qualified Synapse.Autograd as AG
-import qualified Synapse.Tensor as T
-import qualified TensorTest.Ops.Spatial.Reference as R
+import Hedgehog qualified as H
+import Synapse.Autograd qualified as AG
+import Synapse.Tensor qualified as T
+import TensorTest.Ops.Spatial.Reference qualified as R
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -55,10 +55,26 @@ propSelection = H.withTests 1 $ H.property $ do
         (_, nan) =
             AG.backprop (T.maxPool2d @'[2, 2] @'[1, 1] @'[0, 0, 0, 0] @'[1, 1]) $
                 T.fromList @'[1, 1, 2, 2] [0, 0 / 0, 0 / 0, 2 :: Double]
+        (tiled, tiledGradient) =
+            AG.backprop (T.maxPool2d @'[2, 2] @'[2, 2] @'[0, 0, 0, 0] @'[1, 1]) $
+                T.fromList @'[1, 1, 2, 4] [2, 2, 0, 0 / 0, 2, 1, 0 / 0, 3 :: Double]
         (a, b, c) = T.run T.defaultCPU (tied, overlap, nan)
+        (tiledValues, tiledSeeds) = T.run T.defaultCPU (tiled, tiledGradient)
     T.toList a H.=== [1, 0, 0, 0]
     T.toList b H.=== [0, 0, 0, 0, 4, 0, 0, 0, 0]
     T.toList c H.=== [0, 1, 0, 0]
+    map isNaN (T.toList tiledValues) H.=== [False, True]
+    take 1 (T.toList tiledValues) H.=== [2]
+    T.toList tiledSeeds H.=== [1, 0, 0, 1, 0, 0, 0, 0]
+
+propWideTile :: H.Property
+propWideTile = H.withTests 1 $ H.property $ do
+    let (output, gradient) =
+            AG.backprop (T.maxPool2d @'[5, 5] @'[5, 5] @'[0, 0, 0, 0] @'[1, 1]) $
+                T.fromList @'[1, 1, 5, 5] ([0 .. 22] ++ [24, 24 :: Double])
+        (values, seeds) = T.run T.defaultCPU (output, gradient)
+    T.toList values H.=== [24]
+    T.toList seeds H.=== replicate 23 0 ++ [1, 0]
 
 propPrepared :: H.Property
 propPrepared = H.withTests 1 $ H.property $ do
@@ -267,5 +283,6 @@ tests =
                         (R.combine [1, 1, 2, 2, 2] [2, 1, 2] [1, 1, 1] [0, 0, 0, 0, 0, 0])
                         [1 .. 8]
         , testProperty "max pooling selects first ties and accumulates overlaps" propSelection
+        , testProperty "tiled 5x5 max pooling selects the first maximum" propWideTile
         , testProperty "prepared pooling uses the current input's maxima" propPrepared
         ]

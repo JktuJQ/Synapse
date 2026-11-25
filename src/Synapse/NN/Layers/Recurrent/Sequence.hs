@@ -3,17 +3,17 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Sequence traversal shared by RNN, GRU and LSTM.
-module Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory, sequenceHidden) where
+module Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory, sequenceHidden, item, writeItem, packState, unpackState) where
 
 import Control.Monad.Trans.State.Strict (State, runState, state)
-import qualified Data.Array.Accelerate as A
+import Data.Array.Accelerate qualified as A
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, natVal)
-import qualified Synapse.Autograd.Execution as AG
+import Synapse.Autograd.Execution qualified as AG
 import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..))
-import qualified Synapse.Tensor.Ops.Logic as E
+import Synapse.Tensor.Ops.Logic qualified as E
 import Synapse.Tensor.Ops.Math ()
 import Synapse.Tensor.Ops.Raw.Construction (full)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorLike)
@@ -41,7 +41,8 @@ packState
 packState (Tensor hidden, Tensor memory) = A.lift (hidden, memory)
 
 unpackState
-    :: DType a
+    :: forall batch hidden memory a
+     . DType a
     => A.Acc (A.Matrix a, A.Matrix a)
     -> Memory Tensor batch hidden memory a
 unpackState value = let (hidden, memory) = A.unlift value in (Tensor hidden, Tensor memory)

@@ -5,6 +5,7 @@ module Synapse.Tensor.Ops
     , withCachedVJP
     , module Synapse.Tensor.Ops.Constraints
     , module Synapse.Tensor.Ops.Construction
+    , module Synapse.Tensor.Ops.Execution
     , module Synapse.Tensor.Ops.Logic
     , module Synapse.Tensor.Ops.Numeric
     , module Synapse.Tensor.Ops.Conversion
@@ -20,6 +21,7 @@ import Synapse.Tensor.Ops.Constraints
 import Synapse.Tensor.Ops.Construction
 import Synapse.Tensor.Ops.Conversion
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP, withVJP)
+import Synapse.Tensor.Ops.Execution
 import Synapse.Tensor.Ops.Index
 import Synapse.Tensor.Ops.Logic
 import Synapse.Tensor.Ops.Math

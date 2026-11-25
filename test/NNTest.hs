@@ -109,6 +109,14 @@ lossTests =
                 (values (NN.unsafeNegativeLogLikelihood @1 id (T.logSoftmax @1 logits) labels))
                 [expected, expected]
             approxList (values (NN.unsafeCrossEntropy @0 T.mean (T.transpose logits) labels)) [expected]
+        , testProperty "integer cross entropy respects nonuniform seeds on axis zero" $ H.withTests 1 $ H.property $ do
+            let logits = T.fromList @'[3, 2] [1, 3, 2, 2, 3, 1 :: Double]
+                labels = T.fromList @'[2] [2, 0]
+                seeds = T.fromList @'[2] [-2, 3]
+                (actual, backward) = AG.pullback (\x -> NN.unsafeCrossEntropy @0 id x labels) logits
+                (expected, reference) = AG.pullback (\x -> NN.unsafeNegativeLogLikelihood @0 id (T.logSoftmax @0 x) labels) logits
+            approxList (values actual) (values expected)
+            approxList (values (backward seeds)) (values (reference seeds))
         , testProperty "classification losses support soft labels and their gradients" $ H.withTests 1 $ H.property $ do
             let logits = T.full @'[2, 3] (0 :: Double)
                 targets = T.fromList @'[2, 3] [0.2, 0.3, 0.5, 1, 0, 0]

@@ -43,7 +43,7 @@ constraints with opaque aliases solely to shorten their appearance.
 
 Outside tests, put every value signature on multiple lines: the name first,
 then `::`, followed by leading `=>` and `->` on separate lines.
-Apply this to class methods, default signatures, and local bindings as well.
+Apply this to class methods, default signatures, and local function signatures when needed.
 
 Use leading arrows in multiline signatures and omit parentheses around a single
 constraint. Argument Haddock comments follow their argument types (`-- ^`);
@@ -77,6 +77,8 @@ than `{t}`. Keep them inferred so visible type applications retain their order.
 - Keep a private helper used in one place in a `let` or `where` unless there is
   a concrete reason to make it top-level. Add a local signature when it clarifies
   a contract or controls polymorphism; do not require redundant local signatures.
+- Let GHC infer the types of local values. If inference needs help, prefer a visible
+  type application on the operation that determines the type.
 - Omit signatures for local functions with one argument, except when an explicit
   polymorphic signature is necessary for type inference or polymorphic recursion.
 - Prefer `$` to an outer pair of application parentheses when it improves

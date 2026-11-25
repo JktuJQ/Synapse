@@ -6,12 +6,13 @@ module Synapse.NN.Layers.Position (sinusoidalPositions, rope) where
 import Control.Arrow (Arrow, arr)
 import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, Mod, natVal)
-import qualified Synapse.Tensor as T
+import Synapse.Tensor qualified as T
 import Synapse.Tensor.Ops.Constraints (FloatingDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (fromTensor))
 
-{- | Generate sinusoidal positions of shape @'[time, features]@, starting at
-the supplied position offset. For feature pair @2i, 2i+1@ the entries are
+{- | Generate sinusoidal positions of shape @'[time, features]@, starting at the supplied position offset.
+
+For feature pair @2i, 2i+1@ the entries are
 @sin (position / 10000^(2i/features))@ and @cos (position / 10000^(2i/features))@.
 Odd feature widths retain the last sine entry.
 
@@ -38,17 +39,9 @@ sinusoidalPositions
     -> t '[time, features] a
 sinusoidalPositions offset = T.fromGen $ \ix ->
     let feature = T.coordinate @1 ix
-        position
-            :: T.TensorElement a
         position = T.fromIntegral (T.coordinate @0 ix) + T.element (fromIntegral offset)
-        paired
-            :: T.TensorElement a
         paired = T.fromIntegral $ 2 * T.quot feature 2
-        width
-            :: T.TensorElement a
         width = T.element $ fromIntegral $ max 1 $ natVal $ Proxy @features
-        angle
-            :: T.TensorElement a
         angle = position / (10000 ** (paired / width))
      in T.select (T.rem feature 2 T.== 0) (sin angle) (cos angle)
 
@@ -94,14 +87,8 @@ rope
     -> Int
     -> arrow (t '[batch, heads, time, features] a) (t '[batch, heads, time, features] a)
 rope base offset = arr $ \input ->
-    let angles
-            :: T.Tensor '[time, features] a
-        angles = T.fromGen $ \ix ->
-            let position
-                    :: T.TensorElement a
-                position = T.fromIntegral (T.coordinate @0 ix) + T.element (fromIntegral offset)
-                paired
-                    :: T.TensorElement a
+    let angles = T.fromGen @'[time, features] @a $ \ix ->
+            let position = T.fromIntegral (T.coordinate @0 ix) + T.element (fromIntegral offset)
                 paired = T.fromIntegral $ 2 * T.quot (T.coordinate @1 ix) 2
                 width = T.element $ fromIntegral $ max 1 $ natVal $ Proxy @features
              in position / (T.element base ** (paired / width))

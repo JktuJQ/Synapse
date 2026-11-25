@@ -5,26 +5,25 @@
 on caller-supplied bounds.
 -}
 module Synapse.Tensor.Ops.Raw.Index
-    ( -- * Coordinates and element access
+    ( -- * Coordinates and static element access
       coordinate
     , index
     , indexAt
     , indexInBounds
     , dynamicIndexOr
+    , slice
 
-      -- * Gather and row lookup
+      -- * Gather and scatter
     , gatherIndex
     , unsafeGather
     , gatherOr
     , gatherReducedIndex
     , unsafeGatherReduced
     , unsafeLookupRows
-
-      -- * Slicing
-    , slice
+    , scatterWith
     ) where
 
-import qualified Data.Array.Accelerate as A
+import Data.Array.Accelerate qualified as A
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, natVal)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..), TensorIndex (..))
@@ -44,7 +43,7 @@ import Synapse.Tensor.Shapes.Index
     , sliceAxes
     )
 import Prelude hiding ((!!))
-import qualified Prelude as P
+import Prelude qualified as P
 
 -- | Map retained coordinates directly to source coordinates, inserting fixed coordinates for removed axes.
 sliceCoordinates
@@ -116,6 +115,20 @@ dynamicIndexOr fallback selected@(TensorIndex ix) (Tensor input)
         backendIndex @sh $
             zipWith (\coord dim -> A.max 0 (A.min (A.constant (dim - 1)) coord)) (backendCoordinates @sh ix) (shape @sh)
 
+-- | Select the specified coordinates and ranges along each axis.
+slice
+    :: forall spec sh a
+     . (Shape sh, Shape (SliceShape spec sh), DType a, Slice spec, CanSlice spec sh)
+    => Tensor sh a
+    -> Tensor (SliceShape spec sh) a
+slice (Tensor acc) = Tensor $ A.backpermute targetShape sourceIndex acc
+  where
+    targetShape = A.constant (backendShape (Proxy @(SliceShape spec sh)))
+    targetDims = shape @(SliceShape spec sh)
+
+    sourceIndex ix =
+        backendIndex @sh (sliceCoordinates (sliceAxes @spec) targetDims (backendCoordinates @(SliceShape spec sh) ix))
+
 -- | Replace one coordinate with the corresponding element of an index tensor.
 gatherIndex
     :: forall axis sh indices
@@ -131,9 +144,7 @@ gatherIndex (Tensor indices) ix =
                 [0 ..]
                 (backendCoordinates @indices ix)
   where
-    axis
-        :: Int
-    axis = fromInteger (toInteger (natVal (Proxy @axis)))
+    axis = fromIntegral @_ @Int (natVal (Proxy @axis))
 
 -- | Select elements along an axis using an index tensor. Indices must be within the source bounds.
 unsafeGather
@@ -197,16 +208,19 @@ unsafeLookupRows (Tensor table) (Tensor indices) =
                 row = selected A.! A.index1 (offset `A.quot` columns)
              in table A.! A.index2 row (offset `A.rem` columns)
 
--- | Select the specified coordinates and ranges along each axis.
-slice
-    :: forall spec sh a
-     . (Shape sh, Shape (SliceShape spec sh), DType a, Slice spec, CanSlice spec sh)
-    => Tensor sh a
-    -> Tensor (SliceShape spec sh) a
-slice (Tensor acc) = Tensor $ A.backpermute targetShape sourceIndex acc
+-- | Combine updates with destination elements along an axis, discarding out-of-bounds indices.
+scatterWith
+    :: forall axis sh indices a
+     . (KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices, DType a)
+    => (TensorElement a -> TensorElement a -> TensorElement a)
+    -> Tensor sh a
+    -> Tensor indices Int
+    -> Tensor indices a
+    -> Tensor sh a
+scatterWith combine (Tensor base) indices (Tensor updates) =
+    Tensor $ A.permute merge base destination updates
   where
-    targetShape = A.constant (backendShape (Proxy @(SliceShape spec sh)))
-    targetDims = shape @(SliceShape spec sh)
-
-    sourceIndex ix =
-        backendIndex @sh (sliceCoordinates (sliceAxes @spec) targetDims (backendCoordinates @(SliceShape spec sh) ix))
+    merge new old = unTensorElement $ combine (TensorElement new) (TensorElement old)
+    destination ix =
+        let selected@(TensorIndex coord) = gatherIndex @axis @sh indices ix
+         in A.cond (indexInBounds selected) (A.Just_ coord) A.Nothing_

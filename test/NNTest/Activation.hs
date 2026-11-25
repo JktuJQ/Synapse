@@ -1,9 +1,9 @@
 module NNTest.Activation (tests) where
 
-import qualified Hedgehog as H
-import qualified Synapse.Autograd as AG
-import qualified Synapse.NN as NN
-import qualified Synapse.Tensor as T
+import Hedgehog qualified as H
+import Synapse.Autograd qualified as AG
+import Synapse.NN qualified as NN
+import Synapse.Tensor qualified as T
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -41,6 +41,13 @@ tests =
             approxList (values (NN.sigmoid input)) expected
             approxList (values output) expected
             approxList (values gradient) (fmap (\y -> y * (1 - y)) expected)
+        , testProperty "sigmoid retains gradients after rounding to one" $ H.withTests 1 $ H.property $ do
+            let input = T.fromList @'[2] [-40, 40 :: Double]
+                (output, backward) = AG.pullback NN.sigmoid input
+                gradient = backward (T.fromList [2, -3])
+                expected = exp (-40 :: Double)
+            approxList (values (output * T.fromList [recip expected, 1])) [1, 1]
+            approxList (map (/ expected) (values gradient)) [2, -3]
         , testProperty "tanh agrees with Prelude and differentiates through the existing rule" $ H.withTests 1 $ H.property $ do
             let xs = [-2, -0.5, 0, 0.5, 2 :: Double]
                 input = T.fromList @'[5] xs
@@ -94,7 +101,7 @@ tests =
             check (NN.sigmoid input) [0, 1]
             check (NN.tanh input) [-1, 1]
             check (NN.softplus input) [0, 1 / 0]
-        , testProperty "activations support Float, empty tensors, and element expressions" $ H.withTests 1 $ H.property $ do
+        , testProperty "activations support Float, empty tensors, and rank-zero tensors" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [-100, 0, 100 :: Float]
                 empty = T.zeros @'[0, 2] @Double
             approxList (T.toList (T.run T.defaultCPU (NN.sigmoid input))) [0, 0.5, 1]
@@ -111,7 +118,7 @@ tests =
             values gradient H.=== [0.25]
             approxList (values softOutput) [log 2]
             approxList (values softGradient) [0.5]
-            values (T.scalar (NN.relu (T.element (-2 :: Double)))) H.=== [0]
+            values (NN.relu (T.scalar (T.element (-2 :: Double)))) H.=== [0]
         , testProperty "activation composition supports seeded pullbacks and prepared execution" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [-1, 0, 1 :: Double]
                 (_, backward) = AG.pullback (NN.sigmoid . NN.relu) input

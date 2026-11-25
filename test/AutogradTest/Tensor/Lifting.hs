@@ -6,9 +6,9 @@ module AutogradTest.Tensor.Lifting (tests) where
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
-import qualified Hedgehog as H
-import qualified Synapse.Autograd as AG
-import qualified Synapse.Tensor as T
+import Hedgehog qualified as H
+import Synapse.Autograd qualified as AG
+import Synapse.Tensor qualified as T
 import Synapse.Tensor.Ops (TensorOps (..))
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
@@ -118,6 +118,24 @@ tests =
         [ testProperty "user-defined backward constraints do not restrict ordinary evaluation" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [False, True, False]
             T.toList (T.run T.defaultCPU $ customIdentity input) H.=== [False, True, False]
+        , testProperty "scatter add accumulates repeated indices and gathers their seeds" $ H.withTests 1 $ H.property $ do
+            let base = T.fromList @'[3] [10, 20, 30 :: Double]
+                updates = T.fromList @'[4] [1, 2, 4, 8]
+                indices = T.fromList @'[4] [1, 1, -1, 3]
+                (output, backward) = AG.pullback (\(x, y) -> T.force $ T.scatterAdd @0 x indices y) (base, updates)
+                (baseGradient, updateGradient) = backward $ T.fromList [3, 5, 7]
+            values output H.=== [10, 23, 30]
+            values baseGradient H.=== [3, 5, 7]
+            values updateGradient H.=== [5, 5, 0, 0]
+        , testProperty "scatter set removes the base gradient at overwritten indices" $ H.withTests 1 $ H.property $ do
+            let base = T.fromList @'[2, 3] [10, 20, 30, 40, 50, 60 :: Double]
+                updates = T.fromList @'[2, 2] [1, 2, 4, 8]
+                indices = T.fromList @'[2, 2] [2, 0, 1, 4]
+                (output, backward) = AG.pullback (\(x, y) -> T.unsafeScatterSet @1 x indices y) (base, updates)
+                (baseGradient, updateGradient) = backward $ T.fromList [1, 2, 3, 4, 5, 6]
+            values output H.=== [2, 20, 1, 40, 4, 60]
+            values baseGradient H.=== [0, 2, 0, 4, 0, 6]
+            values updateGradient H.=== [3, 1, 5, 0]
         , testProperty "autograd supplies the constraint selected by each reverse rule" $ H.withTests 1 $ H.property $ do
             let input = T.fromList @'[3] [1, 2, 3 :: Double]
                 (output, gradient) = AG.backprop customIdentity input

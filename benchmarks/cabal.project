@@ -1,6 +1,5 @@
 packages:
     .
-    ..
     frameworks/grenade
     frameworks/hasktorch
     frameworks/synapse
@@ -19,3 +18,8 @@ source-repository-package
     location: https://github.com/hasktorch/hasktorch.git
     tag: 059790c64e8556d8dd65978a2c38e50af84e6776
     subdir: hasktorch libtorch-ffi libtorch-ffi-helper
+
+source-repository-package
+    type: git
+    location: https://github.com/JktuJQ/Synapse.git
+    tag: 72d287748cccea9eb4819cb8e4ff6b54b3046252

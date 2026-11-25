@@ -9,30 +9,66 @@ module Synapse.Tensor.Ops.Index
       Indexable (..)
     , coordinate
     , index
-
-      -- * Computed element access
     , unsafeDynamicIndex
     , dynamicIndexOr
+    , slice
 
-      -- * Gather and row lookup
+      -- * Gather and scatter
     , unsafeGather
     , gatherOr
     , unsafeLookupRows
-
-      -- * Static slicing
-    , slice
+    , scatterAdd
+    , unsafeScatterSet
     ) where
 
+import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
-import qualified Synapse.Autograd.Tensor.Ops.Pullback.Index as Pullback
+import Synapse.Autograd.Tensor.Ops.Pullback.Index qualified as Pullback
+import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
-import qualified Synapse.Tensor.Ops.Raw.Index as Raw
+import Synapse.Tensor.Ops.Raw.Construction qualified as Construction
+import Synapse.Tensor.Ops.Raw.Index qualified as Raw
 import Synapse.Tensor.Representation (Tensor, TensorElement, TensorIndex, TensorLike)
 import Synapse.Tensor.Shapes.Axes (CanSelectAxes)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Index (CanGather, CanIndex, CanSlice, Index, LookupRowsShape, Slice, SliceShape)
 import Prelude hiding ((!!))
+
+{- | Read a coordinate or tensor element using a shape-checked index.
+Use @ix !! Proxy \@0@ for a coordinate and @tensor !! Proxy \@'[1, 2]@ for a static element.
+A t'TensorIndex' of the same shape can also be used directly as @tensor !! ix@;
+coordinate values are not checked.
+-}
+class Indexable source selector result | source selector -> result where
+    -- | Build an element expression.
+    (!!)
+        :: source
+        -> selector
+        -> result
+
+infixl 9 !!
+
+instance
+    (KnownNat axis, Shape sh, CanSelectAxes '[axis] sh)
+    => Indexable (TensorIndex sh) (Proxy axis) (TensorElement Int)
+    where
+    ix !! _ = coordinate @axis ix
+instance
+    ( TensorOps t a
+    , Shape sh
+    , Index ix
+    , CanIndex ix sh
+    , result ~ Element t a
+    )
+    => Indexable (t sh a) (Proxy ix) result
+    where
+    tensor !! _ = index @ix tensor
+instance
+    (TensorOps t a, Shape sh, result ~ Element t a)
+    => Indexable (t sh a) (TensorIndex sh) result
+    where
+    tensor !! selected = unsafeDynamicIndex tensor selected
 
 -- | Read a coordinate of a complete index.
 coordinate
@@ -85,6 +121,24 @@ dynamicIndexOr fallback tensor selected =
         (\input -> (Raw.dynamicIndexOr fallback selected input, input))
         (Pullback.dynamicIndexOr selected)
         tensor
+
+-- | Select the specified coordinates and ranges along each axis.
+slice
+    :: forall {t :: TensorLike} spec sh a
+     . ( TensorOps t a
+       , Shape sh
+       , Shape (SliceShape spec sh)
+       , Slice spec
+       , CanSlice spec sh
+       )
+    => t sh a
+    -> t (SliceShape spec sh) a
+slice =
+    withVJP
+        (Proxy @(Num (TensorElement a)))
+        (Raw.slice @spec)
+        (Pullback.slice (Proxy @spec))
+
 
 -- | Select elements along an axis using an index tensor. Indices must be within the source bounds.
 unsafeGather
@@ -143,54 +197,38 @@ unsafeLookupRows table indices =
         (Pullback.lookupRows indices)
         table
 
--- | Select the specified coordinates and ranges along each axis.
-slice
-    :: forall {t :: TensorLike} spec sh a
-     . ( TensorOps t a
-       , Shape sh
-       , Shape (SliceShape spec sh)
-       , Slice spec
-       , CanSlice spec sh
-       )
+-- | Add updates at the given indices along an axis. Out-of-bounds indices are ignored.
+scatterAdd
+    :: forall {t :: TensorLike} axis sh indices a
+     . (TensorOps t a, KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices, NumDType a)
     => t sh a
-    -> t (SliceShape spec sh) a
-slice =
+    -> Tensor indices Int
+    -> t indices a
+    -> t sh a
+scatterAdd base indices updates =
     withVJP
-        (Proxy @(Num (TensorElement a)))
-        (Raw.slice @spec)
-        (Pullback.slice (Proxy @spec))
+        (Proxy @(() :: Constraint))
+        (uncurry $ \input -> Raw.scatterWith @axis (+) input indices)
+        (\_ _ seed -> (seed, Raw.gatherOr @axis 0 seed indices))
+        (base, updates)
 
-{- | Read a coordinate or tensor element using a shape-checked index.
-Use @ix !! Proxy \@0@ for a coordinate and @tensor !! Proxy \@'[1, 2]@ for a static element.
-A t'TensorIndex' of the same shape can also be used directly as @tensor !! ix@;
-coordinate values are not checked.
+{- | Write updates at the given indices along an axis. Out-of-bounds indices are ignored.
+
+Each destination must be written at most once;
+if case this is not true, write order is undefined and in backward propagation both writes get a gradient.
 -}
-class Indexable source selector result | source selector -> result where
-    -- | Build an element expression.
-    (!!)
-        :: source
-        -> selector
-        -> result
-
-infixl 9 !!
-
-instance
-    (KnownNat axis, Shape sh, CanSelectAxes '[axis] sh)
-    => Indexable (TensorIndex sh) (Proxy axis) (TensorElement Int)
-    where
-    ix !! _ = coordinate @axis ix
-instance
-    ( TensorOps t a
-    , Shape sh
-    , Index ix
-    , CanIndex ix sh
-    , result ~ Element t a
-    )
-    => Indexable (t sh a) (Proxy ix) result
-    where
-    tensor !! _ = index @ix tensor
-instance
-    (TensorOps t a, Shape sh, result ~ Element t a)
-    => Indexable (t sh a) (TensorIndex sh) result
-    where
-    tensor !! selected = unsafeDynamicIndex tensor selected
+unsafeScatterSet
+    :: forall {t :: TensorLike} axis sh indices a
+     . (TensorOps t a, KnownNat axis, Shape sh, Shape indices, CanGather axis sh indices, Num a)
+    => t sh a
+    -> Tensor indices Int
+    -> t indices a
+    -> t sh a
+unsafeScatterSet base indices updates =
+    withVJP
+        (Proxy @(() :: Constraint))
+        (uncurry $ \input -> Raw.scatterWith @axis const input indices)
+        ( \_ _ seed ->
+            (Raw.scatterWith @axis const seed indices (Construction.full 0), Raw.gatherOr @axis 0 seed indices)
+        )
+        (base, updates)

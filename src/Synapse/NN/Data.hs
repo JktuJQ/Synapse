@@ -53,11 +53,11 @@ import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 import Synapse.Tensor.Structure (WithTensor)
 
-import qualified Data.Array as Array
-import qualified Data.Array.Accelerate as A
-import qualified Data.Array.Unboxed as Unboxed
-import qualified Data.Map.Lazy as Map
-import qualified Data.Set as Set
+import Data.Array qualified as Array
+import Data.Array.Accelerate qualified as A
+import Data.Array.Unboxed qualified as Unboxed
+import Data.Map.Lazy qualified as Map
+import Data.Set qualified as Set
 
 -- | A prepared function paired with evidence of its batch dimension.
 data Prepared args in_sh out_sh features targets result
@@ -130,8 +130,7 @@ shuffle
 shuffle dataset = state $ \generator ->
     let count = datasetSize dataset
         (indices, next) = uniformShuffleList [0 .. count - 1] generator
-        order :: Unboxed.UArray Int Int
-        order = Unboxed.listArray (0, count - 1) indices
+        order = Unboxed.listArray @Unboxed.UArray (0, count - 1) indices
         reordered = case dataset of
             Indexed _ reader -> Indexed count (reader . (order Unboxed.!))
             Grouped _ reader -> Grouped count (reader . map (order Unboxed.!))

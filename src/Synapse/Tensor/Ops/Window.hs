@@ -39,7 +39,7 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat)
 
 import Synapse.Tensor.Ops.Constraints (FractionalDType, NumDType, OrdDType)
-import Synapse.Tensor.Ops.Definition (TensorOps, withVJP)
+import Synapse.Tensor.Ops.Definition (TensorOps (customVJP), withVJP)
 import Synapse.Tensor.Representation (TensorLike)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Window
@@ -57,8 +57,8 @@ import Synapse.Tensor.Shapes.Window
     , Pool3dShape
     )
 
-import qualified Synapse.Autograd.Tensor.Ops.Pullback.Window as WindowPullback
-import qualified Synapse.Tensor.Ops.Raw.Window as Raw
+import Synapse.Autograd.Tensor.Ops.Pullback.Window qualified as WindowPullback
+import Synapse.Tensor.Ops.Raw.Window qualified as Raw
 
 -- | Extract zero-padded 1D windows from NCL input as @[batch, channels * kernel_volume, positions]@.
 extractPatches1d
@@ -183,6 +183,34 @@ combinePatches3d =
         (Raw.combinePatches @output @kernel @stride @padding @dilation)
         (WindowPullback.combinePatches @kernel @stride @padding @dilation)
 
+convolution
+    :: forall stride padding dilation groups input kernel out t a
+     . ( TensorOps t a
+       , Shape stride
+       , Shape padding
+       , Shape dilation
+       , KnownNat groups
+       , Shape input
+       , Shape kernel
+       , Shape out
+       , NumDType a
+       )
+    => t input a
+    -> t kernel a
+    -> t out a
+convolution =
+    curry $
+        customVJP
+            (Proxy @(() :: Constraint))
+            (uncurry $ Raw.convolution @stride @padding @dilation @groups)
+            ( \(input, weights) ->
+                let (output, windows) = Raw.convolutionCached @stride @padding @dilation @groups input weights
+                 in (output, (input, weights, windows))
+            )
+            ( \(input, weights, windows) ->
+                WindowPullback.convolution @stride @padding @dilation @groups input weights windows
+            )
+
 -- | Apply 1D cross-correlation to NCL input using OIK weights, without reversing the kernel.
 conv1d
     :: forall stride padding dilation groups {t :: TensorLike} input kernel a
@@ -199,17 +227,7 @@ conv1d
     => t input a
     -> t kernel a
     -> t (Conv1dShape input kernel stride padding dilation groups) a
-conv1d =
-    curry $
-        withVJP
-            (Proxy @(() :: Constraint))
-            (uncurry (Raw.convolution @stride @padding @dilation @groups))
-            ( \(left, right) output ->
-                (WindowPullback.convolution @stride @padding @dilation @groups)
-                    left
-                    right
-                    output
-            )
+conv1d = convolution @stride @padding @dilation @groups
 
 -- | Apply 2D cross-correlation to NCHW input using OIHW weights, without reversing the kernel.
 conv2d
@@ -227,17 +245,7 @@ conv2d
     => t input a
     -> t kernel a
     -> t (Conv2dShape input kernel stride padding dilation groups) a
-conv2d =
-    curry $
-        withVJP
-            (Proxy @(() :: Constraint))
-            (uncurry (Raw.convolution @stride @padding @dilation @groups))
-            ( \(left, right) output ->
-                (WindowPullback.convolution @stride @padding @dilation @groups)
-                    left
-                    right
-                    output
-            )
+conv2d = convolution @stride @padding @dilation @groups
 
 -- | Apply 3D cross-correlation to NCDHW input using OIDHW weights, without reversing the kernel.
 conv3d
@@ -255,17 +263,7 @@ conv3d
     => t input a
     -> t kernel a
     -> t (Conv3dShape input kernel stride padding dilation groups) a
-conv3d =
-    curry $
-        withVJP
-            (Proxy @(() :: Constraint))
-            (uncurry (Raw.convolution @stride @padding @dilation @groups))
-            ( \(left, right) output ->
-                (WindowPullback.convolution @stride @padding @dilation @groups)
-                    left
-                    right
-                    output
-            )
+conv3d = convolution @stride @padding @dilation @groups
 
 -- | Apply transposed 1D convolution to NCL input using IOK weights.
 convTranspose1d

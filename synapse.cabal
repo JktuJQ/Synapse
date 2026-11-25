@@ -106,6 +106,7 @@ library
                     , Synapse.Tensor.Ops.Constraints
                     , Synapse.Tensor.Ops.Construction
                     , Synapse.Tensor.Ops.Conversion
+                    , Synapse.Tensor.Ops.Execution
                     , Synapse.Tensor.Ops.Index
                     , Synapse.Tensor.Ops.Logic
                     , Synapse.Tensor.Ops.Math
@@ -140,6 +141,7 @@ library
                     , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
                     , Synapse.Autograd.Tensor.Ops.Pullback.Shape
                     , Synapse.Autograd.Tensor.Ops.Pullback.Window
+                    , Synapse.NN.Layers.Recurrent.LSTMSequence
                     , Synapse.NN.Layers.Recurrent.Sequence
                     , Synapse.Tensor.Ops.Definition
                     , Synapse.Tensor.Ops.Raw.Construction
