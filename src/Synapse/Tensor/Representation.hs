@@ -19,19 +19,20 @@ module Synapse.Tensor.Representation
     ) where
 
 import Data.Kind (Type)
+import Data.Typeable (Typeable)
 import GHC.TypeLits (Nat)
 
 import Synapse.Tensor.Shapes.Backend (ShapeToDIM)
 
-import qualified Data.Array.Accelerate as A
+import Data.Array.Accelerate qualified as A
 
 {- | Types that can be stored as tensor elements.
 
 'DType' must be supported by the Synapse backend.
 -}
-class A.Elt a => DType a
+class (A.Elt a, Typeable a) => DType a
 
-instance A.Elt a => DType a
+instance (A.Elt a, Typeable a) => DType a
 
 {- | Kind of tensor constructors indexed by a shape and an element type.
 Both t'Tensor' and t'TensorData' have this kind.

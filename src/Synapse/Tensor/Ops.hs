@@ -24,7 +24,7 @@ import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP, withVJP)
 import Synapse.Tensor.Ops.Execution
 import Synapse.Tensor.Ops.Index
 import Synapse.Tensor.Ops.Logic
-import Synapse.Tensor.Ops.Math
+import Synapse.Tensor.Ops.Math (dot, matmul)
 import Synapse.Tensor.Ops.Numeric
 import Synapse.Tensor.Ops.Random
 import Synapse.Tensor.Ops.Reduction

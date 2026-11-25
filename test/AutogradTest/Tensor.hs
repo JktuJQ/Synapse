@@ -1,17 +1,18 @@
 module AutogradTest.Tensor (tests) where
 
-import qualified AutogradTest.Tensor.Convolution
-import qualified AutogradTest.Tensor.ElementLifting
-import qualified AutogradTest.Tensor.Elementwise
-import qualified AutogradTest.Tensor.Lifting
-import qualified AutogradTest.Tensor.Spatial
-import qualified Data.Array.Accelerate as A
-import qualified Hedgehog as H
-import qualified Numeric.Backprop.Explicit as BP
-import qualified Synapse.Autograd as AG
-import qualified Synapse.Autograd.Tensor.Representation as Bridge
-import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Representation as Internal
+import AutogradTest.Tensor.Convolution qualified
+import AutogradTest.Tensor.ElementLifting qualified
+import AutogradTest.Tensor.Elementwise qualified
+import AutogradTest.Tensor.Lifting qualified
+import AutogradTest.Tensor.Spatial qualified
+import Data.Array.Accelerate qualified as A
+import Hedgehog qualified as H
+import Numeric.Backprop.Explicit qualified as BP
+import Synapse.Autograd qualified as AG
+import Synapse.Autograd.Tensor.Representation qualified as Bridge
+import Synapse.Tensor qualified as T
+import Synapse.Tensor.Ops.Math qualified as Math
+import Synapse.Tensor.Representation qualified as Internal
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -228,6 +229,42 @@ tests =
                 right = T.fromList @'[3, 2, 1] [5, 6, 7, 8, 9, 10 :: Double]
                 (_, backward) = AG.pullback (uncurry T.matmul) (left, right)
                 (dl, dr) = backward (T.fromList @'[2, 3, 1, 1] [1, 2, 3, 4, 5, 6])
+            values dl H.=== [46, 52, 109, 124]
+            values dr H.=== [13, 18, 17, 24, 21, 30]
+        , testProperty "transposed matmul variants preserve rectangular products and cotangent layouts" $ H.withTests 1 $ H.property $ do
+            let left = T.fromList @'[2, 2, 3] [1 .. 12 :: Double]
+                right = T.fromList @'[2, 3, 4] [2 .. 25 :: Double]
+                leftT = T.transpose left
+                rightT = T.transpose right
+                seed = T.fromList @'[2, 2, 4] [1 .. 16 :: Double]
+                (expected, normalBackward) = AG.pullback (uncurry T.matmul) (left, right)
+                (dl, dr) = normalBackward seed
+                (outR, backR) = AG.pullback (uncurry Math.matmult) (left, rightT)
+                (outL, backL) = AG.pullback (uncurry Math.tmatmul) (leftT, right)
+                (outBoth, backBoth) = AG.pullback (uncurry Math.tmatmult) (leftT, rightT)
+                (outComposed, backComposed) =
+                    AG.pullback (\(x, y) -> T.matmul (T.transpose x) (T.transpose y)) (leftT, rightT)
+                check outputSeed expectedOutput (output, backward) expectedLeft expectedRight = do
+                    values output H.=== values expectedOutput
+                    let (actualLeft, actualRight) = backward outputSeed
+                    values actualLeft H.=== values expectedLeft
+                    values actualRight H.=== values expectedRight
+            check seed expected (outR, backR) dl (T.transpose dr)
+            check seed expected (outL, backL) (T.transpose dl) dr
+            check seed expected (outBoth, backBoth) (T.transpose dl) (T.transpose dr)
+            check seed expected (outComposed, backComposed) (T.transpose dl) (T.transpose dr)
+        , testProperty "transposed matmul gradients contract broadcast axes" $ H.withTests 1 $ H.property $ do
+            let left = T.fromList @'[2, 1, 2, 1] [1, 2, 3, 4 :: Double]
+                right = T.fromList @'[3, 1, 2] [5, 6, 7, 8, 9, 10 :: Double]
+                (_, backward) = AG.pullback (uncurry Math.tmatmult) (left, right)
+                (dl, dr) = backward (T.fromList @'[2, 3, 1, 1] [1, 2, 3, 4, 5, 6])
+            values dl H.=== [46, 52, 109, 124]
+            values dr H.=== [13, 18, 17, 24, 21, 30]
+        , testProperty "transposed matmul accumulates gradients for one shared right matrix" $ H.withTests 1 $ H.property $ do
+            let left = T.fromList @'[2, 1, 2] [1, 2, 3, 4 :: Double]
+                right = T.fromList @'[3, 2] [5, 6, 7, 8, 9, 10 :: Double]
+                (_, backward) = AG.pullback (uncurry Math.matmult) (left, right)
+                (dl, dr) = backward (T.fromList @'[2, 1, 3] [1, 2, 3, 4, 5, 6])
             values dl H.=== [46, 52, 109, 124]
             values dr H.=== [13, 18, 17, 24, 21, 30]
         , testProperty "shared matrix gradients sum over multiple broadcast axes" $ H.withTests 1 $ H.property $ do

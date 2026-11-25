@@ -34,7 +34,7 @@ module Synapse.Autograd.Tensor.Ops.Pullback.Math
 
       -- * Products
     , dot
-    , matmul
+    , matmulWith
     ) where
 
 import Prelude hiding
@@ -70,13 +70,13 @@ import Synapse.Tensor.Ops.Raw.Math
     , contract
     , matrixDimensions
     )
-import Synapse.Tensor.Representation (Tensor (..), TensorElement (..))
-import Synapse.Tensor.Shapes.Dimensions (Shape, shape, shapeSize)
+import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
+import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
 
-import qualified Data.Array.Accelerate as A
-import qualified Prelude as P
+import Data.Array.Accelerate qualified as A
+import Prelude qualified as P
 
-import qualified Synapse.Tensor.Ops.Raw.Math as Raw
+import Synapse.Tensor.Ops.Raw.Math qualified as Raw
 
 -- | Send the seed unchanged to both operands.
 add
@@ -310,45 +310,108 @@ dot x y _ (Tensor gradient) =
     let scale = TensorElement (A.the gradient)
      in (map (* scale) y, map (* scale) x)
 
--- | Contract directly into each original input element, summing all broadcast batch copies.
-matmul
+-- | A flattened matrix operand with its batch shape and transpose flag.
+type MatrixOperand a = ([Int], Bool, A.Acc (A.Vector a))
+
+-- | Read an element from a broadcast matrix in its logical orientation.
+matrixElement
+    :: DType a
+    => [Int]
+    -> Int
+    -> Int
+    -> MatrixOperand a
+    -> A.Exp Int
+    -> A.Exp Int
+    -> A.Exp Int
+    -> A.Exp a
+matrixElement batchDims rows cols (sourceBatch, transposed, values) batch row col =
+    values A.! A.index1 (batchOffset + offset)
+  where
+    batchOffset = broadcastBatchIndex sourceBatch batchDims batch * A.constant (rows * cols)
+    offset
+        | transposed = col * A.constant rows + row
+        | otherwise = row * A.constant cols + col
+
+-- | Multiply matrices and sum any batch axes broadcast by the differentiated operand.
+gradientProduct
+    :: NumDType a
+    => [Int]
+    -> [Int]
+    -> (Int, Int, Int)
+    -> MatrixOperand a
+    -> MatrixOperand a
+    -> A.Acc (A.Vector a)
+gradientProduct batchDims targetBatch (rows, shared, cols) left@(lb, lt, xs) right@(rb, rt, ys)
+    | copies == 1 = Raw.matrixProduct lb rb batchDims rows shared cols lt rt xs ys
+    | otherwise = contract (product targetBatch * rows * cols) (copies * shared) $ \linear entry ->
+        let (matrixRow, col) = A.quotRem linear (A.constant cols)
+            (originalBatch, row) = A.quotRem matrixRow (A.constant rows)
+            (copy, inner) = A.quotRem entry (A.constant shared)
+            batch = expand originalBatch copy
+         in Raw.multiply
+                (matrixElement batchDims rows shared left batch row inner)
+                (matrixElement batchDims shared cols right batch inner col)
+  where
+    (copies, expand) = broadcastCopies targetBatch batchDims
+
+-- | Multiply the seed by the opposite operand's transpose for each input gradient.
+matmulWith
     :: forall lhs rhs out a
      . (Shape lhs, Shape rhs, Shape out, NumDType a)
-    => Tensor lhs a
+    => Bool
+    -> Bool
+    -> Tensor lhs a
     -> Tensor rhs a
     -> Tensor out a
     -> Tensor out a
     -> (Tensor lhs a, Tensor rhs a)
-matmul (Tensor left) (Tensor right) _ (Tensor gradient) =
-    ( Tensor (A.reshape (A.shape left) leftGradient)
-    , Tensor (A.reshape (A.shape right) rightGradient)
+matmulWith transposeLeft transposeRight (Tensor left) (Tensor right) _ (Tensor gradient) =
+    ( Tensor $ A.reshape (A.shape left) leftGradient
+    , Tensor $ A.reshape (A.shape right) rightGradient
     )
   where
-    (leftBatch, rows, shared) = matrixDimensions True (shape @lhs)
-    (rightBatch, _, cols) = matrixDimensions False (shape @rhs)
+    (leftBatch, rows, shared) = matrixDimensions True transposeLeft (shape @lhs)
+    (rightBatch, _, cols) = matrixDimensions False transposeRight (shape @rhs)
     batchDims = broadcastDimensions leftBatch rightBatch
-    (leftCopies, expandLeft) = broadcastCopies leftBatch batchDims
-    (rightCopies, expandRight) = broadcastCopies rightBatch batchDims
     leftVector = A.flatten left
     rightVector = A.flatten right
-    outputVector = A.flatten gradient
-    leftGradient = contract (shapeSize @lhs) (leftCopies * cols) $ \linear entry ->
-        let rowIndex = linear `A.quot` A.constant shared
-            inner = linear `A.rem` A.constant shared
-            row = rowIndex `A.rem` A.constant rows
-            originalBatch = rowIndex `A.quot` A.constant rows
-            batch = expandLeft originalBatch (entry `A.quot` A.constant cols)
-            col = entry `A.rem` A.constant cols
-            outputOffset = (batch * A.constant rows + row) * A.constant cols + col
-            rightOffset = (broadcastBatchIndex rightBatch batchDims batch * A.constant shared + inner) * A.constant cols + col
-         in Raw.multiply (outputVector A.! A.index1 outputOffset) (rightVector A.! A.index1 rightOffset)
-    rightGradient = contract (shapeSize @rhs) (rightCopies * rows) $ \linear entry ->
-        let col = linear `A.rem` A.constant cols
-            innerIndex = linear `A.quot` A.constant cols
-            inner = innerIndex `A.rem` A.constant shared
-            originalBatch = innerIndex `A.quot` A.constant shared
-            batch = expandRight originalBatch (entry `A.quot` A.constant rows)
-            row = entry `A.rem` A.constant rows
-            leftOffset = (broadcastBatchIndex leftBatch batchDims batch * A.constant rows + row) * A.constant shared + inner
-            outputOffset = (batch * A.constant rows + row) * A.constant cols + col
-         in Raw.multiply (leftVector A.! A.index1 leftOffset) (outputVector A.! A.index1 outputOffset)
+    seed = A.flatten gradient
+
+    leftGradient
+        | transposeLeft =
+            gradientProduct
+                batchDims
+                leftBatch
+                (shared, cols, rows)
+                (rightBatch, transposeRight, rightVector)
+                (batchDims, True, seed)
+        | otherwise =
+            gradientProduct
+                batchDims
+                leftBatch
+                (rows, cols, shared)
+                (batchDims, False, seed)
+                (rightBatch, not transposeRight, rightVector)
+
+    (productBatch, productLeftBatch, productRightBatch, productRows)
+        | not transposeLeft
+        , leftBatch == batchDims
+        , product rightBatch == 1 =
+            ([], [], [], product batchDims * rows)
+        | otherwise = (batchDims, leftBatch, rightBatch, rows)
+
+    rightGradient
+        | transposeRight =
+            gradientProduct
+                productBatch
+                productRightBatch
+                (cols, productRows, shared)
+                (productBatch, True, seed)
+                (productLeftBatch, transposeLeft, leftVector)
+        | otherwise =
+            gradientProduct
+                productBatch
+                productRightBatch
+                (shared, productRows, cols)
+                (productLeftBatch, not transposeLeft, leftVector)
+                (productBatch, False, seed)

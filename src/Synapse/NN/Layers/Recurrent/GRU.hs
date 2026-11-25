@@ -36,6 +36,30 @@ data GRU (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = GRU
 instance TensorStructure (GRU input hidden T.Tensor a) where
     type WithTensor t (GRU input hidden T.Tensor a) = GRU input hidden t a
 
+-- | Advance the GRU gates from a precomputed input projection.
+gruStep
+    :: forall hidden batch t a
+     . ( KnownNat hidden
+       , KnownNat batch
+       , KnownNat (3 * hidden)
+       , TensorOps t a
+       , FloatingDType a
+       , OrdDType a
+       , Num (t '[batch, 3 * hidden] a)
+       , Floating (t '[batch, hidden] a)
+       )
+    => (t '[hidden, 3 * hidden] a, t '[3 * hidden] a)
+    -> t '[batch, 3 * hidden] a
+    -> State (t '[batch, hidden] a) (t '[batch, hidden] a)
+gruStep (weights, bias) projected = state $ \previous ->
+    let (xr, xz, xn) = split3 projected
+        (hr, hz, hn) = split3 $ matmul previous weights + broadcast bias
+        reset = sigmoid $ xr + hr
+        update = sigmoid $ xz + hz
+        candidate = tanh $ xn + reset * hn
+        next = (1 - update) * candidate + update * previous
+     in (next, next)
+
 {- | Apply one GRU step, reading and replacing the hidden tensor through 'State'.
 
 For input projections @(xr, xz, xn)@ and recurrent projections @(hr, hz, hn)@:
@@ -62,14 +86,10 @@ gruCell
     => GRU input hidden t a
     -> t '[batch, input] a
     -> State (t '[batch, hidden] a) (t '[batch, hidden] a)
-gruCell parameters input = state $ \previous ->
-    let (xr, xz, xn) = split3 $ matmul input (gruInputWeights parameters) + broadcast (gruInputBias parameters)
-        (hr, hz, hn) = split3 $ matmul previous (gruHiddenWeights parameters) + broadcast (gruHiddenBias parameters)
-        reset = sigmoid $ xr + hr
-        update = sigmoid $ xz + hz
-        candidate = tanh $ xn + reset * hn
-        next = (1 - update) * candidate + update * previous
-     in (next, next)
+gruCell parameters input =
+    gruStep
+        (gruHiddenWeights parameters, gruHiddenBias parameters)
+        (matmul input (gruInputWeights parameters) + broadcast (gruInputBias parameters))
 
 -- | Apply one GRU layer to @'[time, batch, input]@.
 gru
@@ -88,7 +108,7 @@ gru
     -> State (t '[batch, hidden] a) (t '[time, batch, hidden] a)
 gru parameters =
     sequenceHidden
-        (\((w, r), (b, c)) -> gruCell $ GRU w r b c)
+        gruStep
         ( (gruInputWeights parameters, gruHiddenWeights parameters)
         , (gruInputBias parameters, gruHiddenBias parameters)
         )

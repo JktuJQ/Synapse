@@ -6,7 +6,7 @@
 module Synapse.Tensor.Ops.Raw.Math
     ( -- * Matrix products
       dot
-    , matmul
+    , matmulWith
 
       -- * Dimensions and batch broadcasting
     , matrixDimensions
@@ -20,16 +20,16 @@ module Synapse.Tensor.Ops.Raw.Math
     , matrixProduct
     ) where
 
-import qualified Data.Array.Accelerate as A
+import Data.Array.Accelerate qualified as A
 import Data.Proxy (Proxy (..))
 import Synapse.Tensor.Ops.Raw.Elementwise (zipWith)
-import qualified Synapse.Tensor.Ops.Raw.Reduction as Reduction
+import Synapse.Tensor.Ops.Raw.GEMM qualified as GEMM
+import Synapse.Tensor.Ops.Raw.Reduction qualified as Reduction
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorElement (..))
 import Synapse.Tensor.Shapes.Backend (backendShape, strides)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shape)
-import Synapse.Tensor.Shapes.Matmul (MatmulShape)
 import Prelude hiding (zipWith)
-import qualified Prelude as P
+import Prelude qualified as P
 
 -- | Sum pairwise products of equally sized vectors.
 dot
@@ -38,22 +38,6 @@ dot
     -> Tensor '[n] a
     -> Tensor '[] a
 dot x y = Reduction.sum (zipWith (*) x y)
-
--- | Multiply vectors or matrices, broadcasting leading batch dimensions.
-matmul
-    :: forall lhs rhs a
-     . (DType a, Num (TensorElement a), Shape lhs, Shape rhs, Shape (MatmulShape lhs rhs), P.Num a)
-    => Tensor lhs a
-    -> Tensor rhs a
-    -> Tensor (MatmulShape lhs rhs) a
-matmul (Tensor left) (Tensor right) =
-    Tensor $
-        A.reshape (A.constant (backendShape (Proxy @(MatmulShape lhs rhs)))) $
-            matrixProduct leftBatch rightBatch batchDims rows shared cols (A.flatten left) (A.flatten right)
-  where
-    (leftBatch, rows, shared) = matrixDimensions True (shape @lhs)
-    (rightBatch, _, cols) = matrixDimensions False (shape @rhs)
-    batchDims = broadcastDimensions leftBatch rightBatch
 
 -- | Decode a row-major position into one coordinate per dimension.
 coordinates
@@ -65,11 +49,14 @@ coordinates dims linear = P.zipWith (\dim stride -> linear `A.quot` A.constant s
 -- | Promote a left vector to a row or a right vector to a column.
 matrixDimensions
     :: Bool
+    -> Bool
     -> [Int]
     -> ([Int], Int, Int)
-matrixDimensions left dims = case reverse dims of
+matrixDimensions left transposed dims = case reverse dims of
     [features] -> if left then ([], 1, features) else ([], features, 1)
-    cols : rows : batch -> (reverse batch, rows, cols)
+    cols : rows : batch
+        | transposed -> (reverse batch, cols, rows)
+        | otherwise -> (reverse batch, rows, cols)
     [] -> error "Synapse.Tensor.matmul: scalar operand"
 
 -- | Combine trailing batch dimensions without materializing broadcast copies.
@@ -128,25 +115,6 @@ broadcastCopies source target
                 | otherwise = coordinate : merge rest remaining
          in sum (P.zipWith (*) (merge (zip [0 ..] fixed) varying) (P.map A.constant (strides target)))
 
--- | Store each right-hand column contiguously.
-packColumns
-    :: DType a
-    => Int
-    -> Int
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-packColumns shared cols input
-    | cols <= 1 || shared == 0 = input
-    | otherwise = A.compute $ A.backpermute (A.shape input) sourceIndex input
-  where
-    sourceIndex ix =
-        let linear = A.unindex1 ix
-            columnIndex = linear `A.quot` A.constant shared
-            inner = linear `A.rem` A.constant shared
-            batch = columnIndex `A.quot` A.constant cols
-            col = columnIndex `A.rem` A.constant cols
-         in A.index1 ((batch * A.constant shared + inner) * A.constant cols + col)
-
 -- | Multiply scalar expressions using the element arithmetic instance.
 multiply
     :: Num (TensorElement a)
@@ -166,16 +134,31 @@ contract
 contract count width term
     | count == 0 = A.use (A.fromList (A.Z A.:. 0) [])
     | width == 0 = A.fill (A.constant (A.Z A.:. count)) zero
-    | otherwise = A.fold plus zero $ A.generate (A.constant (A.Z A.:. count A.:. width)) $ \ix -> term (A.indexHead (A.indexTail ix)) (A.indexHead ix)
+    | otherwise =
+        A.fold (\x y -> unTensorElement (TensorElement x + TensorElement y)) zero $
+            A.generate (A.constant (A.Z A.:. count A.:. width)) $ \ix ->
+                term (A.indexHead (A.indexTail ix)) (A.indexHead ix)
   where
     zero = unTensorElement (0 :: TensorElement a)
-    plus
-        :: A.Exp a
-        -> A.Exp a
-        -> A.Exp a
-    plus x y = unTensorElement (TensorElement x + TensorElement y)
 
--- | Contract matrix products while mapping shared batch positions back to each operand.
+-- | Transpose each matrix in a flattened row-major batch.
+transposeMatrices
+    :: DType a
+    => Int
+    -> Int
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+transposeMatrices rows cols input =
+    A.generate (A.shape input) $ \ix ->
+        let linear = A.unindex1 ix
+            area = A.constant (rows * cols)
+            batch = linear `A.quot` area
+            position = linear `A.rem` area
+            row = position `A.quot` A.constant rows
+            col = position `A.rem` A.constant rows
+         in input A.! A.index1 (batch * area + col * A.constant cols + row)
+
+-- | Contract possibly transposed matrices across a broadcast batch.
 matrixProduct
     :: (DType a, Num (TensorElement a), P.Num a)
     => [Int]
@@ -184,17 +167,71 @@ matrixProduct
     -> Int
     -> Int
     -> Int
+    -> Bool
+    -> Bool
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector a)
     -> A.Acc (A.Vector a)
-matrixProduct leftBatch rightBatch batchDims rows shared cols left right =
-    contract (product batchDims * rows * cols) shared $ \linear inner ->
+matrixProduct leftBatch rightBatch batchDims rows shared cols transposeLeft transposeRight left right
+    | not transposeLeft && product rightBatch == 1 && leftBatch == batchDims =
+        GEMM.matrixProduct 1 (batches * rows) shared cols 0 0 False transposeRight left right fallback
+    | regular leftBatch && regular rightBatch =
+        GEMM.matrixProduct
+            batches
+            rows
+            shared
+            cols
+            leftStride
+            rightStride
+            transposeLeft
+            transposeRight
+            left
+            right
+            fallback
+    | otherwise = fallback left right
+  where
+    batches = product batchDims
+    regular dims = dims == batchDims || product dims == 1
+    leftStride = if product leftBatch == 1 then 0 else rows * shared
+    rightStride = if product rightBatch == 1 then 0 else shared * cols
+    fallback lhs rhs = contract (batches * rows * cols) shared $ \linear inner ->
         let rowIndex = linear `A.quot` A.constant cols
             row = rowIndex `A.rem` A.constant rows
             batch = rowIndex `A.quot` A.constant rows
             col = linear `A.rem` A.constant cols
             leftOffset = (broadcastBatchIndex leftBatch batchDims batch * A.constant rows + row) * A.constant shared
             rightOffset = (broadcastBatchIndex rightBatch batchDims batch * A.constant cols + col) * A.constant shared
-         in multiply (left A.! A.index1 (leftOffset + inner)) (packedRight A.! A.index1 (rightOffset + inner))
+         in multiply (rowMajorLeft A.! A.index1 (leftOffset + inner)) (packedRight A.! A.index1 (rightOffset + inner))
+      where
+        rowMajorLeft = if transposeLeft then transposeMatrices shared rows lhs else lhs
+        packedRight
+            | transposeRight || cols <= 1 || shared == 0 = rhs
+            | otherwise = A.compute $ transposeMatrices shared cols rhs
+
+-- | Multiply vectors or matrices, broadcasting leading batch dimensions.
+matmulWith
+    :: forall lhs rhs out a
+     . (DType a, Num (TensorElement a), Shape lhs, Shape rhs, Shape out, P.Num a)
+    => Bool
+    -> Bool
+    -> Tensor lhs a
+    -> Tensor rhs a
+    -> Tensor out a
+matmulWith transposeLeft transposeRight (Tensor left) (Tensor right) =
+    Tensor $
+        A.reshape (A.constant (backendShape (Proxy @out))) $
+            matrixProduct
+                leftBatch
+                rightBatch
+                batchDims
+                rows
+                shared
+                cols
+                transposeLeft
+                transposeRight
+                (A.flatten left)
+                (A.flatten right)
   where
-    packedRight = packColumns shared cols right
+    (leftBatch, rows, shared) = matrixDimensions True transposeLeft (shape @lhs)
+    (rightBatch, _, cols) = matrixDimensions False transposeRight (shape @rhs)
+    batchDims = broadcastDimensions leftBatch rightBatch

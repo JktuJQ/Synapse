@@ -13,7 +13,7 @@ import Synapse.Tensor.Ops.Definition (TensorOps)
 import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Shape (broadcast)
 import Synapse.Tensor.Representation (TensorLike)
-import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Representation qualified as T
 import Synapse.Tensor.Structure (TensorStructure, WithTensor)
 
 {- | Input and recurrent projections for one recurrent layer.
@@ -32,6 +32,16 @@ data RNN (input :: Nat) (hidden :: Nat) (t :: TensorLike) a = RNN
 instance TensorStructure (RNN input hidden T.Tensor a) where
     type WithTensor t (RNN input hidden T.Tensor a) = RNN input hidden t a
 
+-- | Advance the hidden state from a precomputed input projection.
+rnnStep
+    :: (KnownNat hidden, KnownNat batch, TensorOps t a, NumDType a, Floating (t '[batch, hidden] a))
+    => (t '[hidden, hidden] a, t '[hidden] a)
+    -> t '[batch, hidden] a
+    -> State (t '[batch, hidden] a) (t '[batch, hidden] a)
+rnnStep (weights, bias) projected = state $ \previous ->
+    let next = tanh $ projected + matmul previous weights + broadcast bias
+     in (next, next)
+
 -- | Apply @h' = tanh (x * W_input + b_input + h * W_hidden + b_hidden)@.
 rnnCell
     :: forall input hidden batch t a
@@ -39,14 +49,10 @@ rnnCell
     => RNN input hidden t a
     -> t '[batch, input] a
     -> State (t '[batch, hidden] a) (t '[batch, hidden] a)
-rnnCell parameters input = state $ \previous ->
-    let next =
-            tanh $
-                matmul input (rnnInputWeights parameters)
-                    + broadcast (rnnInputBias parameters)
-                    + matmul previous (rnnHiddenWeights parameters)
-                    + broadcast (rnnHiddenBias parameters)
-     in (next, next)
+rnnCell parameters input =
+    rnnStep
+        (rnnHiddenWeights parameters, rnnHiddenBias parameters)
+        (matmul input (rnnInputWeights parameters) + broadcast (rnnInputBias parameters))
 
 {- | Apply one tanh recurrent layer to a time-major sequence.
 Input shape is @'[time, batch, input]@ and output shape is @'[time, batch, hidden]@.
@@ -63,7 +69,7 @@ rnn
     -> State (t '[batch, hidden] a) (t '[time, batch, hidden] a)
 rnn parameters =
     sequenceHidden
-        (\((w, r), (b, c)) -> rnnCell $ RNN w r b c)
+        rnnStep
         ( (rnnInputWeights parameters, rnnHiddenWeights parameters)
         , (rnnInputBias parameters, rnnHiddenBias parameters)
         )

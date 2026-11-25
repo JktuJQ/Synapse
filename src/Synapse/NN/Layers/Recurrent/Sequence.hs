@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Sequence traversal shared by RNN, GRU and LSTM.
-module Synapse.NN.Layers.Recurrent.Sequence (sequenceMemory, sequenceHidden, item, writeItem, packState, unpackState) where
+module Synapse.NN.Layers.Recurrent.Sequence (projectSequence, projectSequenceBackward, sequenceHidden, item, writeItem) where
 
 import Control.Monad.Trans.State.Strict (State, runState, state)
 import Data.Array.Accelerate qualified as A
@@ -12,10 +12,11 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeNats (KnownNat, natVal)
 import Synapse.Autograd.Execution qualified as AG
 import Synapse.Tensor.Ops.Constraints (FloatingDType, NumDType, OrdDType)
-import Synapse.Tensor.Ops.Definition (TensorOps (..))
+import Synapse.Tensor.Ops.Definition (TensorOps (..), withVJP)
 import Synapse.Tensor.Ops.Logic qualified as E
-import Synapse.Tensor.Ops.Math ()
+import Synapse.Tensor.Ops.Math (matmul)
 import Synapse.Tensor.Ops.Raw.Construction (full)
+import Synapse.Tensor.Ops.Shape (broadcast)
 import Synapse.Tensor.Representation (DType, Tensor (..), TensorLike)
 import Synapse.Tensor.Shapes.Backend (backendShape)
 import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
@@ -24,10 +25,13 @@ import Synapse.Tensor.Shapes.Dimensions (Shape, shapeSize)
 type Weights (t :: TensorLike) input hidden gates a =
     ((t '[input, gates] a, t '[hidden, gates] a), (t '[gates] a, t '[gates] a))
 
+-- | Hidden projection weights and bias used by each recurrent step.
+type RecurrentWeights t hidden gates a = (t '[hidden, gates] a, t '[gates] a)
+
 type Memory (t :: TensorLike) batch hidden memory a = (t '[batch, hidden] a, t '[batch, memory] a)
 
-type Arguments t time batch input hidden gates memory a =
-    (Weights t input hidden gates a, (t '[time, batch, input] a, Memory t batch hidden memory a))
+type Arguments t time batch hidden gates memory a =
+    (RecurrentWeights t hidden gates a, (t '[time, batch, gates] a, Memory t batch hidden memory a))
 
 type Result t time batch hidden memory a =
     (t '[time, batch, hidden] a, Memory t batch hidden memory a)
@@ -47,24 +51,29 @@ unpackState
     -> Memory Tensor batch hidden memory a
 unpackState value = let (hidden, memory) = A.unlift value in (Tensor hidden, Tensor memory)
 
-packWeights
-    :: DType a
-    => Weights Tensor input hidden gates a
-    -> A.Acc ((A.Matrix a, A.Matrix a), (A.Vector a, A.Vector a))
-packWeights ((Tensor w, Tensor r), (Tensor b, Tensor c)) =
-    A.lift ((w, r), (b, c))
+-- | Project all time steps with one matrix multiplication.
+projectSequence
+    :: forall time batch input gates t a
+     . ( KnownNat time
+       , KnownNat batch
+       , KnownNat input
+       , KnownNat gates
+       , TensorOps t a
+       , NumDType a
+       , Num (t '[time, batch, gates] a)
+       )
+    => (t '[input, gates] a, t '[gates] a, t '[time, batch, input] a)
+    -> t '[time, batch, gates] a
+projectSequence (weights, bias, inputs) = matmul inputs weights + broadcast bias
 
-unpackWeights
-    :: forall input hidden gates a
-     . DType a
-    => A.Acc ((A.Matrix a, A.Matrix a), (A.Vector a, A.Vector a))
-    -> Weights Tensor input hidden gates a
-unpackWeights value =
-    let (matrices, biases) =
-            A.unlift value :: (A.Acc (A.Matrix a, A.Matrix a), A.Acc (A.Vector a, A.Vector a))
-        (w, r) = A.unlift matrices
-        (b, c) = A.unlift biases
-     in ((Tensor w, Tensor r), (Tensor b, Tensor c))
+-- | Differentiate the projection using seeds for the entire sequence.
+projectSequenceBackward
+    :: forall time batch input gates a
+     . (KnownNat time, KnownNat batch, KnownNat input, KnownNat gates, FloatingDType a)
+    => (Tensor '[input, gates] a, Tensor '[gates] a, Tensor '[time, batch, input] a)
+    -> Tensor '[time, batch, gates] a
+    -> (Tensor '[input, gates] a, Tensor '[gates] a, Tensor '[time, batch, input] a)
+projectSequenceBackward = snd . AG.pullback (projectSequence @time @batch @input @gates)
 
 -- Select or replace one time step. Output ranges of different steps are disjoint.
 item
@@ -116,15 +125,15 @@ readHistory i history = Tensor $
 
 -- Only differentiated execution saves states; ordinary execution uses empty histories.
 traverseSequence
-    :: forall time batch input hidden gates memory a
-     . (KnownNat time, KnownNat batch, KnownNat input, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
+    :: forall time batch hidden gates memory a
+     . (KnownNat time, KnownNat batch, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
     => Bool
-    -> ( Weights Tensor input hidden gates a
-         -> Tensor '[batch, input] a
+    -> ( RecurrentWeights Tensor hidden gates a
+         -> Tensor '[batch, gates] a
          -> Memory Tensor batch hidden memory a
          -> (Tensor '[batch, hidden] a, Memory Tensor batch hidden memory a)
        )
-    -> Arguments Tensor time batch input hidden gates memory a
+    -> Arguments Tensor time batch hidden gates memory a
     -> (Result Tensor time batch hidden memory a, A.Acc (History a))
 traverseSequence retainHistory step (parameters, (inputs, initial)) =
     let unliftLoop value =
@@ -166,25 +175,25 @@ traverseSequence retainHistory step (parameters, (inputs, initial)) =
 
 -- Recompute each cell's intermediates from its saved input state.
 backward
-    :: forall time batch input hidden gates memory a
-     . (KnownNat time, KnownNat batch, KnownNat input, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
-    => ( ( Weights Tensor input hidden gates a
-         , (Tensor '[batch, input] a, Memory Tensor batch hidden memory a)
+    :: forall time batch hidden gates memory a
+     . (KnownNat time, KnownNat batch, KnownNat hidden, KnownNat gates, KnownNat memory, NumDType a)
+    => ( ( RecurrentWeights Tensor hidden gates a
+         , (Tensor '[batch, gates] a, Memory Tensor batch hidden memory a)
          )
          -> (Tensor '[batch, hidden] a, Memory Tensor batch hidden memory a)
-         -> ( Weights Tensor input hidden gates a
-            , (Tensor '[batch, input] a, Memory Tensor batch hidden memory a)
+         -> ( RecurrentWeights Tensor hidden gates a
+            , (Tensor '[batch, gates] a, Memory Tensor batch hidden memory a)
             )
        )
-    -> (Arguments Tensor time batch input hidden gates memory a, A.Acc (History a))
+    -> (Arguments Tensor time batch hidden gates memory a, A.Acc (History a))
     -> Result Tensor time batch hidden memory a
-    -> Arguments Tensor time batch input hidden gates memory a
+    -> Arguments Tensor time batch hidden gates memory a
 backward step ((parameters, (inputs, initial)), history) (seeds, finalSeed) =
     let unliftLoop value =
             A.unlift value
                 :: ( A.Acc (A.Scalar Int)
                    , A.Acc (A.Matrix a, A.Matrix a)
-                   , A.Acc ((A.Matrix a, A.Matrix a), (A.Vector a, A.Vector a))
+                   , A.Acc (A.Matrix a, A.Vector a)
                    , A.Acc (A.Array A.DIM3 a)
                    )
         count = fromIntegral $ natVal $ Proxy @time
@@ -199,14 +208,14 @@ backward step ((parameters, (inputs, initial)), history) (seeds, finalSeed) =
                             ( readHistory @'[batch, hidden] (i - 1) hs
                             , readHistory @'[batch, memory] (i - 1) cs
                             )
-                (((dw, dr), (db, dc)), (dx, ds)) =
+                ((dr, dc), (dx, ds)) =
                     step (parameters, (item i inputs, unpackState previous)) (item i seeds, unpackState stateSeed)
-                ((w, r), (b, c)) = unpackWeights parameterSeed
-                Tensor nextInputs = writeItem i dx (Tensor inputSeeds :: Tensor '[time, batch, input] a)
+                A.T2 r c = parameterSeed
+                Tensor nextInputs = writeItem i dx (Tensor inputSeeds :: Tensor '[time, batch, gates] a)
              in A.lift
                     ( A.map (subtract 1) index
                     , packState ds
-                    , packWeights ((w + dw, r + dr), (b + db, c + dc))
+                    , A.T2 (unTensor (Tensor r + dr)) (unTensor (Tensor c + dc))
                     , nextInputs
                     )
         (_, stateGradient, parameterGradient, inputGradient) =
@@ -215,19 +224,16 @@ backward step ((parameters, (inputs, initial)), history) (seeds, finalSeed) =
                     A.lift
                         ( A.unit $ A.constant count
                         , packState finalSeed
-                        , packWeights
-                            ( (full @'[input, gates] 0, full @'[hidden, gates] 0)
-                            , (full @'[gates] 0, full @'[gates] 0)
-                            )
-                        , unTensor $ full @'[time, batch, input] 0
+                        , A.T2 (unTensor $ full @'[hidden, gates] 0) (unTensor $ full @'[gates] 0)
+                        , unTensor $ full @'[time, batch, gates] 0
                         )
-     in (unpackWeights parameterGradient, (Tensor inputGradient, unpackState stateGradient))
+        A.T2 dr dc = parameterGradient
+     in ((Tensor dr, Tensor dc), (Tensor inputGradient, unpackState stateGradient))
 
 sequenceMemory
-    :: forall time batch input hidden gates memory t a
+    :: forall time batch hidden gates memory t a
      . ( KnownNat time
        , KnownNat batch
-       , KnownNat input
        , KnownNat hidden
        , KnownNat gates
        , KnownNat memory
@@ -240,12 +246,12 @@ sequenceMemory
             , forall sh. Shape sh => Floating (u sh a)
             , forall sh. Shape sh => E.Ord (u sh a)
             )
-         => Weights u input hidden gates a
-         -> u '[batch, input] a
+         => RecurrentWeights u hidden gates a
+         -> u '[batch, gates] a
          -> State (Memory u batch hidden memory a) (u '[batch, hidden] a)
        )
-    -> Weights t input hidden gates a
-    -> t '[time, batch, input] a
+    -> RecurrentWeights t hidden gates a
+    -> t '[time, batch, gates] a
     -> State (Memory t batch hidden memory a) (t '[time, batch, hidden] a)
 sequenceMemory step parameters inputs = state $ \initial ->
     customVJP
@@ -278,23 +284,29 @@ sequenceHidden
             , forall sh. Shape sh => Floating (u sh a)
             , forall sh. Shape sh => E.Ord (u sh a)
             )
-         => Weights u input hidden gates a
-         -> u '[batch, input] a
+         => RecurrentWeights u hidden gates a
+         -> u '[batch, gates] a
          -> State (u '[batch, hidden] a) (u '[batch, hidden] a)
        )
     -> Weights t input hidden gates a
     -> t '[time, batch, input] a
     -> State (t '[batch, hidden] a) (t '[time, batch, hidden] a)
-sequenceHidden step parameters inputs = state $ \initial ->
-    let (outputs, (final, _)) =
+sequenceHidden step ((w, r), (b, c)) inputs = state $ \initial ->
+    let projected =
+            withVJP
+                (Proxy @(() :: Constraint))
+                (projectSequence @time @batch @input @gates)
+                (\arguments _ -> projectSequenceBackward @time @batch @input @gates arguments)
+                (w, b, inputs)
+        (outputs, (final, _)) =
             runState
                 ( sequenceMemory
                     ( \p x -> state $ \(h, memory) ->
                         let (output, next) = runState (step p x) h
                          in (output, (next, memory))
                     )
-                    parameters
-                    inputs
+                    (r, c)
+                    projected
                 )
                 (initial, fromTensor (full @'[batch, 0] 0))
      in (outputs, final)

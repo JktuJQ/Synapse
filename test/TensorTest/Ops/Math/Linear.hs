@@ -1,12 +1,12 @@
 module TensorTest.Ops.Math.Linear (tests) where
 
 import Data.List (transpose)
-import qualified Hedgehog as H
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
-import qualified Synapse.Tensor as T
-import qualified Synapse.Tensor.Shapes.Matmul as M
-import qualified TensorTest.Compiler as Compiler
+import Hedgehog qualified as H
+import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
+import Synapse.Tensor qualified as T
+import Synapse.Tensor.Shapes.Matmul qualified as M
+import TensorTest.Compiler qualified as Compiler
 import TensorTest.Support (approxList)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Hedgehog (testProperty)
@@ -70,6 +70,21 @@ propFloating = H.property $ do
         H.=== [3, 4]
     values (T.matmul (T.ones @'[1, 1] @Float) (T.ones @'[1, 1])) H.=== [1]
     values (T.matmul (T.ones @'[2, 3] @Float) (T.ones @'[3])) H.=== [3, 3]
+
+propFloatingBatches :: H.Property
+propFloatingBatches = H.property $ do
+    let left = [1 .. 12] :: [Double]
+        right = [1 .. 18] :: [Double]
+        paired = concat $ zipWith (reference 3 3) (chunks 6 left) (chunks 9 right)
+        broadcast = concat [reference 3 3 x y | x <- chunks 6 left, y <- chunks 9 right]
+    approxList (values (T.matmul (T.fromList @'[2, 2, 3] left) (T.fromList @'[2, 3, 3] right))) paired
+    approxList (values (T.matmul (T.fromList @'[2, 1, 2, 3] left) (T.fromList @'[1, 2, 3, 3] right))) broadcast
+    values
+        ( T.matmul
+            (T.fromList @'[2, 3] (map realToFrac (take 6 left) :: [Float]))
+            (T.fromList @'[3, 3] (map realToFrac (take 9 right)))
+        )
+        H.=== map realToFrac (take 6 paired)
 
 propEmpty :: H.Property
 propEmpty = H.property $ do
@@ -149,6 +164,9 @@ tests =
         , testProperty "vectors broadcast across matrix batches" propBatchedVectors
         , testProperty "singleton batch dimensions broadcast on both sides" propBroadcastBatches
         , testProperty "floating products compose with tensor computations" (H.withTests 1 propFloating)
+        , testProperty
+            "floating batch GEMM preserves batch pairing and broadcasting"
+            (H.withTests 1 propFloatingBatches)
         , testProperty "zero dimensions and empty vectors are supported" (H.withTests 1 propEmpty)
         , testProperty "output shapes preserve batches" (H.withTests 1 propShapes)
         , testProperty

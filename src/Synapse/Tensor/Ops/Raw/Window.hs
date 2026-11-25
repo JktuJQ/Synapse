@@ -27,7 +27,6 @@ module Synapse.Tensor.Ops.Raw.Window
       -- * Convolution
     , convolve
     , transposeConvolve
-    , transposeMatrix
     , outputMatrix
     , convolution
     , convolutionCached
@@ -335,21 +334,6 @@ groupCount
     => Int
 groupCount = fromIntegral $ natVal $ Proxy @groups
 
--- | Transpose each group matrix without expanding channels across groups.
-transposeMatrix
-    :: DType a
-    => Int
-    -> Int
-    -> Int
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-transposeMatrix groups rows cols input =
-    A.flatten $
-        A.backpermute (A.constant $ A.Z A.:. groups A.:. cols A.:. rows) source $
-            A.reshape (A.constant $ A.Z A.:. groups A.:. rows A.:. cols) input
-  where
-    source ix = A.index3 (A.indexHead $ A.indexTail $ A.indexTail ix) (A.indexHead ix) (A.indexHead $ A.indexTail ix)
-
 -- | Reorder channels-first output into an output-channel-by-position matrix.
 outputMatrix
     :: DType a
@@ -367,17 +351,7 @@ outputMatrix dims cout input = A.generate (A.constant $ A.Z A.:. (cout * batches
   where
     spatial = product $ outputSizes dims
 
--- | Multiply kernels by windows and restore channels-first output order.
-convolve
-    :: (DType a, Num (TensorElement a), P.Num a)
-    => Window
-    -> Int
-    -> Int
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-convolve dims cout groups input = convolveWindows dims cout groups (A.flatten $ extract dims input)
-
+-- | Contract extracted windows and restore channels-first output order.
 convolveWindows
     :: (DType a, Num (TensorElement a), P.Num a)
     => Window
@@ -395,8 +369,18 @@ convolveWindows dims cout groups windows weights = A.generate (A.constant $ A.Z 
     spatial = product $ outputSizes dims
     positions = batches dims * spatial
     shared = channels dims `div` groups * product (kernelSizes dims)
-    result =
-        matrixProduct [groups] [groups] [groups] (cout `div` groups) shared positions weights windows
+    result = matrixProduct [groups] [groups] [groups] (cout `div` groups) shared positions False False weights windows
+
+-- | Multiply kernels by windows and restore channels-first output order.
+convolve
+    :: (DType a, Num (TensorElement a), P.Num a)
+    => Window
+    -> Int
+    -> Int
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+convolve dims cout groups input = convolveWindows dims cout groups (A.flatten $ extract dims input)
 
 -- | Apply the transpose of a convolution's linear input mapping.
 transposeConvolve
@@ -411,16 +395,10 @@ transposeConvolve dims cout groups weights input = combine dims $ A.reshape (A.c
   where
     shared = channels dims `div` groups * product (kernelSizes dims)
     positions = batches dims * product (outputSizes dims)
+    outputChannels = cout `div` groups
     patches =
-        matrixProduct
-            [groups]
-            [groups]
-            [groups]
-            shared
-            (cout `div` groups)
-            positions
-            (transposeMatrix groups (cout `div` groups) shared weights)
-            (outputMatrix dims cout input)
+        matrixProduct [groups] [groups] [groups] shared outputChannels positions True False weights $
+            outputMatrix dims cout input
 
 -- | Apply grouped cross-correlation with the validated output shape.
 convolution

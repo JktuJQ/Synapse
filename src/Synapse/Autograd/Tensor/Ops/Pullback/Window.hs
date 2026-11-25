@@ -60,18 +60,7 @@ combinePatches (Tensor patches) _ (Tensor seed) = Tensor $ A.reshape (A.shape pa
   where
     dims = Raw.window (shape @out) (shape @kernel) (shape @stride) (shape @padding) (shape @dilation)
 
--- | Contract an input's windows with channels-first output contributions.
-kernelGradient
-    :: (DType a, Num (TensorElement a), Num a)
-    => Window
-    -> Int
-    -> Int
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-    -> A.Acc (A.Vector a)
-kernelGradient dims cout groups input =
-    kernelGradientFromWindows dims cout groups (A.flatten $ Raw.extract dims input)
-
+-- | Contract output seeds with the extracted windows.
 kernelGradientFromWindows
     :: (DType a, Num (TensorElement a), Num a)
     => Window
@@ -85,14 +74,29 @@ kernelGradientFromWindows dims cout groups windows seed =
         [groups]
         [groups]
         [groups]
-        (cout `div` groups)
+        outputChannels
         positions
         shared
-        (Raw.outputMatrix dims cout seed) $
-        Raw.transposeMatrix groups shared positions windows
+        False
+        True
+        (Raw.outputMatrix dims cout seed)
+        windows
   where
+    outputChannels = cout `div` groups
     shared = channels dims `div` groups * product (kernelSizes dims)
     positions = batches dims * product (outputSizes dims)
+
+-- | Extract the input windows and compute the kernel gradient.
+kernelGradient
+    :: (DType a, Num (TensorElement a), Num a)
+    => Window
+    -> Int
+    -> Int
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+    -> A.Acc (A.Vector a)
+kernelGradient dims cout groups input =
+    kernelGradientFromWindows dims cout groups (A.flatten $ Raw.extract dims input)
 
 -- | Differentiate kernels and inputs through the same spatial window mapping.
 convolution

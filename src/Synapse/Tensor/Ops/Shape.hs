@@ -27,13 +27,13 @@ module Synapse.Tensor.Ops.Shape
 import Data.Kind (Constraint)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, type (*))
-import qualified Synapse.Autograd.Tensor.Ops.Pullback.Shape as Pullback
+import Synapse.Autograd.Tensor.Ops.Pullback.Shape qualified as Pullback
 import Synapse.Tensor.Ops.Constraints (NumDType)
 import Synapse.Tensor.Ops.Definition (TensorOps (..), withCachedVJP, withVJP)
-import qualified Synapse.Tensor.Ops.Raw.Reduction as RawReduction
-import qualified Synapse.Tensor.Ops.Raw.Shape as Raw
+import Synapse.Tensor.Ops.Raw.Reduction qualified as RawReduction
+import Synapse.Tensor.Ops.Raw.Shape qualified as Raw
 import Synapse.Tensor.Representation (TensorLike)
-import qualified Synapse.Tensor.Representation as T
+import Synapse.Tensor.Representation qualified as T
 import Synapse.Tensor.Shapes.Axes
     ( Axes
     , CanReduce
@@ -45,7 +45,7 @@ import Synapse.Tensor.Shapes.Axes
     , RemoveAxis
     , TransposeShape
     )
-import qualified Synapse.Tensor.Shapes.Axes as Axes
+import Synapse.Tensor.Shapes.Axes qualified as Axes
 import Synapse.Tensor.Shapes.Broadcast (CanBroadcast)
 import Synapse.Tensor.Shapes.Dimensions (Shape)
 import Synapse.Tensor.Shapes.Reshape (CanReshape)
@@ -114,15 +114,16 @@ expandReduced reference =
 
 -- | Transpose the last two axes of a matrix or batched matrix.
 transpose
-    :: forall {t :: TensorLike} sh a
-     . (TensorOps t a, Shape sh, Shape (TransposeShape sh))
+    :: forall {t :: TensorLike} sh a {out}
+     . (TensorOps t a, Shape sh, out ~ TransposeShape sh, Shape out)
     => t sh a
-    -> t (TransposeShape sh) a
+    -> t out a
 transpose =
     withVJP
         (Proxy @(() :: Constraint))
         Raw.transpose
         Pullback.transpose
+{-# INLINE [1] transpose #-}
 
 -- | Reorder axes so each output axis corresponds to the specified input axis.
 permuteAxes

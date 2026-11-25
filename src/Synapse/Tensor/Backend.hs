@@ -449,6 +449,8 @@ Set @ACCELERATE_LLVM_NATIVE_THREADS@ for CPU workers or
 For a CPU splice, list @accelerate-llvm-native@ directly in the Cabal @build-depends@ of the component that contains the splice.
 GHC loads the compiler plugin from that package when building the component.
 GPU does not need this to be compiled ahead of time.
+Build with @-blas@ for programs containing matrix products that would use BLAS.
+Accelerate cannot embed foreign GEMM callbacks in a splice.
 -}
 run'
     :: forall f

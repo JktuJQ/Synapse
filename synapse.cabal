@@ -32,6 +32,11 @@ source-repository head
   location: https://github.com/JktuJQ/Synapse
 
 
+flag blas
+    description: Enable CBLAS on CPU and cuBLAS with the GPU backend.
+    default:     False
+    manual:      True
+
 flag gpu
     description: Enable LLVM PTX backend.
     default:     False
@@ -141,11 +146,11 @@ library
                     , Synapse.Autograd.Tensor.Ops.Pullback.Reduction
                     , Synapse.Autograd.Tensor.Ops.Pullback.Shape
                     , Synapse.Autograd.Tensor.Ops.Pullback.Window
-                    , Synapse.NN.Layers.Recurrent.LSTMSequence
                     , Synapse.NN.Layers.Recurrent.Sequence
                     , Synapse.Tensor.Ops.Definition
                     , Synapse.Tensor.Ops.Raw.Construction
                     , Synapse.Tensor.Ops.Raw.Elementwise
+                    , Synapse.Tensor.Ops.Raw.GEMM
                     , Synapse.Tensor.Ops.Raw.Index
                     , Synapse.Tensor.Ops.Raw.Math
                     , Synapse.Tensor.Ops.Raw.Random
@@ -154,6 +159,13 @@ library
                     , Synapse.Tensor.Ops.Raw.Window
                     , Synapse.Tensor.Structure.Constraints
                     , Synapse.Tensor.Structure.Product
+
+    if flag(blas)
+        cpp-options:      -DSYNAPSE_BLAS
+        extra-libraries:  blas
+
+        if flag(gpu)
+            extra-libraries: cublas
 
     if flag(gpu)
         cpp-options:   -DSYNAPSE_GPU
